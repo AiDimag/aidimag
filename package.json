@@ -27,7 +27,9 @@
   "files": [
     "dist",
     "!dist/test",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "LICENSE",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
