@@ -603,12 +603,17 @@ async function runSync() {
     const r = await api("/api/sync", { method: "POST" });
     const mem = (n) => n + (n === 1 ? " memory" : " memories");
     let msg;
-    if (r.memoriesPushed) msg = "Sent " + mem(r.memoriesPushed);
+    if (r.autoRecovered) {
+      msg = "✓ Auto-recovery: restored memories from cloud";
+      if (r.applied) msg += " (" + r.applied + " recovered)";
+    } else if (r.memoriesPushed) msg = "Sent " + mem(r.memoriesPushed);
     else if (r.memoriesQueued) msg = "Already on server (" + mem(r.memoriesQueued) + " unchanged)";
     else msg = "Nothing to send";
-    if (r.applied) msg += ", received " + r.applied + " update" + (r.applied === 1 ? "" : "s");
-    else if (r.pulled) msg += ", pulled " + r.pulled + " (already up to date locally)";
-    else msg += ", nothing new from team";
+    if (!r.autoRecovered) {
+      if (r.applied) msg += ", received " + r.applied + " update" + (r.applied === 1 ? "" : "s");
+      else if (r.pulled) msg += ", pulled " + r.pulled + " (already up to date locally)";
+      else msg += ", nothing new from team";
+    }
     if (r.needsFullUploadConfirm) {
       msg += " — run dim sync in terminal to confirm upload";
     }
@@ -635,7 +640,11 @@ function openCloud() {
   if (c) {
     document.getElementById("cl-server").value = c.server;
     document.getElementById("cl-brain").value = c.brain;
+  } else {
+    document.getElementById("cl-server").value = "";
+    document.getElementById("cl-brain").value = "";
   }
+  document.getElementById("cl-token").value = "";
   document.getElementById("dlg-cloud").showModal();
 }
 

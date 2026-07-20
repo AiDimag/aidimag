@@ -42,7 +42,9 @@ export function readCloudConfig(repoRoot: string): CloudConfig | null {
   if (!existsSync(p)) return null;
   try {
     const cfg = JSON.parse(readFileSync(p, "utf8"));
-    return cfg.server && cfg.brain ? { server: cfg.server, brain: cfg.brain } : null;
+    const server = (cfg.server ?? "").trim();
+    const brain = (cfg.brain ?? "").trim();
+    return server && brain ? { server, brain } : null;
   } catch {
     return null;
   }
@@ -58,7 +60,9 @@ export function writeCloudConfig(repoRoot: string, cfg: CloudConfig): void {
   } catch {
     // fresh file
   }
-  writeFileSync(p, JSON.stringify({ ...existing, server: cfg.server, brain: cfg.brain }, null, 2) + "\n");
+  const server = cfg.server.trim();
+  const brain = cfg.brain.trim();
+  writeFileSync(p, JSON.stringify({ ...existing, server, brain }, null, 2) + "\n");
 }
 
 function credentialsPath(): string {
@@ -156,6 +160,8 @@ export interface SyncResult {
   pushSkipped: boolean;
   /** Remote brain is empty while local has memories — user was not asked or declined upload. */
   needsFullUploadConfirm?: boolean;
+  /** Auto-recovery detected local data loss and reset cursor to pull all remote data. */
+  autoRecovered?: boolean;
 }
 
 export interface SyncOptions {
@@ -163,6 +169,8 @@ export interface SyncOptions {
   full?: boolean;
   /** Called when local has memories missing on the remote; return true to run a full upload. */
   confirmFullUpload?: (localMemoryCount: number, remoteMemoryCount: number | null) => Promise<boolean>;
+  /** Reset pull cursor to 0 and fetch all remote data (useful for recovery after local DB corruption). */
+  forcePull?: boolean;
 }
 
 function formatFetchError(server: string, err: unknown): Error {
@@ -383,7 +391,21 @@ export async function sync(store: MemoryStore, repoRoot: string, opts: SyncOptio
   }
 
   // ---- pull
-  const cursor = parseInt(store.getMeta(cursorKey) ?? "0", 10);
+  let cursor = parseInt(store.getMeta(cursorKey) ?? "0", 10);
+  let autoRecovered = false;
+  
+  // Auto-recovery: if local is empty but cursor suggests we've synced before,
+  // and remote has data, reset cursor to pull everything (likely DB corruption/loss)
+  if (opts.forcePull || (localMemoryCount === 0 && cursor > 0)) {
+    const remoteCount = remoteMemoryCount ?? await getRemoteMemoryCount(cfg, token);
+    if (remoteCount && remoteCount > 0) {
+      cursor = 0;
+      store.setMeta(cursorKey, "0");
+      autoRecovered = true;
+      debugLog("sync", `Auto-recovery: local empty but remote has ${remoteCount} memories, resetting cursor to pull all`);
+    }
+  }
+  
   const pullRes = await api<{ items: SyncItem[]; seq: number }>(
     cfg,
     token,
@@ -440,6 +462,7 @@ export async function sync(store: MemoryStore, repoRoot: string, opts: SyncOptio
     pushQueued,
     pushSkipped,
     ...(needsFullUploadConfirm ? { needsFullUploadConfirm: true } : {}),
+    ...(autoRecovered ? { autoRecovered: true } : {}),
   };
 }
 
