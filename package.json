@@ -39,7 +39,7 @@
     "dev": "tsc --watch",
     "mcp": "node dist/mcp/server.js",
     "pretest": "tsc",
-    "test": "node --test \"dist/test/**/*.test.js\"",
+    "test": "node --test dist/test/*.test.js",
     "prepublishOnly": "npm run build && npm test",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
