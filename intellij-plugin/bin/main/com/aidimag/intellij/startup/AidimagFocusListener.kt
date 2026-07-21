@@ -1,6 +1,8 @@
 package com.aidimag.intellij.startup
 
 import com.aidimag.intellij.core.AidimagStateService
+import com.aidimag.intellij.dashboard.AidimagDashboardService
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationActivationListener
 import com.intellij.openapi.wm.IdeFrame
 
@@ -11,6 +13,10 @@ class AidimagFocusListener : ApplicationActivationListener {
     val project = ideFrame.project ?: return
     if (project.isDisposed) return
     AidimagStateService.getInstance(project).refreshAllAsync()
+    // Reload the dashboard to show the correct project when switching between windows
+    ApplicationManager.getApplication().executeOnPooledThread {
+      AidimagDashboardService.getInstance(project).reloadDashboard()
+    }
   }
 }
 
