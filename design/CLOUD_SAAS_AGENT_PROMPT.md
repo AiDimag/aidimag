@@ -10,7 +10,7 @@ Build **aiDimag Cloud** — a lightweight Node.js hosted service that lets users
 
 **Read first:** `design/CLOUD_SAAS_REQUIREMENTS.md` in the aidimag OSS repo (or a copy in your cloud repo's `docs/`). Also skim aidimag's `src/sync/server.ts`, `src/sync/client.ts` for protocol reference.
 
-**Local development path:** `aidimag/aidimag-cloud/` (inside OSS repo). **Production path:** [anupkhanal/aidimag-cloud](https://github.com/anupkhanal/aidimag-cloud) — migrate before launch.
+**Local development path:** `aidimag/aidimag-cloud/` (inside OSS repo). **Production path:** [anup-khanal/aidimag-cloud](https://github.com/anup-khanal/aidimag-cloud) — migrate before launch.
 
 ```bash
 cd aidimag/aidimag-cloud   # already inside aidimag clone
@@ -27,7 +27,7 @@ Keep cloud code in **`aidimag-cloud/`** — do not scatter cloud routes into the
 
 1. **Local dev:** work in **`aidimag-cloud/`** at the root of the aidimag clone (`"aidimag": "file:.."`). **Before launch:** migrate to `git@github.com:anup-khanal/aidimag-cloud.git`.
 2. **Hostinger MVP hosting:** ~200 GB disk, ~3 GB RAM; **platform + sync data in Hostinger MySQL**; deploy **aidimag-cloud repo root** after migration.
-3. **Production repo:** [anupkhanal/aidimag-cloud](https://github.com/anupkhanal/aidimag-cloud) — `git@github.com:anup-khanal/aidimag-cloud.git`
+3. **Production repo:** [anup-khanal/aidimag-cloud](https://github.com/anup-khanal/aidimag-cloud) — `git@github.com:anup-khanal/aidimag-cloud.git`
 4. **Node 20**, lightweight stack: **Fastify** (or Hono) + **Drizzle** + **MySQL 8** (`mysql2`).
 5. **Billing:** Stripe subscriptions; **bill per active API key** (revoked keys free).
 6. **Auth:** Web signup/login (email + GitHub OAuth); CLI uses existing Bearer `aidimag_sk_*` and device flow.
@@ -294,7 +294,7 @@ npm run db:migrate
 # Products: Starter (1 key), Developer (3), Team (10), Business (25)
 # Prices: monthly + yearly each
 
-# Hostinger Node app — connect GitHub: anupkhanal/aidimag-cloud (repo root)
+# Hostinger Node app — connect GitHub: anup-khanal/aidimag-cloud (repo root)
 # git@github.com:anup-khanal/aidimag-cloud.git
 # Entry: dist/server.js
 # Node 20, production env vars set

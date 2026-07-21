@@ -60,7 +60,7 @@ The built artifact lands under `intellij-plugin/build/distributions/`.
 
 ## License
 
-[Elastic License 2.0](https://github.com/anupkhanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
+[Elastic License 2.0](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
 
 ## Author
 

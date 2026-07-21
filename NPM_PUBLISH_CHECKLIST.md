@@ -7,7 +7,7 @@
 - [x] Version is set (currently `1.0.0`)
 - [x] Description is clear and concise
 - [x] License field is set: `SEE LICENSE IN LICENSE`
-- [x] Repository URL is correct: `https://github.com/anupkhanal/aidimag`
+- [x] Repository URL is correct: `https://github.com/anup-khanal/aidimag`
 - [x] Homepage and bugs URLs are set
 - [x] Keywords are relevant for discoverability
 - [x] `files` array includes only `dist/`, `LICENSE`, `README.md`

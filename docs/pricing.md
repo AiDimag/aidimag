@@ -66,7 +66,7 @@ Simple licensing: **self-host for free** on small teams, or **go commercial** wh
 
 Organizations with **more than 10 users** (anyone running `dim`, using MCP, or the dashboard in your company) need a **commercial license** under the Elastic License 2.0 — even if you self-host.
 
-We’re not publishing tier tables here. [Open a GitHub issue](https://github.com/anupkhanal/aidimag/issues) with the `licensing` label and we’ll help you get compliant.
+We’re not publishing tier tables here. [Open a GitHub issue](https://github.com/anup-khanal/aidimag/issues) with the `licensing` label and we’ll help you get compliant.
 
 ---
 
@@ -95,7 +95,7 @@ Yes, if your organization is within the free user limit. Above 10 users, you nee
 
 ### Is the source code available?
 
-Yes — [github.com/anupkhanal/aidimag](https://github.com/anupkhanal/aidimag). Read, audit, and contribute under the Elastic License 2.0.
+Yes — [github.com/anup-khanal/aidimag](https://github.com/anup-khanal/aidimag). Read, audit, and contribute under the Elastic License 2.0.
 
 ---
 
@@ -108,4 +108,4 @@ aiDimag is licensed under the **Elastic License 2.0** with a 10-user Additional 
 - Cannot offer aiDimag as a managed/hosted service to third parties (use aiDimag Cloud for that)
 - 11+ users require a commercial license
 
-[Read the full license →](https://github.com/anupkhanal/aidimag/blob/main/LICENSE)
+[Read the full license →](https://github.com/anup-khanal/aidimag/blob/main/LICENSE)
