@@ -1,5 +1,5 @@
 <idea-plugin>
-  <id>com.aidimag.intellij</id>
+  <id>com.aidimag.plugin</id>
   <name>aidimag</name>
   <vendor email="support@aidimag.dev" url="https://github.com">aidimag</vendor>
   <description>
@@ -31,6 +31,8 @@
     <group id="Aidimag.Group" text="aidimag" popup="true">
       <add-to-group group-id="ToolsMenu" anchor="last"/>
       <action id="Aidimag.OpenDashboard" class="com.aidimag.intellij.actions.OpenDashboardAction" text="Open Dashboard"/>
+      <action id="Aidimag.RefreshDashboard" class="com.aidimag.intellij.actions.RefreshDashboardAction" text="Refresh Dashboard"
+              description="Reload the dashboard to show the current project"/>
       <action id="Aidimag.Verify" class="com.aidimag.intellij.actions.VerifyMemoriesAction" text="Verify Memories"/>
       <action id="Aidimag.Sync" class="com.aidimag.intellij.actions.SyncTeamMemoryAction" text="Sync Team Memory"/>
       <action id="Aidimag.SyncKnowledge" class="com.aidimag.intellij.actions.SyncKnowledgeAction" text="Sync Knowledge Inbox"

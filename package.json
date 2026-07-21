@@ -1,17 +1,20 @@
 {
   "name": "aidimag",
-  "version": "1.0.0",
+  "version": "1.0.10",
   "description": "Persistent, verified memory for AI coding agents. CLI: dim.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
-  "author": "Anup Khanal",
+  "author": {
+    "name": "Anup Khanal",
+    "url": "https://github.com/anup-khanal"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anupkhanal/aidimag.git"
+    "url": "git+https://github.com/anup-khanal/aidimag.git"
   },
-  "homepage": "https://github.com/anupkhanal/aidimag#readme",
+  "homepage": "https://aidimag.com",
   "bugs": {
-    "url": "https://github.com/anupkhanal/aidimag/issues"
+    "url": "https://github.com/anup-khanal/aidimag/issues"
   },
   "bin": {
     "dim": "./dist/cli/index.js",
@@ -27,7 +30,9 @@
   "files": [
     "dist",
     "!dist/test",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "LICENSE",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
@@ -37,7 +42,7 @@
     "dev": "tsc --watch",
     "mcp": "node dist/mcp/server.js",
     "pretest": "tsc",
-    "test": "node --test \"dist/test/**/*.test.js\"",
+    "test": "node --test dist/test/*.test.js",
     "prepublishOnly": "npm run build && npm test",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

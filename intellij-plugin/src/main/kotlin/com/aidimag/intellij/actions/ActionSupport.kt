@@ -10,7 +10,8 @@ import com.intellij.openapi.ui.Messages
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 
 fun projectOrWarn(e: AnActionEvent): Project? {
-  val project = e.project
+  // Try to get the project from the data context first (more reliable with multiple windows)
+  val project = e.getData(com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT) ?: e.project
   if (project == null) {
     Messages.showErrorDialog("Open a project first.", "aidimag")
   }

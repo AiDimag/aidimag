@@ -6,6 +6,12 @@
   "publisher": "aidimag",
   "author": "Anup Khanal",
   "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anup-khanal/aidimag.git",
+    "directory": "vscode-extension"
+  },
+  "icon": "icon.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["AI", "Other"],
   "activationEvents": ["workspaceContains:.aidimag/**"],

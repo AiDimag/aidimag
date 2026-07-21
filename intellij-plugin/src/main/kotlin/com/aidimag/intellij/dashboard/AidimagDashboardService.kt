@@ -29,7 +29,11 @@ class AidimagDashboardService(private val project: Project) : Disposable {
     if (browser == null && JBCefApp.isSupported()) {
       browser = JBCefBrowser("about:blank")
       rootPanel.add(browser!!.component, BorderLayout.CENTER)
-      pendingUrl?.let { browser!!.loadURL(it) }
+      // Load the correct URL immediately when browser is created
+      val port = projectPort()
+      val url = "http://localhost:$port"
+      pendingUrl = url
+      browser!!.loadURL(url)
       Disposer.register(this, browser!!)
     } else if (browser == null) {
       rootPanel.add(JLabel("JCEF is not available in this IDE runtime."), BorderLayout.CENTER)
@@ -41,9 +45,9 @@ class AidimagDashboardService(private val project: Project) : Disposable {
   private fun projectPort(): Int {
     val basePort = AidimagSettingsState.getInstance().state.uiPort
     val basePath = project.basePath ?: return basePort
-    // Hash the project path to get a consistent port offset (0-99)
+    // Hash the project path to get a consistent port offset (0-999 for better distribution)
     val hash = basePath.hashCode()
-    return basePort + (Math.abs(hash) % 100)
+    return basePort + (Math.abs(hash) % 1000)
   }
 
   /** True if the dim ui server is already listening on [port]. */
@@ -79,8 +83,27 @@ class AidimagDashboardService(private val project: Project) : Disposable {
     }
     val url = "http://localhost:$port"
     pendingUrl = url
+    // Force reload even if browser already has a URL loaded (might be from a different project)
     browser?.loadURL(url)
     return port
+  }
+
+  /** Reload the dashboard for this project (useful when switching between project windows). */
+  fun reloadDashboard() {
+    val port = projectPort()
+    // Ensure the server is running for this project
+    if (!isUiAlive(port)) {
+      startUi(port)
+      // Wait for server to start
+      for (i in 0 until 20) {
+        Thread.sleep(250)
+        if (isUiAlive(port)) break
+      }
+    }
+    // Always reload the URL, even if it's the same, to ensure fresh content
+    val url = "http://localhost:$port"
+    pendingUrl = url
+    browser?.loadURL(url)
   }
 
   private fun startUi(port: Int) {

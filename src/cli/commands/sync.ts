@@ -170,6 +170,7 @@ export function registerSyncCommands(program: Command): void {
     .command("sync")
     .description("Sync this repo's memory with the linked team server (push + pull)")
     .option("--full", "Upload all local memories to this brain (not just changes since last push)")
+    .option("--force-pull", "Reset pull cursor and fetch all remote data (recovery after local DB corruption)")
     .option("-y, --yes", "Skip confirmation when uploading to an empty remote brain")
     .action(async (opts) => {
       const root = findRepoRoot() ?? fail("not inside a repo");
@@ -178,6 +179,7 @@ export function registerSyncCommands(program: Command): void {
       try {
         const r = await sync(store, root, {
           full: Boolean(opts.full),
+          forcePull: Boolean(opts.forcePull),
           confirmFullUpload: opts.full
             ? undefined
             : async (localCount, remoteCount) => {
@@ -215,6 +217,9 @@ export function registerSyncCommands(program: Command): void {
             ? `already on server (${mem(r.memoriesQueued)} unchanged)`
             : "nothing to send";
         console.log(`☁ Synced — ${sent}, ${recv}${r.eventsPushed ? ` (+${r.eventsPushed} verification events)` : ""}.`);
+        if (r.autoRecovered) {
+          console.log("✓ Auto-recovery: detected local data loss and restored memories from the cloud.");
+        }
         const localMemories = store.statusSummary().total;
         if (opts.full && r.memoriesQueued > 0 && r.memoriesPushed === 0 && localMemories > 0) {
           console.log("✓ Full sync checked all local memories — cloud already has them (no updates needed).");

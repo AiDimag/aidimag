@@ -7,9 +7,8 @@ export default defineConfig({
     "aiDimag — persistent, verified memory for AI coding agents. Plain-English docs for the dim CLI, MCP server, IDE extensions, and team sync.",
   lang: "en-US",
 
-  // GitHub Pages project site lives at https://<user>.github.io/aidimag/
-  // If you deploy to a custom domain or a user/org root site, set base to "/".
-  base: "/aidimag/",
+  // Custom domain (aidimag.com) - base path is root
+  base: "/",
 
   lastUpdated: true,
   cleanUrls: true,
@@ -18,7 +17,7 @@ export default defineConfig({
   appearance: "dark",
 
   head: [
-    ["link", { rel: "icon", type: "image/svg+xml", href: "/aidimag/favicon.svg" }],
+    ["link", { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
     ["meta", { name: "theme-color", content: "#0b1220" }],
@@ -33,7 +32,7 @@ export default defineConfig({
           "Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true.",
       },
     ],
-    ["meta", { property: "og:image", content: "/aidimag/logo.svg" }],
+    ["meta", { property: "og:image", content: "/logo.svg" }],
     ["meta", { name: "twitter:card", content: "summary" }],
   ],
 

@@ -87,14 +87,14 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
         const current = existsSync(rootIgnore) ? readFileSync(rootIgnore, "utf8") : "";
         const folder = resolveKnowledgeConfig(root).folder;
         const additions: string[] = [];
-        if (!current.includes(".aidimag/memory.db")) additions.push(".aidimag/memory.db*");
-        // keep dropped knowledge docs (may contain secrets) out of git, but track the folder
-        if (!current.includes(`${folder}/*`)) additions.push(`${folder}/*`, `!${folder}/.gitkeep`);
+        if (!current.includes(".aidimag")) additions.push(".aidimag");
+        if (!current.includes(folder)) additions.push(folder);
         // generated context files (users can commit them if they want, but default is gitignored)
         if (!current.includes("CLAUDE.md")) additions.push("CLAUDE.md");
         if (!current.includes(".cursorrules")) additions.push(".cursorrules");
         if (!current.includes(".windsurfrules")) additions.push(".windsurfrules");
         if (!current.includes("AGENTS.md")) additions.push("AGENTS.md");
+        if (!current.includes(".github/copilot-instructions.md")) additions.push(".github/copilot-instructions.md");
         if (additions.length) {
           appendFileSync(rootIgnore, `${current.endsWith("\n") || current === "" ? "" : "\n"}${additions.join("\n")}\n`);
           console.log(`\nUpdated ${rootIgnore} (ignored memory.db + ${folder}/ drops + generated context files)`);

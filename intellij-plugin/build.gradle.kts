@@ -18,9 +18,14 @@ intellijPlatform {
   pluginConfiguration {
     ideaVersion {
       sinceBuild = "243"
-      untilBuild = "261.*"
+      untilBuild = "263.*"
     }
     changeNotes = "Initial IntelliJ plugin for aidimag dashboard and CLI actions."
+  }
+  
+  publishing {
+    token = providers.environmentVariable("JETBRAINS_TOKEN")
+    channels = listOf("default")
   }
 }
 
