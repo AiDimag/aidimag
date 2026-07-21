@@ -74,22 +74,6 @@ Explorer tree, an embedded dashboard, and memory/sync health in the status bar.
 The `dim` CLI must be installed (`npm i -g aidimag`) and the workspace must contain
 an `.aidimag/` directory (`dim init`). Set `aidimag.dimPath` if `dim` isn't on PATH.
 
-## Try it without packaging
-
-1. Open this folder in VSCode
-2. Press **F5** (Run Extension) — launches an Extension Development Host
-3. In the dev host, open a repo that has `.aidimag/`
-
-## Package for install/marketplace
-
-```sh
-npm i -g @vscode/vsce
-cd vscode-extension && vsce package        # → aidimag-vscode-<version>.vsix
-code --install-extension aidimag-vscode-<version>.vsix
-```
-
-Current version: **1.0.0** (build with `vsce package` or install from the marketplace).
-
 ## License
 
 [Elastic License 2.0](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
