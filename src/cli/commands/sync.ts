@@ -3,8 +3,10 @@
  */
 
 import type { Command } from "commander";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { MemoryStore, findRepoRoot } from "../../db/store.js";
 import { fail, maybeRegenerateContext, openBrowser, createPrompter } from "../shared.js";
+import { configPath } from "../../sync/client.js";
 
 export function registerSyncCommands(program: Command): void {
   program
@@ -28,7 +30,7 @@ export function registerSyncCommands(program: Command): void {
     .argument("<action>", "link | unlink | status | remote")
     .option("-s, --server <url>", "Sync server URL")
     .option("-b, --brain <name>", "Brain (team memory) name on the server")
-    .option("-t, --token <token>", "Auth token (stored in ~/.aidimag/credentials.json, NOT the repo)")
+    .option("-t, --token <token>", "Auth token (stored in .aidimag/config.json)")
     .option("--json", "Machine-readable output (remote)")
     .option("--id <memoryId>", "Show one remote memory by id (remote)")
     .option("--limit <n>", "Max rows to list (remote)", "20")
@@ -43,12 +45,30 @@ export function registerSyncCommands(program: Command): void {
         case "link": {
           if (!opts.server || !opts.brain) fail("usage: dim cloud link --server <url> --brain <name> [--token <token>]");
           const server = String(opts.server).replace(/\/$/, "");
-          writeCloudConfig(root, { server, brain: opts.brain });
-          if (opts.token) saveToken(server, opts.token);
+          
+          // Always store token in project config
+          const p = configPath(root);
+          let existing: Record<string, unknown> = {};
+          try {
+            existing = JSON.parse(readFileSync(p, "utf8"));
+          } catch {
+            // fresh file
+          }
+          
+          const newConfig: Record<string, unknown> = { ...existing, server, brain: opts.brain };
+          if (opts.token) {
+            newConfig.token = opts.token;
+          }
+          
+          writeFileSync(p, JSON.stringify(newConfig, null, 2) + "\n");
           console.log(`Linked to ${server} (brain: ${opts.brain}).`);
-          console.log(`Config in .aidimag/config.json (commit it — no secrets inside). Token in ~/.aidimag/credentials.json.`);
-          if (!opts.token && !getToken(server)) {
-            console.log("⚠ No token stored yet — pass --token or set AIDIMAG_API_KEY before `dim sync`.");
+          console.log(`Config stored in .aidimag/config.json (per-project).`);
+          
+          if (!opts.token && !getToken(server, root)) {
+            console.log("⚠ No token stored yet — pass --token or set AIDIMAG_API_KEY before \`dim sync\`.");
+          } else if (opts.token) {
+            console.log(`✓ Token stored in .aidimag/config.json`);
+            console.log(`⚠ Add .aidimag/config.json to .gitignore if you don't want to commit the token.`);
           }
           break;
         }
@@ -60,7 +80,10 @@ export function registerSyncCommands(program: Command): void {
         case "status": {
           const cfg = readCloudConfig(root);
           if (!cfg) console.log("Not cloud-linked. Use `dim cloud link`.");
-          else console.log(`server: ${cfg.server}\nbrain:  ${cfg.brain}\ntoken:  ${getToken(cfg.server) ? "stored" : "MISSING"}`);
+          else {
+            const token = getToken(cfg.server, root);
+            console.log(`server: ${cfg.server}\nbrain:  ${cfg.brain}\ntoken:  ${token ? "stored in .aidimag/config.json" : "MISSING"}`);
+          }
           break;
         }
         case "remote": {

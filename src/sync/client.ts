@@ -5,9 +5,9 @@
  *   push: rows changed since last push (+ tombstones) → server
  *   pull: latest remote rows since cursor → apply if remote.updatedAt > local
  *
- * Config split (by design):
- *   .aidimag/config.json        { server, brain }   — committed to git (no secrets)
- *   ~/.aidimag/credentials.json { [server]: token } — never in the repo
+ * Config (per-project):
+ *   .aidimag/config.json { server, brain, token } — per-project, add to .gitignore if token is sensitive
+ *   AIDIMAG_API_KEY env var — alternative to storing token in config
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
@@ -69,15 +69,23 @@ function credentialsPath(): string {
   return path.join(homedir(), ".aidimag", "credentials.json");
 }
 
-export function getToken(server: string): string | null {
+export function getToken(server: string, repoRoot?: string): string | null {
   if (process.env.AIDIMAG_API_KEY) return process.env.AIDIMAG_API_KEY;
-  const p = credentialsPath();
-  if (!existsSync(p)) return null;
-  try {
-    return JSON.parse(readFileSync(p, "utf8"))[server] ?? null;
-  } catch {
-    return null;
+  
+  // Always use project-level config
+  if (repoRoot) {
+    const projectConfigPath = configPath(repoRoot);
+    if (existsSync(projectConfigPath)) {
+      try {
+        const cfg = JSON.parse(readFileSync(projectConfigPath, "utf8"));
+        if (cfg.token) return cfg.token;
+      } catch {
+        // ignore
+      }
+    }
   }
+  
+  return null;
 }
 
 export function saveToken(server: string, token: string): void {
@@ -231,7 +239,7 @@ export async function fetchRemoteSnapshot(
 ): Promise<RemoteSnapshot> {
   const cfg = readCloudConfig(repoRoot);
   if (!cfg) throw new Error("repo is not cloud-linked. Run `dim cloud link --server <url> --brain <name> --token <token>` first.");
-  const token = getToken(cfg.server);
+  const token = getToken(cfg.server, repoRoot);
   if (!token) throw new Error(`no credentials for ${cfg.server}. Run \`dim cloud link\` with --token, or set AIDIMAG_API_KEY.`);
 
   const q = new URLSearchParams({ brain: cfg.brain });
@@ -273,7 +281,7 @@ async function getRemoteMemoryCount(cfg: CloudConfig, token: string): Promise<nu
 export async function sync(store: MemoryStore, repoRoot: string, opts: SyncOptions = {}): Promise<SyncResult> {
   const cfg = readCloudConfig(repoRoot);
   if (!cfg) throw new Error("repo is not cloud-linked. Run `dim cloud link --server <url> --brain <name> --token <token>` first.");
-  const token = getToken(cfg.server);
+  const token = getToken(cfg.server, repoRoot);
   if (!token) throw new Error(`no credentials for ${cfg.server}. Run \`dim cloud link\` with --token, or set AIDIMAG_API_KEY.`);
 
   const cursorKey = syncMetaKey(CURSOR_KEY, cfg.brain);
