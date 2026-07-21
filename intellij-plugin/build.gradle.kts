@@ -22,6 +22,11 @@ intellijPlatform {
     }
     changeNotes = "Initial IntelliJ plugin for aidimag dashboard and CLI actions."
   }
+  
+  publishing {
+    token = providers.environmentVariable("JETBRAINS_TOKEN")
+    channels = listOf("default")
+  }
 }
 
 dependencies {

@@ -1,5 +1,5 @@
 <idea-plugin>
-  <id>com.aidimag.intellij</id>
+  <id>com.aidimag.plugin</id>
   <name>aidimag</name>
   <vendor email="support@aidimag.dev" url="https://github.com">aidimag</vendor>
   <description>
