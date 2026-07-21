@@ -176,6 +176,7 @@ export function registerSyncCommands(program: Command): void {
       const start = await startDeviceLogin(server, requestedBrain);
       const approveUrl = `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`;
       console.log(`\nTo approve this device, open:\n\n  ${approveUrl}\n\nand confirm the code: ${start.user_code}\n`);
+      console.log(`Debug: expires_in=${start.expires_in}s, interval=${start.interval}s, requested_brain=${requestedBrain ?? "none"}\n`);
       if (opts.open) await openBrowser(approveUrl);
       console.log("Waiting for approval…");
       
