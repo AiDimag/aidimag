@@ -88,7 +88,6 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
         const folder = resolveKnowledgeConfig(root).folder;
         const additions: string[] = [];
         if (!current.includes(".aidimag")) additions.push(".aidimag");
-        // keep dropped knowledge docs (may contain secrets) out of git
         if (!current.includes(folder)) additions.push(folder);
         // generated context files (users can commit them if they want, but default is gitignored)
         if (!current.includes("CLAUDE.md")) additions.push("CLAUDE.md");
