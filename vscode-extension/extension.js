@@ -47,7 +47,7 @@ function cfg() {
   const basePort = c.get("uiPort") || 4517;
   // Generate unique port per project to allow multiple projects simultaneously
   const root = repoRoot();
-  const port = root ? basePort + (hashCode(root) % 100) : basePort;
+  const port = root ? basePort + (hashCode(root) % 1000) : basePort;
   return {
     dim:             c.get("dimPath") || "dim",
     port:            port,
