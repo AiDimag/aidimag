@@ -5,13 +5,12 @@
  *   push: rows changed since last push (+ tombstones) → server
  *   pull: latest remote rows since cursor → apply if remote.updatedAt > local
  *
- * Config split (by design):
- *   .aidimag/config.json        { server, brain }   — committed to git (no secrets)
- *   ~/.aidimag/credentials.json { [server]: token } — never in the repo
+ * Config (per-project):
+ *   .aidimag/config.json { server, brain, token } — per-project, add to .gitignore if token is sensitive
+ *   AIDIMAG_API_KEY env var — alternative to storing token in config
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { debugLog } from "../debug.js";
 import type { MemoryStore } from "../db/store.js";
@@ -65,38 +64,23 @@ export function writeCloudConfig(repoRoot: string, cfg: CloudConfig): void {
   writeFileSync(p, JSON.stringify({ ...existing, server, brain }, null, 2) + "\n");
 }
 
-function credentialsPath(): string {
-  return path.join(homedir(), ".aidimag", "credentials.json");
-}
-
-export function getToken(server: string): string | null {
+export function getToken(server: string, repoRoot?: string): string | null {
   if (process.env.AIDIMAG_API_KEY) return process.env.AIDIMAG_API_KEY;
-  const p = credentialsPath();
-  if (!existsSync(p)) return null;
-  try {
-    return JSON.parse(readFileSync(p, "utf8"))[server] ?? null;
-  } catch {
-    return null;
+  
+  // Always use project-level config
+  if (repoRoot) {
+    const projectConfigPath = configPath(repoRoot);
+    if (existsSync(projectConfigPath)) {
+      try {
+        const cfg = JSON.parse(readFileSync(projectConfigPath, "utf8"));
+        if (cfg.token) return cfg.token;
+      } catch {
+        // ignore
+      }
+    }
   }
-}
-
-export function saveToken(server: string, token: string): void {
-  const p = credentialsPath();
-  mkdirSync(path.dirname(p), { recursive: true });
-  const creds = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : {};
-  creds[server] = token;
-  writeFileSync(p, JSON.stringify(creds, null, 2) + "\n", { mode: 0o600 });
-  try { chmodSync(p, 0o600); } catch { /* best-effort on Windows */ }
-}
-
-export function removeToken(server: string): boolean {
-  const p = credentialsPath();
-  if (!existsSync(p)) return false;
-  const creds = JSON.parse(readFileSync(p, "utf8"));
-  if (!(server in creds)) return false;
-  delete creds[server];
-  writeFileSync(p, JSON.stringify(creds, null, 2) + "\n", { mode: 0o600 });
-  return true;
+  
+  return null;
 }
 
 // ---------------------------------------------------------------- device-flow login (dim login)
@@ -110,8 +94,12 @@ export interface DeviceStart {
 }
 
 /** Begin a device-code login: server hands back a user code + approval URL. */
-export async function startDeviceLogin(server: string): Promise<DeviceStart> {
-  const res = await cloudFetch(server, `${server}/v1/auth/device`, { method: "POST" });
+export async function startDeviceLogin(server: string, brain?: string): Promise<DeviceStart> {
+  const res = await cloudFetch(server, `${server}/v1/auth/device`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: brain ? JSON.stringify({ brain }) : undefined,
+  });
   if (!res.ok) {
     throw new Error(
       res.status === 404
@@ -122,7 +110,7 @@ export async function startDeviceLogin(server: string): Promise<DeviceStart> {
   return (await res.json()) as DeviceStart;
 }
 
-/** Poll until the device is approved in the browser. Saves the token on success. */
+/** Poll until the device is approved in the browser. Returns the token (caller must save it). */
 export async function pollDeviceLogin(server: string, start: DeviceStart): Promise<{ token: string; brain: string | null }> {
   const deadline = Date.now() + start.expires_in * 1000;
   for (;;) {
@@ -136,7 +124,6 @@ export async function pollDeviceLogin(server: string, start: DeviceStart): Promi
     if (res.status === 428) continue; // authorization_pending
     if (!res.ok) throw new Error(`login failed: HTTP ${res.status} ${await res.text()}`);
     const out = (await res.json()) as { token: string; brain: string | null };
-    saveToken(server, out.token);
     return out;
   }
 }
@@ -231,7 +218,7 @@ export async function fetchRemoteSnapshot(
 ): Promise<RemoteSnapshot> {
   const cfg = readCloudConfig(repoRoot);
   if (!cfg) throw new Error("repo is not cloud-linked. Run `dim cloud link --server <url> --brain <name> --token <token>` first.");
-  const token = getToken(cfg.server);
+  const token = getToken(cfg.server, repoRoot);
   if (!token) throw new Error(`no credentials for ${cfg.server}. Run \`dim cloud link\` with --token, or set AIDIMAG_API_KEY.`);
 
   const q = new URLSearchParams({ brain: cfg.brain });
@@ -273,7 +260,7 @@ async function getRemoteMemoryCount(cfg: CloudConfig, token: string): Promise<nu
 export async function sync(store: MemoryStore, repoRoot: string, opts: SyncOptions = {}): Promise<SyncResult> {
   const cfg = readCloudConfig(repoRoot);
   if (!cfg) throw new Error("repo is not cloud-linked. Run `dim cloud link --server <url> --brain <name> --token <token>` first.");
-  const token = getToken(cfg.server);
+  const token = getToken(cfg.server, repoRoot);
   if (!token) throw new Error(`no credentials for ${cfg.server}. Run \`dim cloud link\` with --token, or set AIDIMAG_API_KEY.`);
 
   const cursorKey = syncMetaKey(CURSOR_KEY, cfg.brain);
@@ -481,7 +468,7 @@ export async function maybeAutoSync(store: MemoryStore, repoRoot: string): Promi
   if ((process.env.AIDIMAG_AUTO_SYNC ?? "").toLowerCase() === "off") return null;
   const cfg = readCloudConfig(repoRoot);
   if (!cfg) return null;
-  if (!getToken(cfg.server)) return null;
+  if (!getToken(cfg.server, repoRoot)) return null;
   const last = store.getMeta(AUTO_SYNC_LAST_KEY);
   if (last && Date.now() - new Date(last).getTime() < AUTO_SYNC_DEBOUNCE_MS) return null;
   try {

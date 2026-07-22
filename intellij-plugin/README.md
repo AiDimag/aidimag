@@ -1,7 +1,7 @@
 # aiDimag for IntelliJ IDEA
 
 IntelliJ plugin that mirrors the VSCode extension with JetBrains-native UI. Current
-version: **1.0.0** (built artifacts under `build/distributions/`).
+version: **1.0.1**.
 
 ## Features
 
@@ -42,25 +42,9 @@ The `dim` CLI must be installed (`npm i -g aidimag`) and the project must contai
 > `PATH`. The plugin inherits your console environment to find `dim`; if you still see
 > "cannot run program dim", install `dim` globally so GUI apps can locate it.
 
-## Dev run
-
-```bash
-cd intellij-plugin
-./gradlew runIde
-```
-
-## Build plugin zip
-
-```bash
-cd intellij-plugin
-./gradlew buildPlugin
-```
-
-The built artifact lands under `intellij-plugin/build/distributions/`.
-
 ## License
 
-[Elastic License 2.0](https://github.com/anupkhanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
+[Elastic License 2.0](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
 
 ## Author
 

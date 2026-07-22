@@ -67,11 +67,11 @@ export function registerTicketCommands(program: Command): void {
               });
               console.log(`🎫 Connected via the team sync server (${cloud.server}, brain: ${cloud.brain}).`);
               console.log(`   Zero local ticket credentials — the server holds the team token.`);
-              if (!getToken(cloud.server)) console.log(`   ⚠ No sync token on this machine yet — run \`dim login\` first.`);
+              if (!getToken(cloud.server, root)) console.log(`   ⚠ No sync token on this machine yet — run \`dim login\` first.`);
               // trust-building: check the server actually has a team config
               try {
                 const res = await fetch(`${cloud.server}/v1/ticket-config?brain=${encodeURIComponent(cloud.brain)}`, {
-                  headers: { Authorization: `Bearer ${getToken(cloud.server) ?? ""}` },
+                  headers: { Authorization: `Bearer ${getToken(cloud.server, root) ?? ""}` },
                 });
                 const body = (await res.json()) as { config?: { provider?: string } | null };
                 if (res.ok && body.config?.provider) {
@@ -152,7 +152,7 @@ export function registerTicketCommands(program: Command): void {
           if (cfg.provider === "remote") {
             const { readCloudConfig, getToken } = await import("../../sync/client.js");
             const cloud = readCloudConfig(root);
-            console.log(`provider: remote (via the team sync server)\nserver:   ${cloud?.server ?? "NOT LINKED — dim cloud link"}\nbrain:    ${cloud?.brain ?? "—"}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${cloud && getToken(cloud.server) ? "sync token stored" : "MISSING — dim login"}`);
+            console.log(`provider: remote (via the team sync server)\nserver:   ${cloud?.server ?? "NOT LINKED — dim cloud link"}\nbrain:    ${cloud?.brain ?? "—"}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${cloud && getToken(cloud.server, root) ? "sync token stored" : "MISSING — dim login"}`);
           } else {
             const credKey = cfg.baseUrl ?? "linear";
             console.log(`provider: ${cfg.provider}${cfg.baseUrl ? `\nbaseUrl:  ${cfg.baseUrl}` : ""}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${tickets.getTicketCredential(credKey) ? "stored" : "MISSING"}`);

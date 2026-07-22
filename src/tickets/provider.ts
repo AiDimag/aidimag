@@ -349,12 +349,9 @@ export function ticketProviderFor(repoRoot: string): TicketProvider | null {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     try {
       const p = path.join(repoRoot, ".aidimag", "config.json");
-      const raw = JSON.parse(readFileSync(p, "utf8")) as { server?: string; brain?: string };
+      const raw = JSON.parse(readFileSync(p, "utf8")) as { server?: string; brain?: string; token?: string };
       if (!raw.server || !raw.brain) return null;
-      const token =
-        process.env.AIDIMAG_API_KEY ??
-        (JSON.parse(readFileSync(credentialsPath(), "utf8"))[raw.server] as string | undefined) ??
-        null;
+      const token = process.env.AIDIMAG_API_KEY ?? raw.token ?? null;
       return token ? new RemoteProvider(raw.server, raw.brain, token) : null;
     } catch {
       return null;

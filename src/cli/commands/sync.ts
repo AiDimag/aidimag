@@ -3,8 +3,10 @@
  */
 
 import type { Command } from "commander";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { MemoryStore, findRepoRoot } from "../../db/store.js";
 import { fail, maybeRegenerateContext, openBrowser, createPrompter } from "../shared.js";
+import { configPath } from "../../sync/client.js";
 
 export function registerSyncCommands(program: Command): void {
   program
@@ -28,7 +30,7 @@ export function registerSyncCommands(program: Command): void {
     .argument("<action>", "link | unlink | status | remote")
     .option("-s, --server <url>", "Sync server URL")
     .option("-b, --brain <name>", "Brain (team memory) name on the server")
-    .option("-t, --token <token>", "Auth token (stored in ~/.aidimag/credentials.json, NOT the repo)")
+    .option("-t, --token <token>", "Auth token (stored in .aidimag/config.json)")
     .option("--json", "Machine-readable output (remote)")
     .option("--id <memoryId>", "Show one remote memory by id (remote)")
     .option("--limit <n>", "Max rows to list (remote)", "20")
@@ -38,17 +40,35 @@ export function registerSyncCommands(program: Command): void {
     .option("--full", "Include full remote payload JSON (remote)")
     .action(async (action: string, opts) => {
       const root = findRepoRoot() ?? fail("not inside a repo");
-      const { readCloudConfig, writeCloudConfig, saveToken, getToken, fetchRemoteSnapshot, syncMetaKey } = await import("../../sync/client.js");
+      const { readCloudConfig, writeCloudConfig, getToken, fetchRemoteSnapshot, syncMetaKey } = await import("../../sync/client.js");
       switch (action) {
         case "link": {
           if (!opts.server || !opts.brain) fail("usage: dim cloud link --server <url> --brain <name> [--token <token>]");
           const server = String(opts.server).replace(/\/$/, "");
-          writeCloudConfig(root, { server, brain: opts.brain });
-          if (opts.token) saveToken(server, opts.token);
+          
+          // Always store token in project config
+          const p = configPath(root);
+          let existing: Record<string, unknown> = {};
+          try {
+            existing = JSON.parse(readFileSync(p, "utf8"));
+          } catch {
+            // fresh file
+          }
+          
+          const newConfig: Record<string, unknown> = { ...existing, server, brain: opts.brain };
+          if (opts.token) {
+            newConfig.token = opts.token;
+          }
+          
+          writeFileSync(p, JSON.stringify(newConfig, null, 2) + "\n");
           console.log(`Linked to ${server} (brain: ${opts.brain}).`);
-          console.log(`Config in .aidimag/config.json (commit it — no secrets inside). Token in ~/.aidimag/credentials.json.`);
-          if (!opts.token && !getToken(server)) {
-            console.log("⚠ No token stored yet — pass --token or set AIDIMAG_API_KEY before `dim sync`.");
+          console.log(`Config stored in .aidimag/config.json (per-project).`);
+          
+          if (!opts.token && !getToken(server, root)) {
+            console.log("⚠ No token stored yet — pass --token or set AIDIMAG_API_KEY before \`dim sync\`.");
+          } else if (opts.token) {
+            console.log(`✓ Token stored in .aidimag/config.json`);
+            console.log(`⚠ Add .aidimag/config.json to .gitignore if you don't want to commit the token.`);
           }
           break;
         }
@@ -60,7 +80,10 @@ export function registerSyncCommands(program: Command): void {
         case "status": {
           const cfg = readCloudConfig(root);
           if (!cfg) console.log("Not cloud-linked. Use `dim cloud link`.");
-          else console.log(`server: ${cfg.server}\nbrain:  ${cfg.brain}\ntoken:  ${getToken(cfg.server) ? "stored" : "MISSING"}`);
+          else {
+            const token = getToken(cfg.server, root);
+            console.log(`server: ${cfg.server}\nbrain:  ${cfg.brain}\ntoken:  ${token ? "stored in .aidimag/config.json" : "MISSING"}`);
+          }
           break;
         }
         case "remote": {
@@ -141,29 +164,70 @@ export function registerSyncCommands(program: Command): void {
     .action(async (opts) => {
       const { readCloudConfig, startDeviceLogin, pollDeviceLogin } = await import("../../sync/client.js");
       const root = findRepoRoot();
+      if (!root) fail("not inside a repo — run this command from a project directory");
+      
+      const cfg = readCloudConfig(root);
       const server: string | undefined =
-        (opts.server as string | undefined)?.replace(/\/$/, "") ?? (root ? readCloudConfig(root)?.server : undefined);
+        (opts.server as string | undefined)?.replace(/\/$/, "") ?? cfg?.server;
       if (!server) fail("no server: pass --server <url> or link the repo with `dim cloud link` first");
-      const start = await startDeviceLogin(server);
+      
+      // Pass the brain so the approval page knows which project is requesting access
+      const requestedBrain = cfg?.brain;
+      const start = await startDeviceLogin(server, requestedBrain);
       const approveUrl = `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`;
       console.log(`\nTo approve this device, open:\n\n  ${approveUrl}\n\nand confirm the code: ${start.user_code}\n`);
+      console.log(`Debug: expires_in=${start.expires_in}s, interval=${start.interval}s, requested_brain=${requestedBrain ?? "none"}\n`);
       if (opts.open) await openBrowser(approveUrl);
       console.log("Waiting for approval…");
-      const { brain } = await pollDeviceLogin(server, start);
-      console.log(`✓ Logged in to ${server} (scope: ${brain ?? "all brains"}). Token saved to ~/.aidimag/credentials.json.`);
+      
+      const { token, brain } = await pollDeviceLogin(server, start);
+      
+      // Save token to project config
+      const p = configPath(root);
+      let existing: Record<string, unknown> = {};
+      try {
+        existing = JSON.parse(readFileSync(p, "utf8"));
+      } catch {
+        // fresh file
+      }
+      
+      existing.token = token;
+      writeFileSync(p, JSON.stringify(existing, null, 2) + "\n");
+      
+      console.log(`✓ Logged in to ${server} (scope: ${brain ?? "all brains"}).`);
+      console.log(`✓ Token saved to .aidimag/config.json (per-project).`);
+      console.log(`⚠ Add .aidimag/config.json to .gitignore if you don't want to commit the token.`);
     });
 
   program
     .command("logout")
-    .description("Remove this device's stored token for the sync server")
-    .option("-s, --server <url>", "Server URL (defaults to the repo's linked server)")
+    .description("Remove this device's stored token from the project config")
     .action(async (opts) => {
-      const { readCloudConfig, removeToken } = await import("../../sync/client.js");
+      const { readCloudConfig } = await import("../../sync/client.js");
       const root = findRepoRoot();
-      const server: string | undefined =
-        (opts.server as string | undefined)?.replace(/\/$/, "") ?? (root ? readCloudConfig(root)?.server : undefined);
-      if (!server) fail("no server: pass --server <url> or link the repo with `dim cloud link` first");
-      console.log(removeToken(server) ? `✓ Logged out of ${server}.` : `No stored token for ${server}.`);
+      if (!root) fail("not inside a repo — run this command from a project directory");
+      
+      const cfg = readCloudConfig(root);
+      if (!cfg) fail("not cloud-linked. Use `dim cloud link` first");
+      
+      // Remove token from project config
+      const p = configPath(root);
+      let existing: Record<string, unknown> = {};
+      try {
+        existing = JSON.parse(readFileSync(p, "utf8"));
+      } catch {
+        console.log("No config file found.");
+        return;
+      }
+      
+      if (!existing.token) {
+        console.log("No token stored in this project.");
+        return;
+      }
+      
+      delete existing.token;
+      writeFileSync(p, JSON.stringify(existing, null, 2) + "\n");
+      console.log(`✓ Logged out — token removed from .aidimag/config.json`);
     });
 
   program

@@ -28,9 +28,15 @@ export function registerMemoryCommands(program: Command): void {
       // keep the DB out of git by default (team-sync mode comes later)
       const gitignore = path.join(dir, ".gitignore");
       if (!existsSync(gitignore)) {
-        writeFileSync(gitignore, "memory.db\nmemory.db-wal\nmemory.db-shm\nknowledge/\n");
-      } else if (!readFileSync(gitignore, "utf8").includes("knowledge/")) {
-        appendFileSync(gitignore, "knowledge/\n");
+        writeFileSync(gitignore, "memory.db\nmemory.db-wal\nmemory.db-shm\nknowledge/\nconfig.json\n");
+      } else {
+        const content = readFileSync(gitignore, "utf8");
+        if (!content.includes("knowledge/")) {
+          appendFileSync(gitignore, "knowledge/\n");
+        }
+        if (!content.includes("config.json")) {
+          appendFileSync(gitignore, "config.json\n");
+        }
       }
       // knowledge inbox: a drop folder for project docs (summaries/backups live in .aidimag/)
       const knowledgeInbox = path.join(root, resolveKnowledgeConfig(root).folder);

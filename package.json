@@ -1,6 +1,6 @@
 {
   "name": "aidimag",
-  "version": "1.0.10",
+  "version": "1.0.15",
   "description": "Persistent, verified memory for AI coding agents. CLI: dim.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
@@ -61,7 +61,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^11.10.0",
     "commander": "^12.0.0",
     "mammoth": "^1.11.0",
     "pdf-parse": "^1.1.1",
@@ -76,6 +76,8 @@
     "vitepress": "2.0.0-alpha.17"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "@hono/node-server": "^2.0.5",
+    "tar-stream": "^3.1.7"
   }
 }

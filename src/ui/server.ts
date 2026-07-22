@@ -8,13 +8,13 @@
  */
 
 import { createServer } from "node:http";
-import { watch, mkdirSync } from "node:fs";
+import { watch, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { verifyAll } from "../verify/engine.js";
 import { mineCommits } from "../capture/commit-miner.js";
 import { hybridSearch, indexMemory, reindexAll } from "../embeddings/search.js";
-import { readCloudConfig, writeCloudConfig, saveToken, getToken, sync as cloudSync } from "../sync/client.js";
+import { readCloudConfig, writeCloudConfig, getToken, sync as cloudSync, configPath } from "../sync/client.js";
 import { resolveKnowledgeConfig } from "../config.js";
 import { ingestAll } from "../knowledge/ingest.js";
 import { isAllowedSyncServerUrl } from "../security/url.js";
@@ -82,7 +82,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
   if (autoSyncMinutes > 0) {
     const timer = setInterval(() => {
       const cloud = readCloudConfig(repoRoot);
-      if (!cloud || !getToken(cloud.server)) return;
+      if (!cloud || !getToken(cloud.server, repoRoot)) return;
       cloudSync(store, repoRoot).catch(() => undefined);
     }, autoSyncMinutes * 60 * 1000);
     timer.unref(); // never keep the process alive on its own
@@ -147,7 +147,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           proposals: store.listProposals("PENDING", 200),
           summary: store.statusSummary(),
           cloud: cloud
-            ? { server: cloud.server, brain: cloud.brain, hasToken: !!getToken(cloud.server) }
+            ? { server: cloud.server, brain: cloud.brain, hasToken: !!getToken(cloud.server, repoRoot) }
             : null,
           tickets: tcfg.provider
             ? {
@@ -156,7 +156,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
                 pattern: tcfg.pattern ?? DEFAULT_TICKET_PATTERN,
                 hasCredential:
                   tcfg.provider === "remote"
-                    ? !!(cloud && getToken(cloud.server))
+                    ? !!(cloud && getToken(cloud.server, repoRoot))
                     : !!getTicketCredential(tcfg.baseUrl ?? "linear"),
                 branch: tcfg.branch ?? null,
               }
@@ -251,9 +251,22 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           json(res, 400, { error: "invalid server URL" });
           return;
         }
-        writeCloudConfig(repoRoot, { server: serverUrl, brain: String(b.brain) });
-        if (b.token) saveToken(serverUrl, String(b.token));
-        json(res, 200, { ok: true, hasToken: !!getToken(serverUrl) });
+        // Save to project config with token
+        const p = configPath(repoRoot);
+        let existing: Record<string, unknown> = {};
+        try {
+          existing = JSON.parse(readFileSync(p, "utf8"));
+        } catch {
+          // fresh file
+        }
+        
+        const newConfig: Record<string, unknown> = { ...existing, server: serverUrl, brain: String(b.brain) };
+        if (b.token) {
+          newConfig.token = String(b.token);
+        }
+        
+        writeFileSync(p, JSON.stringify(newConfig, null, 2) + "\n");
+        json(res, 200, { ok: true, hasToken: !!getToken(serverUrl, repoRoot) });
         return;
       }
       if (req.method === "POST" && path === "/api/cloud/unlink") {
