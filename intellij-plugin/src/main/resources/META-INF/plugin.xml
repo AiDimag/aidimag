@@ -1,6 +1,6 @@
 <idea-plugin>
   <id>com.aidimag.plugin</id>
-  <name>aidimag</name>
+  <name>AI Dimag</name>
   <vendor email="support@aidimag.dev" url="https://github.com">aidimag</vendor>
   <description>
     <![CDATA[
