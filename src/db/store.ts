@@ -109,6 +109,8 @@ interface MemoryRow {
   updated_at?: string | null;
   pinned?: number;
   guardrail_level?: string | null;
+  cloud_synced?: number;
+  cloud_seq?: number | null;
 }
 
 export class MemoryStore {
@@ -1046,6 +1048,72 @@ export class MemoryStore {
 
   close(): void {
     this.db.close();
+  }
+
+  // ---------------------------------------------------------------- cloud sync status (v10)
+
+  /** Mark a memory as synced to cloud with the server sequence number. */
+  markMemorySynced(id: string, seq: number): void {
+    this.db
+      .prepare("UPDATE memories SET cloud_synced = 1, cloud_seq = ? WHERE id = ?")
+      .run(seq, id);
+  }
+
+  /** Mark a memory as unsynced (e.g., removed from cloud but kept locally). */
+  markMemoryUnsynced(id: string): void {
+    this.db
+      .prepare("UPDATE memories SET cloud_synced = 0, cloud_seq = NULL WHERE id = ?")
+      .run(id);
+  }
+
+  /** Mark a proposal as synced to cloud. */
+  markProposalSynced(id: string, seq: number): void {
+    this.db
+      .prepare("UPDATE proposals SET cloud_synced = 1, cloud_seq = ? WHERE id = ?")
+      .run(seq, id);
+  }
+
+  /** Mark a proposal as unsynced. */
+  markProposalUnsynced(id: string): void {
+    this.db
+      .prepare("UPDATE proposals SET cloud_synced = 0, cloud_seq = NULL WHERE id = ?")
+      .run(id);
+  }
+
+  /** Get all memories that are not synced to cloud. */
+  getUnsyncedMemories(limit?: number): MemoryEntry[] {
+    const sql = `SELECT * FROM memories WHERE cloud_synced = 0 
+                 ORDER BY COALESCE(updated_at, created_at) DESC 
+                 ${limit ? `LIMIT ${limit}` : ''}`;
+    const rows = this.db.prepare(sql).all() as MemoryRow[];
+    return rows.map(r => this.hydrate(r));
+  }
+
+  /** Get all memories that are synced to cloud. */
+  getSyncedMemories(): MemoryEntry[] {
+    const rows = this.db
+      .prepare("SELECT * FROM memories WHERE cloud_synced = 1 ORDER BY created_at DESC")
+      .all() as MemoryRow[];
+    return rows.map(r => this.hydrate(r));
+  }
+
+  /** Get sync status summary for cloud quota management. */
+  getSyncStatusSummary(): { synced: number; unsynced: number; total: number } {
+    const synced = (
+      this.db.prepare("SELECT COUNT(*) AS n FROM memories WHERE cloud_synced = 1").get() as { n: number }
+    ).n;
+    const unsynced = (
+      this.db.prepare("SELECT COUNT(*) AS n FROM memories WHERE cloud_synced = 0").get() as { n: number }
+    ).n;
+    return { synced, unsynced, total: synced + unsynced };
+  }
+
+  /** Check if a memory is synced to cloud. */
+  isMemorySynced(id: string): boolean {
+    const row = this.db
+      .prepare("SELECT cloud_synced FROM memories WHERE id = ?")
+      .get(id) as { cloud_synced: number } | undefined;
+    return row?.cloud_synced === 1;
   }
 
   // ---------------------------------------------------------------- private
