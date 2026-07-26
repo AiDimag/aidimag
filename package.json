@@ -1,6 +1,6 @@
 {
   "name": "aidimag",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Persistent, verified memory for AI coding agents. CLI: dim.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
