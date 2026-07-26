@@ -2,7 +2,7 @@
   "name": "aidimag-vscode",
   "displayName": "AI Dimag — Memory for AI Agents",
   "description": "Persistent, verified memory for AI coding agents. Memory Explorer panel, detail view, and stale-memory warnings inside VSCode.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "aidimag",
   "author": "Anup Khanal",
   "license": "SEE LICENSE IN LICENSE",
