@@ -1,7 +1,7 @@
 # aiDimag for IntelliJ IDEA
 
 IntelliJ plugin that mirrors the VSCode extension with JetBrains-native UI. Current
-version: **1.0.1**.
+version: **1.0.4**.
 
 ## Features
 
@@ -26,6 +26,8 @@ version: **1.0.1**.
   - Verify Memories
   - Sync Team Memory
   - Sync Knowledge Inbox
+  - Scratchpad (Session Notes) — jot/show/clear TTL-expiring working notes (`dim scratch`)
+  - Audit Memory Provenance — memories resting on weak ground (`dim audit`)
   - Login (approve this device)
   - Connect Ticketing App
   - Show Ticket
@@ -44,7 +46,7 @@ The `dim` CLI must be installed (`npm i -g aidimag`) and the project must contai
 
 ## License
 
-[Elastic License 2.0](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
+[MIT License](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — open source, free for any team size.
 
 ## Author
 

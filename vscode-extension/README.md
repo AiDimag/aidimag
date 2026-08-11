@@ -68,6 +68,12 @@ Explorer tree, an embedded dashboard, and memory/sync health in the status bar.
   (`feature/XXX-2100-serialize-token-refresh`).
 - **aidimag: Sync Knowledge Inbox** — manually run `dim knowledge sync` to
   summarize dropped docs into review proposals.
+- **aidimag: Scratchpad (short-term session notes)** — jot, show, or clear
+  TTL-expiring working notes (`dim scratch`). Session state only: never synced,
+  never durable memory — promote keepers with **Add Memory**.
+- **aidimag: Audit Memory Provenance** — runs `dim audit` and lists memories
+  resting on weak ground (agent-authored, evidence-free, stale, or
+  long-unverified), highest risk first, with fix-up follow-ups.
 
 ## Requirements
 
@@ -76,7 +82,7 @@ an `.aidimag/` directory (`dim init`). Set `aidimag.dimPath` if `dim` isn't on P
 
 ## License
 
-[Elastic License 2.0](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — free for teams of 10 or fewer users. Commercial license required for larger organizations.
+[MIT License](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — open source, free for any team size.
 
 ## Author
 

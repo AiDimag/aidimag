@@ -55,6 +55,11 @@
       <action id="Aidimag.GenerateContext" class="com.aidimag.intellij.actions.GenerateContextAction" text="Generate Context Files"
               description="Render verified memory into CLAUDE.md / .cursorrules / copilot-instructions.md for non-MCP tools"/>
       <separator/>
+      <action id="Aidimag.Scratchpad" class="com.aidimag.intellij.actions.ScratchpadAction" text="Scratchpad (Session Notes)"
+              description="Short-term working notes for the current session — TTL-expiring, never synced, never durable memory"/>
+      <action id="Aidimag.Audit" class="com.aidimag.intellij.actions.AuditAction" text="Audit Memory Provenance"
+              description="Surface memories resting on weak ground: agent-authored, evidence-free, stale, or long-unverified"/>
+      <separator/>
       <action id="Aidimag.Login" class="com.aidimag.intellij.actions.LoginAction" text="Login (approve this device)"/>
       <action id="Aidimag.ConnectTickets" class="com.aidimag.intellij.actions.ConnectTicketsAction" text="Connect Ticketing App"/>
       <action id="Aidimag.ShowTicket" class="com.aidimag.intellij.actions.ShowTicketAction" text="Show Ticket"/>
