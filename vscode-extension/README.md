@@ -82,7 +82,7 @@ an `.aidimag/` directory (`dim init`). Set `aidimag.dimPath` if `dim` isn't on P
 
 ## License
 
-[MIT License](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — open source, free for any team size.
+[MIT License](https://github.com/AiDimag/aidimag/blob/main/LICENSE) — open source, free for any team size.
 
 ## Author
 

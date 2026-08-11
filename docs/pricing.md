@@ -18,7 +18,7 @@ head:
 
 # Pricing
 
-**aiDimag is open source under the [MIT license](https://github.com/anup-khanal/aidimag/blob/main/LICENSE)** — free for everyone, any team size, no user limits. The optional **aiDimag Cloud** subscription adds managed sync, and is what keeps the project funded and open source.
+**aiDimag is open source under the [MIT license](https://github.com/AiDimag/aidimag/blob/main/LICENSE)** — free for everyone, any team size, no user limits. The optional **aiDimag Cloud** subscription adds managed sync, and is what keeps the project funded and open source.
 
 <p class="pricing-lead">The full product runs on your machines for free — cloud adds managed sync and zero server ops.</p>
 
@@ -160,7 +160,7 @@ Yes — MIT allows commercial use, modification, redistribution, and embedding w
 
 ### How do I get support?
 
-Community support via [GitHub Issues](https://github.com/anup-khanal/aidimag/issues). Cloud subscribers get priority support.
+Community support via [GitHub Issues](https://github.com/AiDimag/aidimag/issues). Cloud subscribers get priority support.
 
 ---
 
@@ -172,4 +172,4 @@ aiDimag is licensed under the **MIT License**.
 - Commercial use, modification, and redistribution allowed
 - Optional paid product: managed sync at [cloud.aidimag.com](https://cloud.aidimag.com)
 
-[Read the full license →](https://github.com/anup-khanal/aidimag/blob/main/LICENSE)
+[Read the full license →](https://github.com/AiDimag/aidimag/blob/main/LICENSE)

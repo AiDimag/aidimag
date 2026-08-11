@@ -10,11 +10,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anup-khanal/aidimag.git"
+    "url": "git+https://github.com/AiDimag/aidimag.git"
   },
   "homepage": "https://aidimag.com",
   "bugs": {
-    "url": "https://github.com/anup-khanal/aidimag/issues"
+    "url": "https://github.com/AiDimag/aidimag/issues"
   },
   "bin": {
     "dim": "./dist/cli/index.js",

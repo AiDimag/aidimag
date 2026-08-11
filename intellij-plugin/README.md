@@ -46,7 +46,7 @@ The `dim` CLI must be installed (`npm i -g aidimag`) and the project must contai
 
 ## License
 
-[MIT License](https://github.com/anup-khanal/aidimag/blob/main/LICENSE) — open source, free for any team size.
+[MIT License](https://github.com/AiDimag/aidimag/blob/main/LICENSE) — open source, free for any team size.
 
 ## Author
 

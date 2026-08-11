@@ -89,5 +89,5 @@ Head to **[Getting started](https://aidimag.com/getting-started)** to set it up 
 
 ## License
 
-**Open source under the [MIT License](https://github.com/anup-khanal/aidimag/blob/main/LICENSE)** — free for any team size, forever. Optional managed sync at [cloud.aidimag.com](https://cloud.aidimag.com) funds the project. See [Pricing & licensing](/pricing) for details.
+**Open source under the [MIT License](https://github.com/AiDimag/aidimag/blob/main/LICENSE)** — free for any team size, forever. Optional managed sync at [cloud.aidimag.com](https://cloud.aidimag.com) funds the project. See [Pricing & licensing](/pricing) for details.
 
