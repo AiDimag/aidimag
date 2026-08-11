@@ -1,3 +1,21 @@
+---
+title: MCP Integration | Connect aiDimag to Claude Code, Cursor & Copilot
+description: Learn how to integrate aiDimag with AI coding agents using the Model Context Protocol (MCP). Setup guides for Claude Code, Cursor, and GitHub Copilot.
+head:
+  - - meta
+    - name: keywords
+      content: MCP integration, Model Context Protocol, Claude Code setup, Cursor integration, GitHub Copilot, aiDimag MCP server, AI agent integration
+  - - meta
+    - property: og:title
+      content: MCP Integration - Connect AI Coding Agents
+  - - meta
+    - property: og:url
+      content: https://aidimag.com/mcp
+  - - link
+    - rel: canonical
+      href: https://aidimag.com/mcp
+---
+
 # MCP integration
 
 aiDimag ships an [MCP](https://modelcontextprotocol.io) server so any MCP-capable AI agent
@@ -59,6 +77,9 @@ tool doesn't speak MCP, use [generated context files](/guides/generate-context) 
 | `memory_status` | Counts by status and kind |
 | `commits_mine` | Mine git history for memory proposals (like `dim mine`; optional `full`, `llm`, `max`) |
 | `memory_critique` | Review work against verified memory + guardrails (a "second critic") |
+| `scratchpad_write` | Jot a **short-term working note** for the current session (task state, plans, hypotheses). TTL-expiring (default 24h), never synced, never durable memory |
+| `scratchpad_read` | Read back working notes — use when resuming a task to recover in-flight state (expired notes are purged automatically) |
+| `scratchpad_clear` | Clear working notes when a task completes |
 | `proposals_pending` | List proposals awaiting review |
 | `knowledge_pending` | List documents waiting in the knowledge inbox to be summarized |
 | `knowledge_ingest_submit` | Submit the claims extracted from a pending knowledge doc (queues proposals, backs up the original) |
@@ -84,12 +105,13 @@ tool doesn't speak MCP, use [generated context files](/guides/generate-context) 
 1. **Start** → run `session_start` (or read `aidimag://session-briefing`) to learn the rules
    and stale spots.
 2. **Before editing files** → `memory_get_for_files` to pull conventions/gotchas/guardrails.
-3. **While working** → `memory_search` whenever a question comes up, and `context_note`
-   the moment the human states a durable fact in chat.
+3. **While working** → `memory_search` whenever a question comes up, `context_note`
+   the moment the human states a durable fact in chat, and `scratchpad_write` for
+   in-flight task state (plans, hypotheses, "resume here" markers).
 4. **Before finishing** → `memory_critique` with a short summary to catch guardrail
    violations and contradictions.
 5. **End** → run `session_end_extraction` and `memory_propose` durable learnings (which you
-   later approve with `dim review`).
+   later approve with `dim review`); `scratchpad_clear` anything no longer needed.
 
 ## Do I even need MCP?
 

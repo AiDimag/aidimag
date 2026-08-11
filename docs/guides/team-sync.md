@@ -21,14 +21,37 @@ This page covers the **self-hosted** `dim serve` option.
 
 ## Set up a server
 
+### Quick start (local testing)
+
 Run it anywhere reachable — a laptop, a VPS, Fly.io:
 
 ```sh
 dim serve --token <shared-secret> --db ./team-sync.db --port 8787
 ```
 
-(See `deploy/` in the repo for a Dockerfile + Fly.io config — about 10 minutes to a private
-hosted server.)
+### Remote deployment
+
+Deploy the sync server using Docker on any host (Railway, Render, VPS, Fly.io, etc.).
+
+```sh
+npm run build
+docker build -f deploy/Dockerfile -t aidimag-sync .
+docker run -d -p 8787:8787 -v aidimag_data:/data \
+  -e AIDIMAG_SYNC_TOKEN=<admin-token> aidimag-sync
+```
+
+**Important:** Put HTTPS in front (Caddy/Traefik/cloud load balancer) before real use — tokens travel as Bearer headers.
+
+#### Deployment files
+
+The `deploy/` directory contains:
+- **`Dockerfile`** — Container image for the sync server
+- **`fly.toml`** — Fly.io configuration
+- **`README.md`** — Detailed deployment instructions
+
+::: tip Security note
+The `AIDIMAG_SYNC_TOKEN` is your admin token. Store it securely (password manager, secrets vault). Never commit it to the repository. Use this token to mint brain-scoped keys for team members (see API keys section below).
+:::
 
 ## Link a repo
 
@@ -39,8 +62,7 @@ dim cloud link --server http://your-server:8787 --brain myrepo --token <shared-s
 dim sync
 ```
 
-The server URL and brain name go in `.aidimag/config.json` (safe to commit). The **token**
-goes in `~/.aidimag/credentials.json` — never in the repo. So onboarding a teammate is:
+The server URL, brain name, and **token** all go in `.aidimag/config.json`. This file is **gitignored by default** (`dim init` adds it to `.aidimag/.gitignore`). So onboarding a teammate is:
 
 ```sh
 dim init

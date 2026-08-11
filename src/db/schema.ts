@@ -3,7 +3,7 @@
  * FTS5 powers Phase 1 search; sqlite-vec embeddings arrive in Phase 2.
  */
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 11;
 
 /** Idempotent migrations for pre-existing DBs (failures = already applied). */
 export const MIGRATIONS: string[] = [
@@ -18,6 +18,11 @@ export const MIGRATIONS: string[] = [
   // column adds cleanly on old DBs.
   "ALTER TABLE memories ADD COLUMN guardrail_level TEXT",
   "ALTER TABLE proposals ADD COLUMN guardrail_level TEXT",
+  // v10: per-item cloud sync tracking for quota management
+  "ALTER TABLE memories ADD COLUMN cloud_synced INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE memories ADD COLUMN cloud_seq INTEGER",
+  "ALTER TABLE proposals ADD COLUMN cloud_synced INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE proposals ADD COLUMN cloud_seq INTEGER",
 ];
 
 /**
@@ -153,7 +158,9 @@ CREATE TABLE IF NOT EXISTS memories (
   superseded_by TEXT REFERENCES memories(id),
   updated_at    TEXT,
   pinned        INTEGER NOT NULL DEFAULT 0,
-  guardrail_level TEXT CHECK (guardrail_level IN ('always','ask-first','never'))
+  guardrail_level TEXT CHECK (guardrail_level IN ('always','ask-first','never')),
+  cloud_synced  INTEGER NOT NULL DEFAULT 0,
+  cloud_seq     INTEGER
 );
 
 -- scope: one row per path / symbol a memory applies to
@@ -219,7 +226,9 @@ CREATE TABLE IF NOT EXISTS proposals (
   memory_id  TEXT REFERENCES memories(id) ON DELETE SET NULL,  -- set when approved
   updated_at TEXT,
   ticket_ref TEXT,                          -- ticket id (e.g. XXX-2100) when known
-  guardrail_level TEXT                      -- always | ask-first | never (GUARDRAIL proposals)
+  guardrail_level TEXT,                     -- always | ask-first | never (GUARDRAIL proposals)
+  cloud_synced INTEGER NOT NULL DEFAULT 0,
+  cloud_seq  INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status);
@@ -235,6 +244,8 @@ CREATE TABLE IF NOT EXISTS tombstones (
 
 CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
 CREATE INDEX IF NOT EXISTS idx_memories_kind   ON memories(kind);
+CREATE INDEX IF NOT EXISTS idx_memories_cloud_synced ON memories(cloud_synced);
+CREATE INDEX IF NOT EXISTS idx_proposals_cloud_synced ON proposals(cloud_synced);
 CREATE INDEX IF NOT EXISTS idx_scopes_value    ON memory_scopes(value);
 CREATE INDEX IF NOT EXISTS idx_evidence_memory ON evidence(memory_id);
 
@@ -272,5 +283,21 @@ CREATE TABLE IF NOT EXISTS events (
   synced         INTEGER NOT NULL DEFAULT 0     -- 1 once pushed to the server
 );
 CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced, seq);
+
+-- v11: scratchpad — session-scoped short-term working memory.
+-- Intermediate findings, plans, and hypotheses for the CURRENT session. Entries
+-- expire automatically (TTL) and are purged on read. Local-only: never synced,
+-- never enters the review queue, never becomes durable memory. Promote anything
+-- worth keeping via \`dim remember\` / memory_propose.
+CREATE TABLE IF NOT EXISTS scratchpad (
+  id         TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL DEFAULT 'default',
+  content    TEXT NOT NULL,
+  created_by TEXT NOT NULL DEFAULT 'agent',
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_scratchpad_session ON scratchpad(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_scratchpad_expiry ON scratchpad(expires_at);
 `;
 

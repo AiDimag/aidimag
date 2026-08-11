@@ -22,6 +22,8 @@
  *  - "aidimag: Show Knowledge Gaps" → `dim gaps` (+ clear / add-memory follow-ups)
  *  - "aidimag: Review Synced-in Evidence" → interactive `dim verify --trust`
  *  - "aidimag: Generate Context Files" → `dim generate-context -f <fmt>` (+ --auto)
+ *  - "aidimag: Scratchpad"        → `dim scratch` (jot/show/clear short-term session notes)
+ *  - "aidimag: Audit Memory Provenance" → `dim audit` (agent-authored / evidence-free / long-unverified)
  *  - Status bar: 🧠 memory counts + ☁ sync state
  *
  * Plain CommonJS: no build step, packageable with `vsce package` as-is.
@@ -1267,6 +1269,64 @@ function verifyTrust() {
   runInTerminal("verify --trust", "verify --trust");
 }
 
+// ─── Scratchpad (short-term session notes) ─────────────────────────────────
+
+async function scratch() {
+  const root = repoRoot();
+  if (!root) { vscode.window.showErrorMessage("aidimag: open a folder first."); return; }
+  const pick = await vscode.window.showQuickPick(
+    [
+      { label: "$(pencil) Jot a note", description: "TTL-expiring session note — never synced, never durable memory", act: "add" },
+      { label: "$(list-unordered) Show notes", description: "current scratchpad contents (expired notes auto-purged)", act: "show" },
+      { label: "$(trash) Clear all notes", description: "wipe the scratchpad now", act: "clear" },
+    ],
+    { placeHolder: "Scratchpad: short-term working notes (auto-expire; use Add Memory for durable knowledge)" },
+  );
+  if (!pick) return;
+  try {
+    if (pick.act === "add") {
+      const note = await vscode.window.showInputBox({
+        prompt: "Scratchpad note (expires in 24h — promote durable learnings with “aidimag: Add Memory”)",
+        placeHolder: "e.g. auth refactor: JWT rotation half-done, resume at src/auth/rotate.ts",
+      });
+      if (!note || !note.trim()) return;
+      await runDim(["scratch", note.trim()], root);
+      vscode.window.setStatusBarMessage("aidimag: note jotted 📝 (expires in 24h)", 5000);
+    } else if (pick.act === "show") {
+      const { stdout } = await runDim(["scratch", "--all"], root);
+      const out = vscode.window.createOutputChannel("aidimag scratchpad", { log: false });
+      out.clear(); out.append(stdout); out.show(true);
+    } else if (pick.act === "clear") {
+      const { stdout } = await runDim(["scratch", "--clear", "--all"], root);
+      vscode.window.setStatusBarMessage(`aidimag: ${stdout.trim()}`, 5000);
+    }
+  } catch (err) {
+    vscode.window.showErrorMessage(`aidimag scratch: ${err.message}`);
+  }
+}
+
+// ─── Provenance audit ──────────────────────────────────────────────────────
+
+async function audit() {
+  const root = repoRoot();
+  if (!root) return;
+  try {
+    const { stdout } = await runDim(["audit"], root);
+    const out = vscode.window.createOutputChannel("aidimag audit", { log: false });
+    out.clear(); out.append(stdout); out.show(true);
+    if (/nothing suspicious/i.test(stdout)) return;
+    const pick = await vscode.window.showWarningMessage(
+      "aidimag: some memories rest on weak ground (agent-authored, evidence-free, or long-unverified). " +
+      "Add evidence, re-verify, or refute them.",
+      "Verify Memories", "Open Dashboard",
+    );
+    if (pick === "Verify Memories") verify();
+    if (pick === "Open Dashboard") openDashboard();
+  } catch (err) {
+    vscode.window.showErrorMessage(`aidimag audit: ${err.message}`);
+  }
+}
+
 async function generateContext() {
   const root = repoRoot();
   if (!root) return;
@@ -1484,6 +1544,8 @@ function activate(context) {
     vscode.commands.registerCommand("aidimag.gaps",                   gaps),
     vscode.commands.registerCommand("aidimag.verifyTrust",            verifyTrust),
     vscode.commands.registerCommand("aidimag.generateContext",        generateContext),
+    vscode.commands.registerCommand("aidimag.scratch",                scratch),
+    vscode.commands.registerCommand("aidimag.audit",                  audit),
     // disposables
     statusItem, syncStatusItem, treeView, memoryDecorations,
   );

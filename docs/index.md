@@ -1,5 +1,23 @@
 ---
 layout: home
+title: AI Dimag - Verified Memory for AI Coding Agents
+description: Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true. Open source under the MIT license.
+head:
+  - - meta
+    - name: keywords
+      content: AI coding assistant, AI memory, verified memory, coding agent, Claude Code, Cursor, GitHub Copilot, MCP, dim CLI, aiDimag, codebase memory
+  - - meta
+    - property: og:title
+      content: AI Dimag - Verified Memory for AI Coding Agents
+  - - meta
+    - property: og:description
+      content: Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true.
+  - - meta
+    - property: og:url
+      content: https://aidimag.com
+  - - link
+    - rel: canonical
+      href: https://aidimag.com
 
 hero:
   name: AI Dimag
@@ -22,29 +40,35 @@ hero:
 features:
   - icon: 🧠
     title: Never explain your codebase twice
-    details: Your AI assistant remembers the decisions, conventions, gotchas, and dead ends you've already worked through — so every new session starts where the last one left off.
+    details: Your coding agent remembers the architecture decisions, conventions, invariants, gotchas, and dead ends your team already worked through — every session starts where the last one left off, not from a cold repo scan.
   - icon: ✅
-    title: Knowledge you can actually trust
-    details: Each memory comes with a way to check it's still true. As your code changes, aiDimag re-checks and flags anything that's gone out of date — no more acting on stale advice.
+    title: Claim-and-verify, not store-and-retrieve
+    details: Every memory is a falsifiable claim with evidence — a shell check, an anchored commit, a test. Git hooks re-verify on every pull and rebase; claims the code has outgrown flip to STALE instead of silently misleading your agent.
   - icon: 🚦
-    title: Rules your AI will respect
-    details: Set guardrails like "never", "ask first", or "always". They guide every AI tool, show up at the start of each session, and can even stop a risky change before it's committed.
+    title: Guardrails your agent must respect
+    details: Encode engineering rules as never / ask-first / always guardrails. They surface in every session briefing, ground the memory_critique second-critic, and dim check can block a violating commit before it lands.
   - icon: 🔌
-    title: Plays nice with your AI tools
-    details: Connects directly to Claude Code, Cursor, and Copilot — and for anything else, it writes a CLAUDE.md, .cursorrules, and Copilot instructions file your tools already read.
+    title: Wired into your development tools
+    details: Live MCP tools for Claude Code, Cursor, and Copilot — plus generated CLAUDE.md, .cursorrules, and copilot-instructions.md for everything else. VS Code and IntelliJ extensions, git-hook capture, ticket integration.
   - icon: 👥
-    title: Yours by default, shared when you want
-    details: Everything lives in one file inside your repo — no account needed to start. Ready for a team? Spin up your own sync server and share a brain. No SaaS, no lock-in.
-  - icon: 🧩
-    title: Use it your way
-    details: Browse and add memories right inside VSCode or IntelliJ, or open the friendly web dashboard with one command (dim ui).
+    title: Local-first, team-ready
+    details: One SQLite file in your repo — no account, no cloud required. Scale to a team with a self-hosted sync server, brain-scoped API keys, and cross-machine verification consensus.
+  - icon: 🔒
+    title: Engineered for repo security
+    details: Nothing enters memory without human review. Shell-command evidence that arrives via team sync is never executed until you inspect and approve it — a teammate's memory can't become code execution on your machine.
 ---
 
 ## In one sentence
 
-**aiDimag gives AI coding agents a long-term memory of your codebase that is checked
-against reality**, so they stop re-discovering the same things — and stop trusting facts
-that have since become false.
+**aiDimag is a memory system for software engineering**: it gives AI coding agents a
+long-term memory of your codebase that is **checked against reality** — so they stop
+re-discovering the same things, and stop trusting facts the code has since outgrown.
+
+It is not a general-purpose "AI memory" app. The subject of memory is your *repository* —
+not your preferences, not your conversations — and every capability (evidence, git-hook
+verification, guardrails, pre-commit checks, path-scoped recall) exists to serve
+day-to-day development work. See **[how aiDimag compares](/comparison)** to other memory
+systems.
 
 ## The 30-second mental model
 
@@ -54,14 +78,16 @@ that have since become false.
 - When the code changes and a claim no longer holds, it's marked **stale** so nobody trusts it.
 - The most important rules can be **pinned** (never expire) and turned into **guardrails**
   the agent must obey.
+- Short-lived session state goes in the **scratchpad** — it expires on its own and never
+  pollutes durable memory.
 - All of it is fed to your AI tools automatically.
 
-Head to **[Getting started](/getting-started)** to set it up in your repo, or read
-**[What is aiDimag?](/introduction)** for the why.
+Head to **[Getting started](https://aidimag.com/getting-started)** to set it up in your repo, or read
+**[What is aiDimag?](https://aidimag.com/introduction)** for the why.
 
 ---
 
 ## License
 
-**Free for teams of 10 or fewer users** under the [Elastic License 2.0](https://github.com/anup-khanal/aidimag/blob/main/LICENSE). For larger teams or commercial use beyond this limit, a commercial license is required. See [Pricing & licensing](/pricing) for details.
+**Open source under the [MIT License](https://github.com/anup-khanal/aidimag/blob/main/LICENSE)** — free for any team size, forever. Optional managed sync at [cloud.aidimag.com](https://cloud.aidimag.com) funds the project. See [Pricing & licensing](/pricing) for details.
 

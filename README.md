@@ -7,7 +7,7 @@
 **Your codebase remembers its decisions, conventions, and rules — and proves they're still true.**
 
 [![npm version](https://img.shields.io/npm/v/aidimag?color=blue&logo=npm)](https://www.npmjs.com/package/aidimag)
-[![License](https://img.shields.io/badge/license-Elastic_2.0-blue.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-aidimag.com-blue)](https://aidimag.com)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 
@@ -19,11 +19,15 @@
 
 ## What is AI Dimag?
 
-**AI Dimag** gives any MCP-compatible agent (Claude, Cursor, Copilot, Windsurf…) a **persistent memory** of your codebase that survives across sessions — decisions, conventions, gotchas, failed approaches, **guardrails**, and reusable **skills** — stored as **falsifiable claims with grounding evidence** in `.aidimag/` next to your code.
+**AI Dimag** is a memory system **for software engineering** — not a general-purpose "AI memory" app. It gives any MCP-compatible agent (Claude, Cursor, Copilot, Windsurf…) a **persistent memory of your codebase** that survives across sessions — decisions, conventions, gotchas, failed approaches, **guardrails**, and reusable **skills** — stored as **falsifiable claims with grounding evidence** in `.aidimag/` next to your code.
 
-### 🎯 The Difference: Verified, Not Just Stored
+The subject of memory is your **repository**, not your preferences or chat history. Every capability — evidence, git-hook verification, guardrails, pre-commit checks, path-scoped recall, session scratchpad — exists to serve day-to-day development work.
 
-Every memory carries **evidence** (a shell check, an anchored commit, a test) that `dim verify` re-runs against the current repo. Beliefs that stop being true go **STALE** instead of silently misleading your AI.
+### 🎯 The Difference: Claim-and-Verify, Not Store-and-Retrieve
+
+Most memory systems **store** text and **retrieve** whatever is similar later — a stored fact is assumed true forever. That's dangerous in a codebase, where a confidently-retrieved stale fact is *worse* than no memory at all.
+
+Every AI Dimag memory carries **evidence** (a shell check, an anchored commit, a test) that `dim verify` re-runs against the current repo — automatically, via git hooks, on every pull, checkout, and rebase. Beliefs that stop being true go **STALE** instead of silently misleading your AI.
 
 ### ✨ Works with Every AI Tool
 
@@ -103,8 +107,27 @@ Behavioral rules (`never` / `ask-first` / `always`) and step-by-step procedures,
 ### 📚 Knowledgebase Inbox
 Drop design docs / ADRs / PDFs / DOCX into `knowledge/` and they're summarized into reviewed, pinned memories.
 
+### 📝 Scratchpad & Provenance Audit
+`dim scratch` (and the `scratchpad_*` MCP tools) hold short-term session notes — TTL-expiring, never synced, never durable memory. `dim audit` lists memories resting on the weakest ground (agent-authored, evidence-free, stale, or long-unverified) so you can fix them up like a dependency audit for your repo's knowledge.
+
 ### 🎨 Web Dashboard & Extensions
 `dim ui` plus VS Code and IntelliJ extensions.
+
+## 🥊 How It Compares
+
+AI Dimag follows a **claim-and-verify** model; other memory systems follow **store-and-retrieve**. The short version:
+
+| | Conversational memory layers | Vector-store memory plugins | Hand-maintained context files | **AI Dimag** |
+|---|---|---|---|---|
+| **Built for** | Chat assistants remembering *users* | General recall over embedded text | Static instructions for coding agents | **Coding agents in a living repo** |
+| **Unit of memory** | Extracted facts / chat summaries | Embedded text chunks | Prose | **Falsifiable, typed claims with evidence** |
+| **How memory gets in** | Automatic capture | Automatic embedding | Manual edits | **Human-gated review queue** |
+| **When the code changes** | Nothing — stored facts stay "true" | Nothing | File silently rots | **Evidence re-runs via git hooks; broken claims flip STALE** |
+| **Trust model** | Write-time label, never re-checked | Similarity ≈ trust | "It's in the file" | **Verification status + decaying confidence; trust-ranked retrieval** |
+| **Enforcement** | None — injection only | None | Hope the model reads it | **Guardrails + pre-commit `dim check` + `memory_critique`** |
+| **Failure mode** | Confidently recalls outdated facts | Retrieves similar, true or not | Instructions drift from reality | **Says "this went STALE" instead of guessing** |
+
+Full comparison: **[aidimag.com/comparison](https://aidimag.com/comparison)**
 
 ## 📖 Documentation
 
@@ -141,11 +164,13 @@ Full documentation: **[aidimag.com](https://aidimag.com)**
 
 ---
 
-## 💰 Pricing
+## 💰 License & Pricing
 
-**Free for teams of 10 or fewer users** under the [Elastic License 2.0](./LICENSE).
+**AI Dimag is open source under the [MIT License](./LICENSE)** — free for everyone, any team size, forever. Use it, fork it, embed it.
 
-For larger teams or commercial use beyond this limit, a commercial license is required. See [**Pricing & Licensing**](https://aidimag.com/pricing) for details.
+The entire local-first product is free: CLI, MCP server, verification, guardrails, skills, IDE extensions, local dashboard, and self-hosted team sync (`dim serve`).
+
+Want team sync without running a server? **[AI Dimag Cloud](https://cloud.aidimag.com)** is an optional managed sync subscription — that's how the project stays funded and open source. See [**Pricing**](https://aidimag.com/pricing).
 
 ---
 

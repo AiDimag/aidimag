@@ -16,6 +16,8 @@ import { debugLog } from "../debug.js";
 import type { MemoryStore } from "../db/store.js";
 import type { MemoryEntry, Proposal } from "../types.js";
 import type { SyncItem, EventItem, RemoteSnapshot } from "./server.js";
+import { shouldEnforceQuota, getUserPlan, calculateQuotaStatus, type UserPlan, type QuotaStatus } from "./quota.js";
+import { selectMemories, type SelectionStrategy } from "./selection.js";
 
 export interface CloudConfig {
   server: string;
@@ -149,6 +151,14 @@ export interface SyncResult {
   needsFullUploadConfirm?: boolean;
   /** Auto-recovery detected local data loss and reset cursor to pull all remote data. */
   autoRecovered?: boolean;
+  /** Quota status from server (if applicable). */
+  quota?: QuotaStatus;
+  /** Quota exceeded, user needs to select memories. */
+  quotaExceeded?: boolean;
+  /** Number of unsynced memories. */
+  unsyncedCount?: number;
+  /** Warning message from server. */
+  warning?: string;
 }
 
 export interface SyncOptions {
@@ -158,6 +168,12 @@ export interface SyncOptions {
   confirmFullUpload?: (localMemoryCount: number, remoteMemoryCount: number | null) => Promise<boolean>;
   /** Reset pull cursor to 0 and fetch all remote data (useful for recovery after local DB corruption). */
   forcePull?: boolean;
+  /** Selection strategy for quota limits. */
+  selectionStrategy?: SelectionStrategy;
+  /** Specific memory IDs to sync (for custom selection). */
+  selectedIds?: string[];
+  /** Skip quota checks and selection UI (for testing). */
+  skipQuotaCheck?: boolean;
 }
 
 function formatFetchError(server: string, err: unknown): Error {
@@ -255,6 +271,39 @@ async function getRemoteMemoryCount(cfg: CloudConfig, token: string): Promise<nu
       return null;
     }
   }
+}
+
+/**
+ * Check quota and detect plan upgrades.
+ * Returns quota status if enforcement applies, null otherwise.
+ */
+async function checkQuotaAndPlan(
+  cfg: CloudConfig,
+  token: string,
+  store: MemoryStore
+): Promise<{ plan: UserPlan; quota: QuotaStatus; upgraded: boolean } | null> {
+  if (!shouldEnforceQuota(cfg.server)) {
+    return null;
+  }
+
+  const plan = await getUserPlan(cfg.server, token);
+  if (!plan) {
+    return null;
+  }
+
+  const lastKnownPlan = store.getMeta("last_known_plan") || "free";
+  const upgraded = lastKnownPlan === "free" && plan.tier !== "free";
+  
+  if (upgraded) {
+    debugLog("quota", `Plan upgraded: ${lastKnownPlan} → ${plan.tier}`);
+  }
+  
+  store.setMeta("last_known_plan", plan.tier);
+
+  const remoteCount = await getRemoteMemoryCount(cfg, token);
+  const quota = calculateQuotaStatus(remoteCount || 0, plan);
+
+  return { plan, quota, upgraded };
 }
 
 export async function sync(store: MemoryStore, repoRoot: string, opts: SyncOptions = {}): Promise<SyncResult> {

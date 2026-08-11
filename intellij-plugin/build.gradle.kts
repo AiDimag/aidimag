@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.aidimag"
-version = "1.0.1"
+version = "1.0.4"
 
 repositories {
   mavenCentral()

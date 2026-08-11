@@ -1,11 +1,11 @@
 {
   "name": "aidimag-vscode",
-  "displayName": "aidimag — repo brain",
+  "displayName": "AI Dimag — Memory for AI Agents",
   "description": "Persistent, verified memory for AI coding agents. Memory Explorer panel, detail view, and stale-memory warnings inside VSCode.",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "publisher": "aidimag",
   "author": "Anup Khanal",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/anup-khanal/aidimag.git",
@@ -40,7 +40,9 @@
       { "command": "aidimag.brief",                   "title": "aidimag: Session Briefing" },
       { "command": "aidimag.gaps",                    "title": "aidimag: Show Knowledge Gaps" },
       { "command": "aidimag.verifyTrust",             "title": "aidimag: Review Synced-in Evidence (trust gate)" },
-      { "command": "aidimag.generateContext",         "title": "aidimag: Generate Context Files (CLAUDE.md, .cursorrules…)" }
+      { "command": "aidimag.generateContext",         "title": "aidimag: Generate Context Files (CLAUDE.md, .cursorrules…)" },
+      { "command": "aidimag.scratch",                 "title": "aidimag: Scratchpad (short-term session notes)" },
+      { "command": "aidimag.audit",                   "title": "aidimag: Audit Memory Provenance" }
     ],
     "viewsContainers": {
       "activitybar": [

@@ -1,9 +1,9 @@
 {
   "name": "aidimag",
-  "version": "1.0.15",
+  "version": "1.0.17",
   "description": "Persistent, verified memory for AI coding agents. CLI: dim.",
   "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "author": {
     "name": "Anup Khanal",
     "url": "https://github.com/anup-khanal"
@@ -61,7 +61,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^13.0.1",
     "commander": "^12.0.0",
     "mammoth": "^1.11.0",
     "pdf-parse": "^1.1.1",

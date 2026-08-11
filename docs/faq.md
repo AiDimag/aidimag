@@ -1,3 +1,21 @@
+---
+title: FAQ & Troubleshooting | aiDimag Help & Common Questions
+description: Frequently asked questions about aiDimag. Get answers about privacy, API keys, compatibility, troubleshooting, and common issues.
+head:
+  - - meta
+    - name: keywords
+      content: aiDimag FAQ, troubleshooting, common questions, help, support, aiDimag issues, dim problems, setup help
+  - - meta
+    - property: og:title
+      content: FAQ & Troubleshooting - aiDimag Help
+  - - meta
+    - property: og:url
+      content: https://aidimag.com/faq
+  - - link
+    - rel: canonical
+      href: https://aidimag.com/faq
+---
+
 # FAQ & troubleshooting
 
 ## General
@@ -93,6 +111,54 @@ the server aggregates results across machines into consensus.
 ### I don't want to share the admin token with the team.
 Don't — mint brain-scoped member keys with `dim keys create`, or use `dim login`. See
 [Team sync](/guides/team-sync).
+
+## Cloud quotas (aiDimag Cloud)
+
+### I hit the 100 memory limit on the free tier. What happens?
+When you reach the limit, `dim sync` will prompt you to choose which memories to sync:
+- **Sync newest 100** — Most recently created/updated
+- **Sync verified only** — Only VERIFIED status memories
+- **Let me select** — Choose specific memories
+
+Updates to already-synced memories always work, even at the limit. Only new memories are restricted.
+
+### Can I sync more than 100 memories on the free tier?
+No, the free tier is limited to 100 memories in the cloud. You can have unlimited memories locally,
+but only 100 will sync. Upgrade to a paid plan for more:
+- **Starter ($5/mo):** 1,000 memories
+- **Developer ($15/mo):** 10,000 memories
+- **Team ($50/mo):** 50,000 memories
+
+### What if I have 1000 local memories but only 100 can sync?
+You'll see a selection prompt when you run `dim sync`. Choose which 100 memories are most important
+to sync with your team. The rest stay local on your machine. You can change your selection anytime.
+
+### Do updates count against the quota?
+No! Updates to already-synced memories bypass the quota. The limit only applies to new memories
+you haven't synced before. This means you can always fix or update existing team knowledge.
+
+### What happens if I upgrade to a paid plan?
+After upgrading, run `dim sync` and it will automatically detect your new plan and offer to sync
+all remaining memories. No data is lost — everything that was local-only will sync to the cloud.
+
+### Does the rate limit (1 sync/min) apply to all syncs?
+Yes, on the free tier you can sync once per minute. Paid plans have unlimited sync frequency.
+Auto-sync respects this limit automatically.
+
+### I'm self-hosting aiDimag Cloud. How do I disable quotas?
+If you're running your own aiDimag Cloud instance, you can set unlimited quotas for all users:
+
+```sql
+-- Set unlimited memory for all users
+UPDATE subscriptions SET memory_limit = NULL;
+
+-- Or set custom limits per user
+UPDATE subscriptions 
+SET memory_limit = 10000 
+WHERE user_id = 'your-user-id';
+```
+
+Alternatively, disable the billing feature entirely in your server configuration. See the server documentation for details.
 
 ## Still stuck?
 

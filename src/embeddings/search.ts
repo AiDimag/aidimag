@@ -14,6 +14,28 @@ import { debugLog } from "../debug.js";
 const RRF_K = 60;
 const STATUS_PENALTY: Record<string, number> = { VERIFIED: 0, UNVERIFIED: 0.004, STALE: 0.012, REFUTED: 0.02 };
 
+/**
+ * Provenance weighting: agent/miner-authored
+ * memories rank slightly below human-authored and knowledgebase ones.
+ * Smaller than the status penalties — verification still dominates.
+ */
+function provenancePenalty(m: MemoryEntry): number {
+  return m.createdBy === "human" || m.createdBy.startsWith("knowledge") ? 0 : 0.002;
+}
+
+/**
+ * Recency bonus: recently touched memories edge
+ * out long-untouched ones as a tiebreak. ~30-day e-folding; pinned memories
+ * get the full bonus (curated reference never "ages out").
+ */
+function recencyBonus(m: MemoryEntry): number {
+  if (m.pinned) return 0.002;
+  const ts = Date.parse(m.updatedAt ?? m.createdAt);
+  if (Number.isNaN(ts)) return 0;
+  const ageDays = Math.max(0, (Date.now() - ts) / 86_400_000);
+  return 0.002 * Math.exp(-ageDays / 30);
+}
+
 /** Embed and index one memory (call after write/approve). No-op without a provider. */
 export async function indexMemory(store: MemoryStore, entry: MemoryEntry): Promise<boolean> {
   const provider = await getEmbeddingProvider();
@@ -86,8 +108,8 @@ export async function hybridSearch(store: MemoryStore, opts: MemorySearchOptions
   }
 
   candidates.sort((a, b) => {
-    const sa = (scores.get(a.id) ?? 0) - (STATUS_PENALTY[a.status] ?? 0);
-    const sb = (scores.get(b.id) ?? 0) - (STATUS_PENALTY[b.status] ?? 0);
+    const sa = (scores.get(a.id) ?? 0) - (STATUS_PENALTY[a.status] ?? 0) - provenancePenalty(a) + recencyBonus(a);
+    const sb = (scores.get(b.id) ?? 0) - (STATUS_PENALTY[b.status] ?? 0) - provenancePenalty(b) + recencyBonus(b);
     return sb - sa || b.confidence - a.confidence;
   });
 

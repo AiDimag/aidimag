@@ -24,8 +24,12 @@ Agents always query your local SQLite copy. Cloud is sync only — not a remote 
 3. **Create a new project** — one project = one shared **brain** for your team
 4. In your project → **Keys** tab → **Create API key** → copy the `aidimag_sk_…` token (shown once)
 
+::: tip Free tier limits
+The free tier includes **100 memories**, **1 API key**, and **1 sync per minute**. Perfect for trying cloud sync! Upgrade to a paid plan for unlimited memories and sync frequency. See [Pricing](/pricing) for details.
+:::
+
 ::: warning Keep your API key secret
-The key goes in `~/.aidimag/credentials.json` on your machine, never in git. Each team member gets their own key from the dashboard.
+The token is stored per-project in `.aidimag/config.json`. Add this file to `.gitignore` to keep tokens private (done automatically by `dim init`). Each team member gets their own key from the dashboard.
 :::
 
 ::: tip Self-hosting?
@@ -67,8 +71,8 @@ dim cloud link \
 dim sync
 ```
 
-- **Committed:** `.aidimag/config.json` (server URL + brain ID only)
-- **Private:** token in `~/.aidimag/credentials.json`
+- **`.aidimag/config.json`** stores server URL, brain ID, and token
+- **Gitignored by default** — `dim init` adds `config.json` to `.aidimag/.gitignore`
 
 Verify the connection:
 
@@ -126,6 +130,10 @@ Manual sync when you want to be sure:
 dim sync              # incremental
 dim sync --full       # re-upload everything (after server reset / cursor issues)
 ```
+
+::: tip Free tier quota
+If you hit the 100 memory limit, `dim sync` will prompt you to select which memories to sync. Updates to already-synced memories always work, even at the limit. See [FAQ - Cloud quotas](/faq#cloud-quotas-aidimag-cloud) for details.
+:::
 
 ---
 
