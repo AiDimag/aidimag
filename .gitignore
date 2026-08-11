@@ -8,11 +8,8 @@ dist/
 .vscode/
 .aidimag/
 
-# Editor plugins / cloud server live only on main-full & local disk
 # VitePress docs build output + cache
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 
-# Cloud server (separate repo, local only)
-aidimag-cloud/
 
