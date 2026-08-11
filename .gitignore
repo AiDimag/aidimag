@@ -21,3 +21,13 @@ docs/.vitepress/cache/
 
 # Cloud server (separate repo)
 aidimag-cloud/
+
+# Internal working notes (not published)
+CHANGELOG_v*.md
+CLOUD_SERVER_REQUIREMENTS.md
+DEVICE_LOGIN_FIX.md
+IMPLEMENTATION_STATUS.md
+NPM_PUBLISH_CHECKLIST.md
+SERVER_VERIFICATION_COMPLETE.md
+SYNC_CLIENT_REFACTOR_NEEDED.md
+design/
