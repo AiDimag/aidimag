@@ -10,6 +10,7 @@ import path from "node:path";
 import { MemoryStore } from "../db/store.js";
 import { scoreProposal, claimSimilarity, triagePending } from "../capture/triage.js";
 import { userMessagesFromTranscript, redactSecrets } from "../capture/harvest.js";
+import { codexTranscript, copilotUserMessages } from "../capture/transcript-sources.js";
 import { parseClaims, dedupeClaims } from "../knowledge/extract.js";
 import { classifyCommit, scopeFromFiles } from "../capture/commit-miner.js";
 import { buildPrPrompt } from "../capture/pr-miner.js";
@@ -110,6 +111,37 @@ test("redactSecrets strips secret-looking lines, keeps the rest", () => {
   assert.equal(lines[1], "[REDACTED — possible secret]");
   assert.equal(lines[2], "[REDACTED — possible secret]");
   assert.equal(lines[3], "another safe line");
+});
+
+test("codexTranscript extracts cwd and human turns, skips scaffolding", () => {
+  const jsonl = [
+    JSON.stringify({ type: "session_meta", payload: { cwd: "/repo/my-project", id: "abc" } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "<environment_context>stuff</environment_context>" }] } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "Our deploys always go through deploy/fly.toml — never push straight to prod." }] } }),
+    JSON.stringify({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "Got it." }] } }),
+    JSON.stringify({ type: "message", role: "user", content: "ok" }), // flat format, too short
+    "garbage line",
+  ].join("\n");
+  const { cwd, messages } = codexTranscript(jsonl);
+  assert.equal(cwd, "/repo/my-project");
+  assert.equal(messages.length, 1);
+  assert.match(messages[0], /fly\.toml/);
+});
+
+test("copilotUserMessages extracts request turns, skips short/malformed", () => {
+  const json = JSON.stringify({
+    requests: [
+      { message: { text: "We use better-sqlite3 for all persistence — do not introduce an ORM here." } },
+      { message: { text: "yes" } },
+      { message: { parts: [{ text: "Migrations live in src/db/schema.ts and " }, { text: "must bump SCHEMA_VERSION." }] } },
+      {},
+    ],
+  });
+  const msgs = copilotUserMessages(json);
+  assert.equal(msgs.length, 2);
+  assert.match(msgs[0], /better-sqlite3/);
+  assert.match(msgs[1], /SCHEMA_VERSION/);
+  assert.deepEqual(copilotUserMessages("not json"), []);
 });
 
 // ---------------------------------------------------------------- extraction

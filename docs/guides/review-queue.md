@@ -17,9 +17,9 @@ approval. This is the human gate that lets you trust what's in the store.
 - **In-chat context notes** — when you state a durable fact in an AI chat ("we use X because
   Y", "never touch Z"), the agent captures it live with the `context_note` MCP tool — your
   verbatim quote is kept for the review.
-- **Chat transcript harvesting** — `dim harvest` mines your local Claude Code session
-  transcripts for facts you typed (secrets redacted, local-only). See the
-  [CLI reference](/cli-reference#dim-harvest).
+- **Chat transcript harvesting** — `dim harvest` mines your local AI-chat session
+  transcripts (Claude Code, Codex CLI, GitHub Copilot/VS Code, Cursor) for facts you typed
+  (secrets redacted, local-only). See the [CLI reference](/cli-reference#dim-harvest).
 - **Knowledgebase ingestion** — summarized documents become proposals too (pinned on
   approval). See [Knowledgebase](/guides/knowledgebase).
 - **Stale-memory follow-ups** — when `dim verify` flips a memory to STALE, a recovery

@@ -1,14 +1,14 @@
 /**
  * Transcript harvester — out-of-band capture of the context humans type into
- * AI chats. Claude Code persists every session as JSONL under
- * ~/.claude/projects/<path-slug>/*.jsonl; the USER messages in there are the
- * highest-signal capture source aidimag has: they're the facts a human already
- * decided were worth teaching an AI ("we use X because Y", "never touch Z").
+ * AI chats. The USER messages in those transcripts are the highest-signal
+ * capture source aidimag has: they're the facts a human already decided were
+ * worth teaching an AI ("we use X because Y", "never touch Z").
  *
- * `dim harvest` extracts durable, falsifiable claims from those messages with
- * the configured LLM provider (OpenAI/Ollama, same fallback as knowledge
- * ingestion) and queues them as proposals (source `harvest:claude-code`) —
- * nothing becomes active memory without `dim review`.
+ * Sources (see transcript-sources.ts): Claude Code, Codex CLI, GitHub Copilot
+ * (VS Code) and Cursor. `dim harvest` extracts durable, falsifiable claims
+ * from those messages with the configured LLM provider (OpenAI/Ollama, same
+ * fallback as knowledge ingestion) and queues them as proposals (source
+ * `harvest:<tool>`) — nothing becomes active memory without `dim review`.
  *
  * Privacy: opt-in by invocation, local-only (transcripts never leave the
  * machine except to the LLM provider you configured), and secret-looking lines
@@ -16,19 +16,29 @@
  * SessionEnd hook so harvesting runs automatically when a session closes.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MemoryStore } from "../db/store.js";
 import { getTextProvider } from "../knowledge/llm.js";
 import { parseClaims, type ExtractedClaim } from "../knowledge/extract.js";
 import { debugLog } from "../debug.js";
+import { TRANSCRIPT_SOURCES, type TranscriptSource } from "./transcript-sources.js";
 
-const CURSOR_META_KEY = "harvest_claude_last_mtime";
-/** Ignore short/noisy user turns ("yes", "continue", slash commands…). */
-const MIN_MESSAGE_CHARS = 40;
+// re-export for back-compat (tests, external callers)
+export { claudeProjectDir, userMessagesFromTranscript } from "./transcript-sources.js";
+
 /** Cap what we send to the LLM per session (chars). */
 const MAX_SESSION_CHARS = 24_000;
+
+export interface SourceHarvestResult {
+  source: string;
+  label: string;
+  sessionsScanned: number;
+  messagesConsidered: number;
+  proposed: number;
+  duplicates: number;
+  transcriptDir: string | null;
+}
 
 export interface HarvestResult {
   sessionsScanned: number;
@@ -36,14 +46,10 @@ export interface HarvestResult {
   proposed: number;
   duplicates: number;
   provider: string | null;
+  /** First detected source's transcript dir (back-compat; prefer `sources`). */
   transcriptDir: string | null;
-}
-
-/** Claude Code stores transcripts under a slug of the project's absolute path. */
-export function claudeProjectDir(repoRoot: string): string | null {
-  const slug = path.resolve(repoRoot).replace(/[^a-zA-Z0-9]/g, "-");
-  const dir = path.join(homedir(), ".claude", "projects", slug);
-  return existsSync(dir) ? dir : null;
+  /** Per-source breakdown — only sources whose tool/transcripts were found. */
+  sources: SourceHarvestResult[];
 }
 
 /** Very conservative redaction: drop lines that look like secrets before they reach any LLM. */
@@ -54,40 +60,6 @@ export function redactSecrets(text: string): string {
     .split("\n")
     .map((line) => (SECRET_LINE.test(line) ? "[REDACTED — possible secret]" : line))
     .join("\n");
-}
-
-/** Extract genuine human-typed messages from one Claude Code session JSONL. */
-export function userMessagesFromTranscript(jsonl: string): string[] {
-  const out: string[] = [];
-  for (const line of jsonl.split("\n")) {
-    if (!line.trim()) continue;
-    let entry: Record<string, unknown>;
-    try {
-      entry = JSON.parse(line) as Record<string, unknown>;
-    } catch {
-      continue;
-    }
-    if (entry.type !== "user" || entry.isMeta) continue;
-    const message = entry.message as { role?: string; content?: unknown } | undefined;
-    if (!message || message.role !== "user") continue;
-
-    let text = "";
-    if (typeof message.content === "string") {
-      text = message.content;
-    } else if (Array.isArray(message.content)) {
-      // tool_result blocks are machine output, not the human — skip them
-      text = (message.content as Array<{ type?: string; text?: string }>)
-        .filter((c) => c.type === "text" && typeof c.text === "string")
-        .map((c) => c.text as string)
-        .join("\n");
-    }
-    text = text.trim();
-    // skip injected command/system scaffolding and trivial turns
-    if (!text || text.startsWith("<") || text.startsWith("/")) continue;
-    if (text.length < MIN_MESSAGE_CHARS) continue;
-    out.push(text);
-  }
-  return out;
 }
 
 export const HARVEST_EXTRACT_INSTRUCTIONS = `You are reviewing messages a DEVELOPER typed into an AI coding assistant while working on their project. These messages often contain durable project knowledge the developer was teaching the AI: decisions, conventions, gotchas, failed approaches, architecture facts, rules.
@@ -104,32 +76,22 @@ Extract that durable knowledge as FALSIFIABLE claims. Rules:
 Respond with ONLY a JSON object of this exact shape:
 {"claims":[{"kind":"CONVENTION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"rationale":"user said: \\"...\\""}]}`;
 
-interface SessionFile {
-  file: string;
-  abs: string;
-  mtimeMs: number;
-}
-
-function pendingSessions(dir: string, sinceMtimeMs: number, all: boolean): SessionFile[] {
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".jsonl"))
-    .map((f) => {
-      const abs = path.join(dir, f);
-      return { file: f, abs, mtimeMs: statSync(abs).mtimeMs };
-    })
-    .filter((s) => all || s.mtimeMs > sinceMtimeMs)
-    .sort((a, b) => a.mtimeMs - b.mtimeMs);
+function cursorMetaKey(source: TranscriptSource): string {
+  // claude-code keeps its historical key so existing installs don't rescan
+  return source.name === "claude-code"
+    ? "harvest_claude_last_mtime"
+    : `harvest_${source.name.replace(/-/g, "_")}_last_mtime`;
 }
 
 /**
- * Harvest new/updated Claude Code sessions for this repo into the proposal
- * queue. Cursor-tracked by file mtime; `all` rescans everything (the proposal
- * dedupe index absorbs repeats).
+ * Harvest new/updated AI-chat sessions for this repo — across every detected
+ * source — into the proposal queue. Cursor-tracked by transcript mtime per
+ * source; `all` rescans everything (the proposal dedupe index absorbs repeats).
  */
-export async function harvestClaudeSessions(
+export async function harvestSessions(
   store: MemoryStore,
   repoRoot: string,
-  opts: { all?: boolean } = {}
+  opts: { all?: boolean; sources?: string[] } = {}
 ): Promise<HarvestResult> {
   const result: HarvestResult = {
     sessionsScanned: 0,
@@ -138,68 +100,112 @@ export async function harvestClaudeSessions(
     duplicates: 0,
     provider: null,
     transcriptDir: null,
+    sources: [],
   };
-  const dir = claudeProjectDir(repoRoot);
-  if (!dir) return result;
-  result.transcriptDir = dir;
+
+  const wanted = opts.sources?.length
+    ? TRANSCRIPT_SOURCES.filter((s) => opts.sources!.includes(s.name))
+    : TRANSCRIPT_SOURCES;
+
+  // detect sources first so we can report "no transcripts anywhere" without an LLM
+  const detected: Array<{
+    source: TranscriptSource;
+    sessions: NonNullable<ReturnType<TranscriptSource["sessions"]>>;
+  }> = [];
+  for (const source of wanted) {
+    let sessions;
+    try {
+      sessions = source.sessions(repoRoot);
+    } catch (err) {
+      debugLog(`harvest source ${source.name} discovery (skipped)`, err);
+      continue;
+    }
+    if (sessions === null) continue;
+    detected.push({ source, sessions });
+  }
+  if (!detected.length) return result;
+  result.transcriptDir = detected[0].source.transcriptDir(repoRoot);
 
   const provider = await getTextProvider();
   if (!provider) return result;
   result.provider = `${provider.name}/${provider.model}`;
 
-  const cursor = opts.all ? 0 : parseFloat(store.getMeta(CURSOR_META_KEY) ?? "0") || 0;
-  const sessions = pendingSessions(dir, cursor, Boolean(opts.all));
-  let maxMtime = cursor;
+  for (const { source, sessions } of detected) {
+    const sourceResult: SourceHarvestResult = {
+      source: source.name,
+      label: source.label,
+      sessionsScanned: 0,
+      messagesConsidered: 0,
+      proposed: 0,
+      duplicates: 0,
+      transcriptDir: source.transcriptDir(repoRoot),
+    };
+    result.sources.push(sourceResult);
 
-  for (const s of sessions) {
-    result.sessionsScanned++;
-    maxMtime = Math.max(maxMtime, s.mtimeMs);
-    let messages: string[];
-    try {
-      messages = userMessagesFromTranscript(readFileSync(s.abs, "utf8"));
-    } catch (err) {
-      debugLog(`harvest transcript ${s.file} (skipped)`, err);
-      continue; // unreadable/partial file — retry next run (cursor still advances past it)
-    }
-    if (!messages.length) continue;
-    result.messagesConsidered += messages.length;
+    const metaKey = cursorMetaKey(source);
+    const cursor = opts.all ? 0 : parseFloat(store.getMeta(metaKey) ?? "0") || 0;
+    const pending = sessions
+      .filter((s) => opts.all || s.mtimeMs > cursor)
+      .sort((a, b) => a.mtimeMs - b.mtimeMs);
+    let maxMtime = cursor;
 
-    const corpus = redactSecrets(messages.join("\n\n---\n\n")).slice(0, MAX_SESSION_CHARS);
-    let claims: ExtractedClaim[];
-    try {
-      const raw = await provider.generate(
-        HARVEST_EXTRACT_INSTRUCTIONS,
-        `Developer messages from one coding session on this project:\n\n----- BEGIN MESSAGES -----\n${corpus}\n----- END MESSAGES -----`
-      );
-      claims = parseClaims(raw);
-    } catch (err) {
-      debugLog(`harvest llm extraction ${s.file} (skipped)`, err);
-      continue; // provider hiccup — this session retries on the next --all run
+    for (const s of pending) {
+      sourceResult.sessionsScanned++;
+      maxMtime = Math.max(maxMtime, s.mtimeMs);
+      let messages: string[];
+      try {
+        messages = s.messages();
+      } catch (err) {
+        debugLog(`harvest transcript ${source.name}/${s.id} (skipped)`, err);
+        continue; // unreadable/partial file — retry next --all run (cursor still advances past it)
+      }
+      if (!messages.length) continue;
+      sourceResult.messagesConsidered += messages.length;
+
+      const corpus = redactSecrets(messages.join("\n\n---\n\n")).slice(0, MAX_SESSION_CHARS);
+      let claims: ExtractedClaim[];
+      try {
+        const raw = await provider.generate(
+          HARVEST_EXTRACT_INSTRUCTIONS,
+          `Developer messages from one coding session on this project:\n\n----- BEGIN MESSAGES -----\n${corpus}\n----- END MESSAGES -----`
+        );
+        claims = parseClaims(raw);
+      } catch (err) {
+        debugLog(`harvest llm extraction ${source.name}/${s.id} (skipped)`, err);
+        continue; // provider hiccup — this session retries on the next --all run
+      }
+
+      for (const c of claims) {
+        const p = store.propose({
+          kind: c.kind,
+          claim: c.claim,
+          paths: c.paths,
+          symbols: c.symbols,
+          guardrailLevel: c.guardrailLevel,
+          rationale: c.rationale ?? `Stated by the user in a ${source.label} session.`,
+          evidence: [
+            { type: "HUMAN_ATTESTED", payload: `stated by user in ${source.label} session ${s.id.slice(0, 8)}` },
+          ],
+          source: `harvest:${source.name}`,
+          sourceRef: s.id,
+        });
+        if (p) sourceResult.proposed++;
+        else sourceResult.duplicates++;
+      }
     }
 
-    const sessionId = s.file.replace(/\.jsonl$/, "");
-    for (const c of claims) {
-      const p = store.propose({
-        kind: c.kind,
-        claim: c.claim,
-        paths: c.paths,
-        symbols: c.symbols,
-        guardrailLevel: c.guardrailLevel,
-        rationale: c.rationale ?? "Stated by the user in a Claude Code session.",
-        evidence: [
-          { type: "HUMAN_ATTESTED", payload: `stated by user in Claude Code session ${sessionId.slice(0, 8)}` },
-        ],
-        source: "harvest:claude-code",
-        sourceRef: sessionId,
-      });
-      if (p) result.proposed++;
-      else result.duplicates++;
-    }
+    if (maxMtime > cursor) store.setMeta(metaKey, String(maxMtime));
+    result.sessionsScanned += sourceResult.sessionsScanned;
+    result.messagesConsidered += sourceResult.messagesConsidered;
+    result.proposed += sourceResult.proposed;
+    result.duplicates += sourceResult.duplicates;
   }
 
-  if (maxMtime > cursor) store.setMeta(CURSOR_META_KEY, String(maxMtime));
   return result;
 }
+
+/** Back-compat alias — harvests all detected sources, not just Claude Code. */
+export const harvestClaudeSessions = harvestSessions;
 
 // ---------------------------------------------------------------- hook install
 
@@ -209,6 +215,8 @@ const HOOK_COMMAND = "dim harvest -q";
  * Wire `dim harvest -q` into the repo's Claude Code SessionEnd hook
  * (.claude/settings.json) so every session is harvested when it closes.
  * Additive: merges with existing settings, never clobbers other hooks.
+ * (Codex/Copilot/Cursor have no session-end hook — those sources are swept
+ * whenever `dim harvest` runs.)
  */
 export function installClaudeSessionEndHook(repoRoot: string): { installed: boolean; settingsPath: string } {
   const settingsPath = path.join(repoRoot, ".claude", "settings.json");
@@ -230,5 +238,4 @@ export function installClaudeSessionEndHook(repoRoot: string): { installed: bool
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
   return { installed: true, settingsPath };
 }
-
 

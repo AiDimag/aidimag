@@ -207,15 +207,14 @@ export function registerCaptureCommands(program: Command): void {
 
   program
     .command("harvest")
-    .description("Harvest durable facts YOU typed into AI chats (Claude Code transcripts) into the review queue — local-only, secrets redacted")
+    .description("Harvest durable facts YOU typed into AI chats (Claude Code, Codex CLI, Copilot/VS Code, Cursor) into the review queue — local-only, secrets redacted")
     .option("--all", "Rescan every session (ignore cursor; dedupe absorbs repeats)")
+    .option("--source <names>", "Comma-separated sources to harvest: claude-code,codex,copilot-vscode,cursor (default: all detected)")
     .option("--install-hook", "Wire `dim harvest -q` into this repo's Claude Code SessionEnd hook (.claude/settings.json)")
     .option("-q, --quiet", "Only speak up when proposals are queued (for the SessionEnd hook)")
     .action(async (opts) => {
       const root = findRepoRoot() ?? fail("not inside a git repo");
-      const { harvestClaudeSessions, installClaudeSessionEndHook, claudeProjectDir } = await import(
-        "../../capture/harvest.js"
-      );
+      const { harvestSessions, installClaudeSessionEndHook } = await import("../../capture/harvest.js");
       if (opts.installHook) {
         const { installed, settingsPath } = installClaudeSessionEndHook(root);
         console.log(
@@ -225,8 +224,11 @@ export function registerCaptureCommands(program: Command): void {
         );
         return;
       }
+      const sources = typeof opts.source === "string"
+        ? opts.source.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : undefined;
       const store = MemoryStore.open(root, { create: true });
-      const res = await harvestClaudeSessions(store, root, { all: Boolean(opts.all) });
+      const res = await harvestSessions(store, root, { all: Boolean(opts.all), sources });
       if (opts.quiet) {
         if (res.proposed > 0) {
           console.log(
@@ -236,13 +238,14 @@ export function registerCaptureCommands(program: Command): void {
         store.close();
         return;
       }
-      if (!res.transcriptDir) {
-        console.log(`No Claude Code transcripts found for this repo (${claudeProjectDir(root) ?? "~/.claude/projects/<repo-slug>"} missing).`);
-        console.log("Transcripts appear after your first Claude Code session here. Cursor/Copilot chat harvesting: planned.");
+      if (!res.sources.length) {
+        console.log("No AI-chat transcripts found for this repo (checked Claude Code, Codex CLI, Copilot/VS Code, Cursor).");
+        console.log("Transcripts appear after your first chat session in this repo. Devin is cloud-hosted and can't be harvested locally.");
       } else if (!res.provider) {
         fail("no LLM provider available — run Ollama locally or set OPENAI_API_KEY (see AIDIMAG_LLM)");
       } else if (res.sessionsScanned === 0) {
-        console.log("No new sessions since the last harvest. Use --all to rescan everything.");
+        const names = res.sources.map((s) => s.label).join(", ");
+        console.log(`No new sessions since the last harvest (sources: ${names}). Use --all to rescan everything.`);
       } else {
         console.log(
           `Scanned ${res.sessionsScanned} session(s), ${res.messagesConsidered} user message(s) via ${res.provider}: ` +
@@ -250,9 +253,13 @@ export function registerCaptureCommands(program: Command): void {
             (res.duplicates ? `, ${res.duplicates} duplicate(s) skipped` : "") +
             "."
         );
+        for (const s of res.sources) {
+          if (s.sessionsScanned === 0) continue;
+          console.log(`  ${s.label}: ${s.sessionsScanned} session(s), ${s.proposed} proposal(s)`);
+        }
         if (res.proposed) console.log(`Review with \`dim review\`.`);
       }
-      if (!opts.installHook && res.transcriptDir) {
+      if (res.sources.some((s) => s.source === "claude-code")) {
         console.log(`(tip: \`dim harvest --install-hook\` runs this automatically when each Claude Code session ends)`);
       }
       store.close();

@@ -264,11 +264,22 @@ dim mine --prs          # newly merged PRs + review threads since the last run
 
 ### `dim harvest`
 
-Harvest durable facts **you typed into AI chats** into the review queue. Reads the local
-Claude Code session transcripts for this repo (`~/.claude/projects/<repo-slug>/*.jsonl`),
-extracts falsifiable claims from *your* messages with the configured LLM
-(OpenAI/Ollama — same auto-detection as knowledge ingestion), and queues them as proposals
-(source `harvest:claude-code`) with `HUMAN_ATTESTED` evidence.
+Harvest durable facts **you typed into AI chats** into the review queue. Reads local chat
+transcripts for this repo from every detected source, extracts falsifiable claims from
+*your* messages with the configured LLM (OpenAI/Ollama — same auto-detection as knowledge
+ingestion), and queues them as proposals (source `harvest:<tool>`) with `HUMAN_ATTESTED`
+evidence.
+
+| Source | Where transcripts live |
+|---|---|
+| Claude Code | `~/.claude/projects/<repo-slug>/*.jsonl` |
+| Codex CLI | `~/.codex/sessions/**/*.jsonl` (matched by session `cwd`) |
+| GitHub Copilot (VS Code) | VS Code `workspaceStorage/<hash>/chatSessions/*.json` |
+| Cursor | Cursor `workspaceStorage/<hash>/state.vscdb` |
+
+Devin is cloud-hosted with no local transcripts, so it can't be harvested offline — but any
+tool connected over MCP (including Devin) can harvest the current session **live** with the
+`chat_harvest` [MCP tool](/mcp), and capture single facts as stated with `context_note`.
 
 **Privacy:** local-only and opt-in by invocation. Secret-looking lines (API keys, tokens,
 passwords) are redacted *before* anything reaches the LLM. Nothing becomes active memory
@@ -277,17 +288,19 @@ without `dim review`.
 | Option | Meaning |
 |---|---|
 | `--all` | Rescan every session (ignore the cursor; dedupe absorbs repeats) |
+| `--source <names>` | Comma-separated sources to harvest: `claude-code,codex,copilot-vscode,cursor` (default: all detected) |
 | `--install-hook` | Add a Claude Code `SessionEnd` hook (`.claude/settings.json`) so every session is harvested automatically when it closes |
 | `-q, --quiet` | Only speak up when proposals are queued (hook mode) |
 
 ```sh
-dim harvest                  # scan sessions since the last run
-dim harvest --all            # rescan everything
-dim harvest --install-hook   # automate it per-session
+dim harvest                    # scan new sessions across all detected sources
+dim harvest --all              # rescan everything
+dim harvest --source codex     # only Codex CLI sessions
+dim harvest --install-hook     # automate it per Claude Code session
 ```
 
-Cursor/Copilot chat harvesting is planned; for those tools the `context_note`
-[MCP tool](/mcp) captures user-stated facts live instead.
+Codex/Copilot/Cursor have no session-end hook, so those sources are swept whenever
+`dim harvest` runs (the per-source mtime cursor keeps that cheap).
 
 ### `dim review [action] [id]`
 
