@@ -9,7 +9,7 @@
 [![npm version](https://img.shields.io/npm/v/aidimag?color=blue&logo=npm)](https://www.npmjs.com/package/aidimag)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-aidimag.com-blue)](https://aidimag.com)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 
 [**Documentation**](https://aidimag.com) • [**Getting Started**](https://aidimag.com/getting-started) • [**AI Dimag Cloud**](https://cloud.aidimag.com) • [**Pricing**](https://aidimag.com/pricing)
 
@@ -44,7 +44,7 @@ Every AI Dimag memory carries **evidence** (a shell check, an anchored commit, a
 npm install -g aidimag
 ```
 
-Requires Node 18+. Ships two equivalent binaries: `dim` (short) and `aidimag`.
+Requires Node 22+. Ships two equivalent binaries: `dim` (short) and `aidimag`.
 
 ## 🚀 Quick Start
 

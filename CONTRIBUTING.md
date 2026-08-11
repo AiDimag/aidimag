@@ -15,7 +15,7 @@ developed here. The optional managed sync service at
 
 ## Development setup
 
-Requirements: **Node 18+** and git.
+Requirements: **Node 22+** and git.
 
 ```sh
 git clone git@github.com:AiDimag/aidimag.git

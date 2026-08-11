@@ -22,7 +22,7 @@ This page gets aiDimag running in your repository.
 
 ## Prerequisites
 
-- **Node.js 18 or newer** (`node --version` to check).
+- **Node.js 22 or newer** (`node --version` to check).
 - A **git repository** — aiDimag stores memory per repo and installs git hooks.
 - *(Optional)* An embedding provider for semantic search: an `OPENAI_API_KEY`, or a local
   [Ollama](https://ollama.com) install. Everything works without one (keyword search only).
