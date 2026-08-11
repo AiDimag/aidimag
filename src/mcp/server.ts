@@ -208,6 +208,63 @@ async function main() {
   );
 
   server.tool(
+    "scratchpad_write",
+    "Jot a SHORT-TERM working note for the current session: intermediate findings, plans, hypotheses, task state. Auto-expires (default 24h) and is never synced. NOT durable memory — use memory_write/memory_propose for knowledge that should persist across sessions.",
+    {
+      content: z.string().min(1).describe("The note to jot down"),
+      session_id: z.string().optional().describe("Session/topic key to group notes under (default 'default')"),
+      ttl_hours: z.number().min(0.1).max(168).optional().describe("Hours until the note expires (default 24)"),
+    },
+    async (args) => {
+      const entry = store.scratchpadWrite(args.content, {
+        sessionId: args.session_id,
+        ttlHours: args.ttl_hours,
+        createdBy: "agent:mcp",
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Scratchpad note saved (id=${entry.id.slice(0, 8)}, session=${entry.sessionId}, expires ${entry.expiresAt}).`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
+    "scratchpad_read",
+    "Read short-term working notes from the current session's scratchpad (newest first). Use at session start or when resuming a task to recover in-flight state. Expired notes are purged automatically.",
+    {
+      session_id: z.string().optional().describe("Only notes for this session key; omit for all"),
+      limit: z.number().int().min(1).max(100).optional(),
+    },
+    async (args) => {
+      const notes = store.scratchpadRead(args.session_id, args.limit ?? 50);
+      const text =
+        notes.length === 0
+          ? "Scratchpad is empty."
+          : notes
+              .map((n) => `- [${n.sessionId} · ${n.createdAt.slice(0, 16)}] ${n.content}`)
+              .join("\n") +
+            "\n(Scratchpad notes expire automatically — promote durable learnings with memory_propose.)";
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
+  server.tool(
+    "scratchpad_clear",
+    "Clear scratchpad working notes (one session key, or everything). Use when a task completes and its intermediate state is no longer needed.",
+    {
+      session_id: z.string().optional().describe("Only clear this session key; omit to clear all"),
+    },
+    async (args) => {
+      const n = store.scratchpadClear(args.session_id);
+      return { content: [{ type: "text", text: `Cleared ${n} scratchpad note(s).` }] };
+    }
+  );
+
+  server.tool(
     "memory_verify",
     "Re-run cheap evidence checks (STATIC_CHECK, COMMIT_REF) and update memory statuses. Use before relying on VERIFIED memories if the repo may have changed, or to verify specific memories by id.",
     {

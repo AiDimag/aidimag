@@ -3,7 +3,7 @@
  * FTS5 powers Phase 1 search; sqlite-vec embeddings arrive in Phase 2.
  */
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 /** Idempotent migrations for pre-existing DBs (failures = already applied). */
 export const MIGRATIONS: string[] = [
@@ -283,5 +283,21 @@ CREATE TABLE IF NOT EXISTS events (
   synced         INTEGER NOT NULL DEFAULT 0     -- 1 once pushed to the server
 );
 CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced, seq);
+
+-- v11: scratchpad — session-scoped short-term working memory.
+-- Intermediate findings, plans, and hypotheses for the CURRENT session. Entries
+-- expire automatically (TTL) and are purged on read. Local-only: never synced,
+-- never enters the review queue, never becomes durable memory. Promote anything
+-- worth keeping via \`dim remember\` / memory_propose.
+CREATE TABLE IF NOT EXISTS scratchpad (
+  id         TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL DEFAULT 'default',
+  content    TEXT NOT NULL,
+  created_by TEXT NOT NULL DEFAULT 'agent',
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_scratchpad_session ON scratchpad(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_scratchpad_expiry ON scratchpad(expires_at);
 `;
 

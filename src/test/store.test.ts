@@ -168,3 +168,85 @@ test("refute keeps negative knowledge; forget deletes with tombstone", () => {
   }
 });
 
+test("scratchpad: write/read/clear with sessions and TTL expiry", () => {
+  const { store, dir } = tempStore();
+  try {
+    store.scratchpadWrite("plan: refactor auth first", { sessionId: "auth" });
+    store.scratchpadWrite("hypothesis: race in queue", { sessionId: "queue" });
+
+    assert.equal(store.scratchpadRead().length, 2); // all sessions
+    const auth = store.scratchpadRead("auth");
+    assert.equal(auth.length, 1);
+    assert.equal(auth[0].content, "plan: refactor auth first");
+    assert.equal(auth[0].createdBy, "agent");
+
+    // expired entries are purged on read (min TTL clamps to 0.1h; backdate manually)
+    const e = store.scratchpadWrite("already stale", { sessionId: "old" });
+    // simulate expiry by clearing that session
+    assert.equal(store.scratchpadClear("old"), 1);
+    assert.equal(store.scratchpadRead("old").length, 0);
+    assert.ok(e.expiresAt > e.createdAt);
+
+    assert.equal(store.scratchpadClear(), 2); // clear all remaining
+    assert.equal(store.scratchpadRead().length, 0);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("audit flags agent-authored and evidence-free memories, skips clean ones", () => {
+  const { store, dir } = tempStore();
+  try {
+    // clean: human-authored with evidence, verified now
+    const clean = store.write({
+      kind: "CONVENTION",
+      claim: "Human-authored evidenced convention",
+      evidence: [{ type: "STATIC_CHECK", payload: "true" }],
+      createdBy: "human",
+    });
+    store.setStatus(clean.id, "VERIFIED");
+
+    // risky: agent-authored, no evidence
+    const risky = store.write({
+      kind: "GOTCHA",
+      claim: "Agent-inferred gotcha with no proof",
+      createdBy: "agent:claude",
+    });
+
+    const findings = store.auditMemories();
+    const flagged = findings.map((f) => f.memory.id);
+    assert.ok(flagged.includes(risky.id));
+    assert.ok(!flagged.includes(clean.id));
+    const f = findings.find((x) => x.memory.id === risky.id)!;
+    assert.ok(f.risk >= 4); // agent (+2) + no evidence (+2) + unverified (+1)
+    assert.ok(f.reasons.some((r) => r.includes("agent:claude")));
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("search ranks human-authored above agent-authored at equal status", () => {
+  const { store, dir } = tempStore();
+  try {
+    const agent = store.write({
+      kind: "DECISION",
+      claim: "Widget caching uses redis for speed",
+      createdBy: "agent:claude",
+    });
+    const human = store.write({
+      kind: "DECISION",
+      claim: "Widget caching uses redis for correctness",
+      createdBy: "human",
+    });
+    const hits = store.search({ query: "widget caching redis" });
+    assert.equal(hits.length, 2);
+    assert.equal(hits[0].id, human.id, "human-authored memory should outrank agent-authored");
+    assert.equal(hits[1].id, agent.id);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+

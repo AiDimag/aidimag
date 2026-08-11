@@ -292,6 +292,69 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
     });
 
   program
+    .command("scratch")
+    .description("Short-term scratchpad (session working memory): TTL-expiring notes, never synced, never durable memory")
+    .argument("[note...]", "Note to jot down; omit to list current notes")
+    .option("--session <id>", "Session/topic key", "default")
+    .option("--ttl <hours>", "Hours until the note expires", "24")
+    .option("--clear", "Clear notes (this --session, or --all)")
+    .option("--all", "With --clear: clear every session; when listing: show all sessions")
+    .action((note: string[], opts) => {
+      const store = MemoryStore.open();
+      try {
+        if (opts.clear) {
+          const n = store.scratchpadClear(opts.all ? undefined : opts.session);
+          console.log(`Cleared ${n} scratchpad note(s)${opts.all ? "" : ` in session '${opts.session}'`}.`);
+        } else if (note.length) {
+          const ttl = parseFloat(opts.ttl);
+          if (!Number.isFinite(ttl) || ttl <= 0) fail(`invalid --ttl '${opts.ttl}'`);
+          const entry = store.scratchpadWrite(note.join(" "), {
+            sessionId: opts.session,
+            ttlHours: ttl,
+            createdBy: "human",
+          });
+          console.log(`📝 jotted (session=${entry.sessionId}, expires ${entry.expiresAt.slice(0, 16)})`);
+          console.log(`   Scratch notes are short-term. Keep it forever with \`dim remember\`.`);
+        } else {
+          const notes = store.scratchpadRead(opts.all ? undefined : opts.session);
+          if (notes.length === 0) {
+            console.log("Scratchpad is empty.");
+          } else {
+            for (const n of notes) {
+              console.log(`- [${n.sessionId} · ${n.createdAt.slice(0, 16)} · by ${n.createdBy}] ${n.content}`);
+            }
+            console.log(`\n${notes.length} note(s). They expire automatically; \`dim scratch --clear\` wipes them now.`);
+          }
+        }
+      } finally {
+        store.close();
+      }
+    });
+
+  program
+    .command("audit")
+    .description("Provenance audit: memories resting on the least ground — agent-authored, evidence-free, stale, or long-unverified")
+    .option("-n, --limit <n>", "Max entries", "20")
+    .action((opts) => {
+      const store = MemoryStore.open();
+      const findings = store.auditMemories({ limit: parseInt(opts.limit, 10) });
+      if (findings.length === 0) {
+        console.log("✓ Nothing suspicious — every memory is human/knowledge-authored, evidenced, and recently verified.");
+      } else {
+        console.log(`${findings.length} memorie(s) worth a look — highest risk first:\n`);
+        for (const f of findings) {
+          printMemory(f.memory);
+          for (const r of f.reasons) console.log(`    ⚠ ${r}`);
+        }
+        console.log(
+          `\nFix-ups: \`dim update <id> -e TYPE:proof\` adds evidence · \`dim verify\` re-checks · ` +
+            `\`dim refute <id>\` / \`dim forget <id>\` removes.`
+        );
+      }
+      store.close();
+    });
+
+  program
     .command("refute")
     .description("Mark a memory REFUTED (kept as negative knowledge, unlike forget)")
     .argument("<id>", "Memory id (full or 8-char prefix)")

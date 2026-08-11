@@ -96,6 +96,24 @@ export interface MemoryEvent {
   createdAt: string;
 }
 
+/** Session-scoped short-term working memory note (TTL-expiring, never synced). */
+export interface ScratchpadEntry {
+  id: string;
+  sessionId: string;
+  content: string;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+/** A memory flagged by the provenance audit, with why and how risky. */
+export interface MemoryAuditFinding {
+  memory: MemoryEntry;
+  /** heuristic risk score — higher = review sooner */
+  risk: number;
+  reasons: string[];
+}
+
 interface MemoryRow {
   id: string;
   kind: MemoryKind;
@@ -404,6 +422,15 @@ export class MemoryStore {
     // only surfaces when nothing trustworthy matches.
     const statusPenalty =
       "(CASE m.status WHEN 'VERIFIED' THEN 0 WHEN 'UNVERIFIED' THEN 2 WHEN 'STALE' THEN 10 ELSE 20 END)";
+    // Provenance weighting: human-authored and
+    // knowledgebase memories outrank agent/miner-authored ones as a tiebreak.
+    // Small relative to the status penalty — verification still dominates.
+    const provenancePenalty =
+      "(CASE WHEN m.created_by = 'human' OR m.created_by LIKE 'knowledge%' THEN 0 ELSE 1 END)";
+    // Recency-aware tiebreak: fresher memories edge
+    // out long-untouched ones. Pinned memories are curated reference — exempt.
+    const recencyPenalty =
+      "(CASE WHEN m.pinned = 1 THEN 0 ELSE MIN(1.0, (julianday('now') - julianday(COALESCE(m.updated_at, m.created_at))) / 180.0) END)";
     let rows: MemoryRow[];
     if (ftsQuery) {
       rows = this.db
@@ -411,7 +438,7 @@ export class MemoryStore {
           `SELECT m.* FROM memories_fts f
            JOIN memories m ON m.rowid = f.rowid
            WHERE memories_fts MATCH ? ${where}
-           ORDER BY (rank + ${statusPenalty}) ASC, m.confidence DESC
+           ORDER BY (rank + ${statusPenalty} + 0.5 * ${provenancePenalty} + 0.5 * ${recencyPenalty}) ASC, m.confidence DESC
            LIMIT ?`
         )
         .all(ftsQuery, ...params, limit) as MemoryRow[];
@@ -419,7 +446,7 @@ export class MemoryStore {
       rows = this.db
         .prepare(
           `SELECT m.* FROM memories m WHERE 1=1 ${where}
-           ORDER BY ${statusPenalty} ASC, m.confidence DESC, m.created_at DESC LIMIT ?`
+           ORDER BY (${statusPenalty} + 0.5 * ${provenancePenalty} + 0.5 * ${recencyPenalty}) ASC, m.confidence DESC, m.created_at DESC LIMIT ?`
         )
         .all(...params, limit) as MemoryRow[];
     }
@@ -719,6 +746,110 @@ export class MemoryStore {
   /** Clear logged searches (e.g. after the gaps have been addressed). */
   clearSearchGaps(): number {
     return this.db.prepare("DELETE FROM search_log").run().changes;
+  }
+
+  // ---------------------------------------------------------------- scratchpad (short-term working memory)
+  // Session workspace: intermediate findings, plans, hypotheses.
+  // TTL-expiring, local-only (never synced), never becomes durable memory —
+  // promote anything worth keeping via write()/propose().
+
+  scratchpadWrite(
+    content: string,
+    opts: { sessionId?: string; ttlHours?: number; createdBy?: string } = {}
+  ): ScratchpadEntry {
+    const now = new Date();
+    const ttlHours = Math.min(Math.max(opts.ttlHours ?? 24, 0.1), 24 * 7);
+    const entry: ScratchpadEntry = {
+      id: randomUUID(),
+      sessionId: opts.sessionId ?? "default",
+      content: content.trim(),
+      createdBy: opts.createdBy ?? "agent",
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + ttlHours * 3_600_000).toISOString(),
+    };
+    this.db
+      .prepare(
+        "INSERT INTO scratchpad (id, session_id, content, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)"
+      )
+      .run(entry.id, entry.sessionId, entry.content, entry.createdBy, entry.createdAt, entry.expiresAt);
+    return entry;
+  }
+
+  /** Read scratchpad notes (newest first). Expired entries are purged first. */
+  scratchpadRead(sessionId?: string, limit = 50): ScratchpadEntry[] {
+    this.purgeExpiredScratchpad();
+    const rows = (
+      sessionId
+        ? this.db
+            .prepare("SELECT * FROM scratchpad WHERE session_id = ? ORDER BY created_at DESC LIMIT ?")
+            .all(sessionId, limit)
+        : this.db.prepare("SELECT * FROM scratchpad ORDER BY created_at DESC LIMIT ?").all(limit)
+    ) as Array<Record<string, string>>;
+    return rows.map((r) => ({
+      id: r.id,
+      sessionId: r.session_id,
+      content: r.content,
+      createdBy: r.created_by,
+      createdAt: r.created_at,
+      expiresAt: r.expires_at,
+    }));
+  }
+
+  /** Clear scratchpad notes (one session, or all). Returns count removed. */
+  scratchpadClear(sessionId?: string): number {
+    return sessionId
+      ? this.db.prepare("DELETE FROM scratchpad WHERE session_id = ?").run(sessionId).changes
+      : this.db.prepare("DELETE FROM scratchpad").run().changes;
+  }
+
+  /** Drop expired scratchpad entries. Returns count purged. */
+  purgeExpiredScratchpad(): number {
+    return this.db
+      .prepare("DELETE FROM scratchpad WHERE expires_at < ?")
+      .run(new Date().toISOString()).changes;
+  }
+
+  // ---------------------------------------------------------------- provenance audit
+  // Provenance audit: surface memories whose trust rests
+  // on the least ground — agent-authored, evidence-free, or long-unverified —
+  // so humans can periodically confirm, add evidence, or forget them.
+
+  auditMemories(opts: { limit?: number } = {}): MemoryAuditFinding[] {
+    const memories = this.list(10_000);
+    const now = Date.now();
+    const findings: MemoryAuditFinding[] = [];
+    for (const m of memories) {
+      if (m.status === "REFUTED") continue;
+      const reasons: string[] = [];
+      let risk = 0;
+      const provenance =
+        m.createdBy === "human" || m.createdBy.startsWith("knowledge") ? "trusted" : "agent";
+      if (provenance === "agent") {
+        risk += 2;
+        reasons.push(`authored by '${m.createdBy}' (not human/knowledgebase)`);
+      }
+      if (m.grounding.length === 0) {
+        risk += 2;
+        reasons.push("no evidence attached — unverifiable, only decays");
+      }
+      if (m.status === "STALE") {
+        risk += 3;
+        reasons.push("STALE — evidence currently failing");
+      } else if (m.status === "UNVERIFIED") {
+        risk += 1;
+        reasons.push("never verified");
+      }
+      if (m.verifiedAt) {
+        const ageDays = (now - Date.parse(m.verifiedAt)) / 86_400_000;
+        if (ageDays > 30) {
+          risk += 1;
+          reasons.push(`last verified ${Math.floor(ageDays)}d ago`);
+        }
+      }
+      if (risk >= 2) findings.push({ memory: m, risk, reasons });
+    }
+    findings.sort((a, b) => b.risk - a.risk || a.memory.confidence - b.memory.confidence);
+    return findings.slice(0, Math.min(opts.limit ?? 20, 200));
   }
 
   /** Last mined commit sha (commit-miner cursor), or null. */
