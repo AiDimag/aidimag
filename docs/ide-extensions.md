@@ -19,7 +19,7 @@ the hood and need it on your `PATH`.
 
 ## VSCode extension
 
-Located in `vscode-extension/`. A prebuilt `.vsix` is included.
+Source: [AiDimag/aidimag-vscode](https://github.com/AiDimag/aidimag-vscode).
 
 **Features**
 
@@ -37,13 +37,12 @@ Located in `vscode-extension/`. A prebuilt `.vsix` is included.
 
 **Install**
 
-1. Download [aidimag-vscode-1.0.0.vsix](../releases/aidimag-vscode-1.0.0.vsix)
-2. Install via command: `code --install-extension aidimag-vscode-1.0.0.vsix`
-3. Or in VS Code: Extensions → "..." menu → "Install from VSIX..."
+1. Open the Extensions view in VS Code (`Cmd/Ctrl+Shift+X`) and search for **aiDimag** — or install from the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
+2. Or from the command line: `code --install-extension aidimag.aidimag-vscode`
 
 ## IntelliJ plugin
 
-Located in `intellij-plugin/`. Works in IntelliJ IDEA (and other JetBrains IDEs on the same
+Source: [AiDimag/aidimag-intellij](https://github.com/AiDimag/aidimag-intellij). Works in IntelliJ IDEA (and other JetBrains IDEs on the same
 platform version).
 
 **Features**
