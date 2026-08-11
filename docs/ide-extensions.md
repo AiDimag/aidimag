@@ -4,11 +4,12 @@ aiDimag has native extensions for **VSCode** and **IntelliJ IDEA** so you can br
 and verify memory without leaving your editor. Both shell out to the same `dim` CLI, so they
 always behave consistently with the terminal.
 
-::: tip Download Extensions
-**[📦 Download VS Code Extension (v1.0.0)](../releases/aidimag-vscode-1.0.0.vsix)**  
-**[📦 Download IntelliJ Plugin (v1.0.0)](../releases/aidimag-intellij-plugin-1.0.0.zip)**
+::: tip Install the extensions
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/aidimag.aidimag-vscode?label=VS%20Code%20Marketplace&logo=visualstudiocode&color=blue)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
+[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains%20Marketplace&logo=jetbrains&color=blue)](https://plugins.jetbrains.com/plugin/33030-ai-dimag)
 
-See installation instructions below.
+**[📦 VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)** — or search "aiDimag" in the Extensions view.
+**[📦 JetBrains Marketplace](https://plugins.jetbrains.com/plugin/33030-ai-dimag)** — or search "AI Dimag" in Settings → Plugins.
 :::
 
 ::: tip Prerequisite
@@ -61,10 +62,9 @@ Find the actions under **Tools → aiDimag**.
 
 **Install**
 
-1. Download [aidimag-intellij-plugin-1.0.0.zip](../releases/aidimag-intellij-plugin-1.0.0.zip)
-2. Open IntelliJ IDEA → Settings/Preferences → Plugins
-3. Click the gear icon ⚙️ → "Install Plugin from Disk..."
-4. Select the downloaded `.zip` file and restart IDE
+1. Open IntelliJ IDEA → Settings/Preferences → **Plugins → Marketplace**
+2. Search for **AI Dimag** and click Install — or browse the [Marketplace page](https://plugins.jetbrains.com/plugin/33030-ai-dimag)
+3. Restart the IDE
 
 ::: warning macOS PATH note
 JetBrains IDEs launched from Finder/Toolbox sometimes run with a minimal `PATH` that doesn't
