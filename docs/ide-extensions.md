@@ -39,6 +39,7 @@ Source: [AiDimag/aidimag-vscode](https://github.com/AiDimag/aidimag-vscode).
 
 1. Open the Extensions view in VS Code (`Cmd/Ctrl+Shift+X`) and search for **aiDimag** — or install from the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
 2. Or from the command line: `code --install-extension aidimag.aidimag-vscode`
+3. **Cursor / VSCodium users:** install from the [Open VSX listing](https://open-vsx.org/extension/aidimag/aidimag-vscode) — same extension ID (`aidimag.aidimag-vscode`), same code.
 
 ## IntelliJ plugin
 
