@@ -35,7 +35,7 @@ Every AI Dimag memory carries **evidence** (a shell check, an anchored commit, a
 - **Non-MCP tools** (Copilot, Windsurf, etc.) get static context files (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`, etc.)
 
 <div align="center">
-<img src="assets/hero-illustration.svg" alt="AI Dimag Flow" width="600">
+<img src="https://raw.githubusercontent.com/AiDimag/aidimag/main/assets/hero-illustration.svg" alt="AI Dimag Flow" width="600">
 </div>
 
 ## Install
