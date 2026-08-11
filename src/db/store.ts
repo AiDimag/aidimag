@@ -161,15 +161,21 @@ export class MemoryStore {
     } catch {
       prevVersion = 0; // meta table doesn't exist yet
     }
-    this.db.exec(SCHEMA_SQL);
+    // Column migrations must run BEFORE SCHEMA_SQL: the schema creates indexes
+    // on migrated columns (e.g. idx_memories_cloud_synced), which fails with
+    // "no such column" if an old DB hasn't been ALTERed yet. On fresh DBs these
+    // ALTERs fail harmlessly ("no such table") and SCHEMA_SQL creates the
+    // current shape directly.
     for (const m of MIGRATIONS) {
       try {
         this.db.exec(m);
       } catch (err) {
-        // usually "duplicate column" = already applied; AIDIMAG_DEBUG=1 shows which
+        // usually "duplicate column" (already applied) or "no such table"
+        // (fresh DB); AIDIMAG_DEBUG=1 shows which
         debugLog("schema migration (likely already applied)", err);
       }
     }
+    this.db.exec(SCHEMA_SQL);
     // v6: evidence CHECK gains TICKET_REF — needs a one-time table rebuild
     if (prevVersion > 0 && prevVersion < 6) {
       const tx = this.db.transaction(() => this.db.exec(EVIDENCE_REBUILD_V6));
