@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.svg" alt="AI Dimag Logo" width="120" height="120">
+<img src="https://raw.githubusercontent.com/AiDimag/aidimag/main/assets/logo.svg" alt="AI Dimag Logo" width="120" height="120">
 
 # AI Dimag — Verified Memory for AI Coding Agents
 
