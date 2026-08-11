@@ -5,7 +5,7 @@ and verify memory without leaving your editor. Both shell out to the same `dim` 
 always behave consistently with the terminal.
 
 ::: tip Install the extensions
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/aidimag.aidimag-vscode?label=VS%20Code%20Marketplace&logo=visualstudiocode&color=blue)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code%20Marketplace-v1.0.4-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
 [![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains%20Marketplace&logo=jetbrains&color=blue)](https://plugins.jetbrains.com/plugin/33030-ai-dimag)
 
 **[📦 VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)** — or search "aiDimag" in the Extensions view.

@@ -7,7 +7,7 @@
 **Your codebase remembers its decisions, conventions, and rules — and proves they're still true.**
 
 [![npm version](https://img.shields.io/npm/v/aidimag?color=blue&logo=npm)](https://www.npmjs.com/package/aidimag)
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/aidimag.aidimag-vscode?label=VS%20Code&logo=visualstudiocode&color=blue)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-v1.0.4-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
 [![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains&logo=jetbrains&color=blue)](https://plugins.jetbrains.com/plugin/33030-ai-dimag)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-aidimag.com-blue)](https://aidimag.com)
