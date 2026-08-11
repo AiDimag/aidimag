@@ -7,6 +7,10 @@ dist/
 .idea/
 .vscode/
 .aidimag/
+
+# Editor plugins (maintained separately)
+intellij-plugin/
+vscode-extension/
 intellij-plugin/.gradle/
 intellij-plugin/build/
 
