@@ -1,7 +1,30 @@
+---
+title: What is aiDimag? | Introduction to Verified Memory for AI Agents
+description: Learn how aiDimag solves the forgetfulness problem in AI coding assistants with verified, falsifiable memory that stays true as your code evolves.
+head:
+  - - meta
+    - name: keywords
+      content: aiDimag introduction, AI memory system, verified memory, falsifiable claims, AI coding assistant memory, dim CLI, codebase knowledge
+  - - meta
+    - property: og:title
+      content: What is aiDimag? Introduction to Verified Memory
+  - - meta
+    - property: og:url
+      content: https://aidimag.com/introduction
+  - - link
+    - rel: canonical
+      href: https://aidimag.com/introduction
+---
+
 # What is aiDimag?
 
-**aiDimag** is a memory system for AI coding agents. Its command-line
-tool is called **`dim`**.
+**aiDimag** is a memory system **for software engineering** — built for AI coding agents
+and the developers who work with them. Its command-line tool is called **`dim`**.
+
+It is *not* a general-purpose assistant memory: it doesn't track user preferences or chat
+history. The subject of memory is your **repository** — its decisions, conventions,
+invariants, gotchas, failed approaches, and rules — and everything in the tool exists to
+keep that engineering knowledge *provably current*.
 
 ## The problem it solves
 
@@ -61,12 +84,18 @@ aiDimag organizes knowledge into **kinds**:
 
 ## What makes it different
 
+- **Claim-and-verify, not store-and-retrieve.** Most memory systems store text and
+  retrieve whatever is similar later — a stored fact is assumed true forever. aiDimag
+  re-runs each memory's evidence against the current repo, so trust reflects *now*, not
+  *when it was written*. See [How aiDimag compares](/comparison).
 - **Local-first.** Everything lives in a single SQLite file in `.aidimag/` next to your
   code. No account required to start.
 - **Human-gated.** Nothing becomes active memory automatically — proposals wait in a review
   queue until you approve them.
 - **Self-correcting.** Memories carry confidence that decays over time and collapses when
   evidence fails, so trust expires instead of lingering.
+- **Enforcing, not just informing.** Guardrails, pre-commit `dim check`, and the
+  `memory_critique` second-critic actively catch work that contradicts verified memory.
 - **Team-optional.** Add a self-hosted sync server when you want a shared brain. No SaaS lock-in.
 
 Next: **[Core concepts](/concepts)** explains the moving parts, or jump to

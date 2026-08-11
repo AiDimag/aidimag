@@ -100,7 +100,7 @@ Unpacked size: **~595 KB**
 ## Important Notes
 
 1. **No source code in package**: Only compiled `dist/` folder is published
-2. **License**: Elastic License 2.0 - free for teams ≤10 users
+2. **License**: MIT — open source, free for any team size (cloud sync at cloud.aidimag.com is the paid product)
 3. **Provenance**: Workflow uses `--provenance` flag for supply chain security
 4. **Access**: Package is public (`--access public`)
 5. **Tests run before publish**: `prepublishOnly` script ensures build and tests pass

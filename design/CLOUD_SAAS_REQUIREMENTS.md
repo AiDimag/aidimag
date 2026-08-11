@@ -192,7 +192,7 @@ Account (user)
 
 Add-ons (post-MVP): extra key packs (+5 keys for $15/mo).
 
-OSS aidimag remains free for self-host / ≤10 users local-only per Elastic License 2.0; **cloud is a separate hosted product**.
+OSS aidimag is MIT-licensed — free for any team size, self-host included; **cloud is a separate hosted product** (the monetization that funds the open-source project).
 
 ---
 

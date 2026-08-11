@@ -1,3 +1,21 @@
+---
+title: CLI Reference | Complete dim Command Guide
+description: Complete reference for all dim CLI commands. Learn how to use dim init, remember, recall, verify, review, and all other aiDimag commands with examples.
+head:
+  - - meta
+    - name: keywords
+      content: dim CLI, aiDimag commands, dim reference, CLI documentation, dim init, dim remember, dim recall, dim verify, command line interface
+  - - meta
+    - property: og:title
+      content: CLI Reference - Complete dim Command Guide
+  - - meta
+    - property: og:url
+      content: https://aidimag.com/cli-reference
+  - - link
+    - rel: canonical
+      href: https://aidimag.com/cli-reference
+---
+
 # CLI reference
 
 Every `dim` command, with plain-English descriptions and examples. The `dim` and `aidimag`
@@ -116,6 +134,44 @@ dim gaps -d 7 --clear
 
 The top gaps also appear in the [session briefing](/guides/session-briefing), so agents
 proactively ask you about them.
+
+### `dim scratch [note...]`
+
+Short-term **scratchpad** for the current work session: in-flight task state, hypotheses,
+"resume here tomorrow" notes. Notes expire automatically (default 24h), are **never
+synced**, and never become durable memory — promote anything worth keeping with
+`dim remember`. Agents get the same scratchpad via the `scratchpad_*` [MCP tools](/mcp).
+
+| Option | Meaning |
+|---|---|
+| `--session <id>` | Session/topic key to group notes under (default `default`) |
+| `--ttl <hours>` | Hours until the note expires (default 24) |
+| `--clear` | Clear notes (this `--session`, or everything with `--all`) |
+| `--all` | List/clear notes across every session key |
+
+```sh
+dim scratch "auth refactor: JWT rotation half-done, resume at src/auth/rotate.ts"
+dim scratch --session payments "hypothesis: race in the retry queue"
+dim scratch                 # list current notes
+dim scratch --clear --all   # wipe the scratchpad
+```
+
+### `dim audit`
+
+**Provenance audit**: list memories resting on the weakest ground — agent-authored,
+evidence-free, stale, or long-unverified — highest risk first, with the reasons. Run it
+periodically (like a dependency audit, but for your repo's knowledge) and fix up findings:
+add evidence (`dim update <id> -e TYPE:proof`), re-check (`dim verify`), or drop
+(`dim refute` / `dim forget`).
+
+| Option | Meaning |
+|---|---|
+| `-n, --limit <n>` | Max entries (default 20) |
+
+```sh
+dim audit
+dim audit -n 50
+```
 
 ### `dim refute <id>`
 
@@ -391,15 +447,35 @@ dim cloud unlink
 Push/pull memory with the linked team server (also runs automatically after writes).
 
 ```sh
-dim sync
+dim sync              # incremental sync
+dim sync --full       # re-upload everything
 ```
+
+**Cloud quota handling (aiDimag Cloud free tier):**
+
+When you hit the 100 memory limit, `dim sync` will prompt you to select which memories to sync:
+- **Sync newest 100** — Most recently created/updated
+- **Sync verified only** — Only VERIFIED status memories  
+- **Let me select** — Choose specific memories interactively
+
+Updates to already-synced memories always work, even at the limit. The quota only applies to new memories.
+
+::: tip
+Upgrade to a paid plan for unlimited memories and sync frequency. See [Pricing](/pricing).
+:::
 
 ### `dim login` / `dim logout`
 
-Device-code login: approve this machine in the browser; the token is saved locally.
+Device-code login: approve this machine in the browser; the token is saved to `.aidimag/config.json` (per-project). Requires the repo to be linked first with `dim cloud link`.
 
 ```sh
+# First link the repo (without token)
+dim cloud link --server https://cloud.aidimag.com --brain myrepo-abc123
+
+# Then login via browser
 dim login
+
+# Logout removes the token from config
 dim logout
 ```
 

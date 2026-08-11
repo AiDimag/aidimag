@@ -1,3 +1,21 @@
+---
+title: How It Works | aiDimag Architecture & Memory Flow
+description: Learn how aiDimag works under the hood - SQLite storage, knowledge capture, verification system, and memory delivery to AI agents.
+head:
+  - - meta
+    - name: keywords
+      content: aiDimag architecture, how aiDimag works, memory flow, SQLite storage, verification system, knowledge capture
+  - - meta
+    - property: og:title
+      content: How It Works - aiDimag Architecture
+  - - meta
+    - property: og:url
+      content: https://aidimag.com/how-it-works
+  - - link
+    - rel: canonical
+      href: https://aidimag.com/how-it-works
+---
+
 # How it works
 
 A plain-English tour of what happens under the hood. You don't need this to use aiDimag,
@@ -64,9 +82,27 @@ When you (or an agent) search, aiDimag uses **hybrid retrieval**:
 
 - keyword match (FTS5) +
 - semantic match (vector similarity, if embeddings are set up), then
-- **trust-ranking**: verified memories outrank unverified, which outrank stale.
+- **trust-ranking**: verified memories outrank unverified, which outrank stale, plus two
+  smaller tiebreaks —
+  - **provenance**: human-authored and knowledgebase memories edge out agent/miner-authored
+    ones at equal trust, and
+  - **recency**: recently touched memories edge out long-untouched ones (pinned memories
+    never "age out").
 
+Verification always dominates: a verified agent-authored memory still outranks an
+unverified human one — trust is earned by evidence, not just by who wrote the claim.
 So even if a stale memory matches your query, it's pushed down and clearly labeled.
+
+## Short-term vs long-term: the scratchpad
+
+Not everything belongs in durable memory. The **scratchpad** (`dim scratch`, or the
+`scratchpad_*` MCP tools for agents) holds session-scoped working notes — in-flight task
+state, hypotheses, "resume here tomorrow" markers. Notes expire automatically (default
+24h), are never synced, and never enter the review queue. When a scratch note turns out
+to be a durable fact, promote it with `dim remember`.
+
+This keeps the two memory tiers honest: the scratchpad is fast and disposable; the memory
+store is reviewed, evidenced, and verified.
 
 ## Delivery: how AI tools receive memory
 
