@@ -4,8 +4,9 @@
  * (Claude Code, Cursor, Copilot, ...) over stdio.
  *
  * Tools: memory_search, memory_get_for_files, memory_write, memory_refute, memory_status,
- *        commits_mine, context_note (passive in-chat fact capture), … — searches are logged so zero-hit
- *        queries surface as coverage gaps (`dim gaps`).
+ *        commits_mine, context_note (passive in-chat fact capture), chat_harvest (bulk
+ *        on-the-fly harvest of the current session from any tool), … — searches are logged
+ *        so zero-hit queries surface as coverage gaps (`dim gaps`).
  * Resource: aidimag://digest — repo memory digest for session bootstrapping.
  */
 
@@ -27,6 +28,8 @@ import { stripExecutableEvidence } from "../security/evidence.js";
 import { resolveKnowledgeConfig } from "../config.js";
 import { classifyInbox, finalizeDoc } from "../knowledge/ingest.js";
 import { KNOWLEDGE_EXTRACT_INSTRUCTIONS, buildExtractionUser, parseClaims } from "../knowledge/extract.js";
+import { redactSecrets, HARVEST_EXTRACT_INSTRUCTIONS } from "../capture/harvest.js";
+import { getTextProvider } from "../knowledge/llm.js";
 import { debugLog } from "../debug.js";
 import type { GuardrailLevel, MemoryEntry } from "../types.js";
 
@@ -87,8 +90,60 @@ function openStore(): MemoryStore {
   return MemoryStore.open(start, { create: true });
 }
 
+/**
+ * One help text, three discovery surfaces:
+ *  - server `instructions` (sent to the client at initialize — most hosts feed it to the model)
+ *  - the `help` prompt (surfaced as a slash command / prompt picker entry in MCP clients)
+ *  - the `aidimag_help` tool (callable when the user asks "what can aidimag do?")
+ */
+const HELP_TEXT = `# aidimag — verified memory for this repo
+
+aidimag gives AI agents persistent, *verified* memory about this codebase. Everything below
+runs against the repo's local memory store; inferred knowledge waits in a human review queue
+(\`dim review\`) before becoming active.
+
+## Prompts (run these as slash commands / from the prompt picker)
+- **session_start** — run at the START of a session: in-scope memory, guardrails, stale warnings, questions to ask
+- **session_end_extraction** — run at the END: extract durable learnings into the review queue
+- **knowledge_ingest** — summarize documents waiting in the knowledge inbox into reviewable memories
+- **help** — show this overview
+
+## Tools the agent can call
+- **memory_search** / **memory_get_for_files** — recall before exploring or editing
+- **memory_write** / **memory_propose** / **memory_refute** — record, queue, or retract knowledge
+- **context_note** — capture a durable fact the user just stated, live
+- **chat_harvest** — bulk-harvest the user's messages from the current session (works from any MCP client, incl. cloud tools)
+- **memory_critique** — check planned work against verified memory + guardrails
+- **memory_verify** / **memory_status** — re-run evidence, see counts
+- **commits_mine** — mine git history for memory candidates
+- **scratchpad_write / read / clear** — short-term session notes (TTL, never synced)
+- **proposals_pending**, **knowledge_pending**, **knowledge_ingest_submit**, **ticket_get**
+
+## Resources
+- **aidimag://session-briefing** — the same briefing as \`dim brief\`
+- **aidimag://digest** — compact repo-memory digest
+- **aidimag://instructions** — passive-capture rules for agents
+
+## Companion CLI (run in a terminal)
+\`dim review\` (approve queued memories) · \`dim verify\` · \`dim harvest\` (offline chat-transcript harvest) ·
+\`dim brief\` · \`dim generate-context\` · \`dim status\` — full list: \`dim --help\`
+
+Tip for users: state facts naturally in chat ("we use X because Y", "never touch Z") — the agent
+captures them via context_note/chat_harvest, and you approve them with \`dim review\`.`;
+
 async function main() {
-  const server = new McpServer({ name: "aidimag", version: PKG_VERSION });
+  const server = new McpServer(
+    { name: "aidimag", version: PKG_VERSION },
+    {
+      instructions:
+        `aidimag provides verified, persistent memory for this repo. ` +
+        `Start sessions with the \`session_start\` prompt (or read aidimag://session-briefing); search memory before exploring (memory_search / memory_get_for_files); ` +
+        `capture user-stated facts live with context_note and bulk-harvest the session with chat_harvest; ` +
+        `end sessions with the \`session_end_extraction\` prompt. ` +
+        `If the user asks what aidimag can do (or types "aidimag help"), call the aidimag_help tool and relay it. ` +
+        `Inferred knowledge is queued for human approval via \`dim review\`.`,
+    }
+  );
   const store = openStore();
 
   server.tool(
@@ -399,6 +454,89 @@ async function main() {
   );
 
   server.tool(
+    "chat_harvest",
+    "Harvest the CURRENT chat session on the fly: pass the messages the USER typed this session (verbatim) and durable facts are extracted and queued for human review — the live, tool-agnostic equivalent of `dim harvest`. Works from ANY IDE/agent (Copilot, Cursor, Codex, Claude, Devin, …), including cloud tools with no local transcripts. Call at session end, or after a long exchange rich in project knowledge. Secrets are redacted server-side before any LLM sees the text. For single facts stated in passing, prefer context_note instead.",
+    {
+      user_messages: z
+        .array(z.string())
+        .min(1)
+        .describe("The user's messages from this session, verbatim, in order. Include only what the HUMAN typed — no assistant replies, no tool output."),
+      agent_id: z.string().optional().describe("Your agent/tool identifier, e.g. 'copilot', 'cursor', 'devin'"),
+      session_id: z.string().optional().describe("A stable id for this chat session, if your host exposes one (used for dedupe/evidence)"),
+    },
+    async (args) => {
+      const meaningful = args.user_messages.map((m) => m.trim()).filter((m) => m.length >= 20);
+      if (!meaningful.length) {
+        return { content: [{ type: "text", text: "No substantive user messages to harvest." }] };
+      }
+      const provider = await getTextProvider();
+      if (!provider) {
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                "No LLM provider is configured on this machine (Ollama/OPENAI_API_KEY), so server-side extraction is unavailable. " +
+                "Fallback: extract the durable facts YOURSELF from the user's messages and submit each one with `context_note` " +
+                "(kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL, SKILL, TODO_CONTEXT; " +
+                "quote the user verbatim in `quote`).",
+            },
+          ],
+        };
+      }
+      const corpus = redactSecrets(meaningful.join("\n\n---\n\n")).slice(0, 24_000);
+      let claims;
+      try {
+        const raw = await provider.generate(
+          HARVEST_EXTRACT_INSTRUCTIONS,
+          `Developer messages from one coding session on this project:\n\n----- BEGIN MESSAGES -----\n${corpus}\n----- END MESSAGES -----`
+        );
+        claims = parseClaims(raw);
+      } catch (err) {
+        debugLog("chat_harvest llm extraction failed", err);
+        return {
+          content: [
+            { type: "text", text: "Extraction failed (LLM provider error) — retry later, or capture key facts individually with `context_note`." },
+          ],
+        };
+      }
+      const agent = args.agent_id ?? "agent";
+      const sessionTag = args.session_id ?? new Date().toISOString();
+      let proposed = 0;
+      let duplicates = 0;
+      for (const c of claims) {
+        const p = store.propose({
+          kind: c.kind,
+          claim: c.claim,
+          paths: c.paths,
+          symbols: c.symbols,
+          guardrailLevel: c.guardrailLevel,
+          rationale: c.rationale ?? `Stated by the user in a live ${agent} chat session.`,
+          evidence: [{ type: "HUMAN_ATTESTED", payload: `stated by user in live ${agent} session ${sessionTag}` }],
+          source: `harvest:live:${agent}`,
+          sourceRef: args.session_id,
+        });
+        if (p) proposed++;
+        else duplicates++;
+      }
+      const text =
+        claims.length === 0
+          ? `Scanned ${meaningful.length} user message(s): no durable facts found (that's normal for most sessions).`
+          : `Harvested ${meaningful.length} user message(s) via ${provider.name}/${provider.model}: ${proposed} proposal(s) queued for \`dim review\`` +
+            (duplicates ? `, ${duplicates} duplicate(s) skipped` : "") +
+            `. Continue the conversation — no need to mention this unless asked.`;
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
+  server.tool(
+    "aidimag_help",
+    "Show what aidimag offers: available tools, prompts (slash commands), resources, and the companion `dim` CLI commands. Call this when the user asks what aidimag can do, how to use it, or types 'aidimag help' — then relay the overview to them.",
+    {},
+    async () => ({ content: [{ type: "text", text: HELP_TEXT }] })
+  );
+
+  server.tool(
     "memory_critique",
     "Review what you just did (or plan to do) against the project's VERIFIED memory and guardrails — a 'second critic' grounded in real, falsifiable beliefs rather than another model's opinion. Call BEFORE committing or proposing memories. Resolve guardrail violations and contradictions first.",
     {
@@ -631,6 +769,22 @@ async function main() {
   );
 
   server.prompt(
+    "help",
+    "Show everything aidimag offers in this session: tools, prompts (slash commands), resources, and companion `dim` CLI commands.",
+    () => ({
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Relay the following aidimag overview to the user, verbatim or lightly formatted for this chat:\n\n${HELP_TEXT}`,
+          },
+        },
+      ],
+    })
+  );
+
+  server.prompt(
     "session_start",
     "Run at the START of a coding session: surfaces in-scope memory, guardrails, stale warnings, and clarifying questions to ask the user before writing any code.",
     async () => {
@@ -644,6 +798,10 @@ async function main() {
           `\n\n---\n📚 ${pending.length} document(s) are waiting in the knowledge inbox ` +
           `(${pending.map((d) => d.file).join(", ")}). Run the \`knowledge_ingest\` prompt to summarize them into reviewable, pinned-on-approve memories.`;
       }
+      text +=
+        `\n\n---\nAlso mention to the user, in one short line at the end of your briefing summary: ` +
+        `aidimag is active — memory is searched/captured automatically; they can run the \`help\` prompt ` +
+        `(or ask "what can aidimag do?") to see all commands, and \`dim review\` in a terminal to approve queued memories.`;
       return {
         messages: [
           {
@@ -654,6 +812,10 @@ async function main() {
       };
     }
   );
+
+  server.resource("help", "aidimag://help", async () => ({
+    contents: [{ uri: "aidimag://help", mimeType: "text/markdown", text: HELP_TEXT }],
+  }));
 
   server.resource("instructions", "aidimag://instructions", async () => {
     return {
@@ -671,7 +833,10 @@ async function main() {
             `• "We always do X" → CONVENTION\n` +
             `• "We tried X, it failed" → FAILED_APPROACH\n` +
             `• Architecture descriptions → ARCHITECTURE\n\n` +
-            `Capture facts as they're stated, then continue naturally. Don't ask permission.\n`,
+            `Capture facts as they're stated, then continue naturally. Don't ask permission.\n\n` +
+            `At session end (or after a knowledge-rich exchange), call chat_harvest once with the user's ` +
+            `verbatim messages from this session — it bulk-extracts durable facts you may have missed. ` +
+            `This works from any IDE/agent connected over MCP.\n`,
         },
       ],
     };

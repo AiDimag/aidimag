@@ -27,6 +27,7 @@ Review what you learned this session and propose memories using the \`memory_pro
 6. FAILED_APPROACH memories are especially valuable — they prevent future sessions from repeating dead ends.
 7. Propose 0–7 memories. Zero is fine if nothing durable was learned. Do NOT pad.
 8. Before proposing, call \`memory_critique\` with a short summary of what you did and the files you touched. It checks your work against the project's existing memory and guardrails — resolve any contradictions or guardrail concerns it raises first.
+9. Separately from YOUR learnings: if the USER stated project facts during this session ("we use X because Y", "never touch Z", …) that you didn't already capture with \`context_note\`, call \`chat_harvest\` once with the user's verbatim messages — it extracts and queues their statements for review in bulk.
 
 Respect all GUARDRAIL memories you've seen this session: 'never' = refuse and explain why, 'always' = do without asking, 'ask-first' = ask the user before proceeding.
 
@@ -45,9 +46,9 @@ export function sessionEndPromptFor(ticketId: string | null): string {
     `
 
 This session's branch is tied to ticket ${ticketId}. Additionally:
-8. Call \`ticket_get\` first — the ticket usually carries the WHY (root cause, rejected alternatives, acceptance criteria) that the code alone doesn't.
-9. Combine sources: claim from what you did + ticket title/description for the rationale. A bug ticket's root cause is usually a GOTCHA; what didn't fix it is a FAILED_APPROACH; acceptance criteria are INVARIANT candidates.
-10. Proposals are tagged with ${ticketId} automatically (ticket_ref); you don't need to mention the id in claims.`
+10. Call \`ticket_get\` first — the ticket usually carries the WHY (root cause, rejected alternatives, acceptance criteria) that the code alone doesn't.
+11. Combine sources: claim from what you did + ticket title/description for the rationale. A bug ticket's root cause is usually a GOTCHA; what didn't fix it is a FAILED_APPROACH; acceptance criteria are INVARIANT candidates.
+12. Proposals are tagged with ${ticketId} automatically (ticket_ref); you don't need to mention the id in claims.`
   );
 }
 
