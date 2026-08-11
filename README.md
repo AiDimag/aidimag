@@ -164,6 +164,10 @@ Full documentation: **[aidimag.com](https://aidimag.com)**
 
 ---
 
+## 🤝 Contributing
+
+Contributions welcome! See [**CONTRIBUTING.md**](./CONTRIBUTING.md) for dev setup, project principles, and the PR checklist. All participation is governed by our [Code of Conduct](./CODE_OF_CONDUCT.md).
+
 ## 💰 License & Pricing
 
 **AI Dimag is open source under the [MIT License](./LICENSE)** — free for everyone, any team size, forever. Use it, fork it, embed it.

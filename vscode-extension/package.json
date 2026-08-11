@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/anup-khanal/aidimag.git",
+    "url": "https://github.com/AiDimag/aidimag.git",
     "directory": "vscode-extension"
   },
   "icon": "icon.png",

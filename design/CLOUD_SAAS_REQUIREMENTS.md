@@ -12,7 +12,7 @@ Build **aiDimag Cloud** — a hosted sync and account service so developers can 
 
 The OSS product already ships a self-hostable sync server (`dim serve`), brain-scoped keys (`dim keys`), device login (`dim login`), and push/pull/event APIs. The cloud MVP wraps that protocol with **user accounts, billing, a marketing site, and an admin console** — without changing the local-first model (agents still read local SQLite; the cloud is sync + dashboard, not a remote query database).
 
-**Repository:** Production home is **[anup-khanal/aidimag-cloud](https://github.com/anup-khanal/aidimag-cloud)** (`git@github.com:anup-khanal/aidimag-cloud.git`). **During development**, the app lives in **`aidimag-cloud/`** inside the aidimag repo for convenience; migrate to the separate repo before launch (see §4).
+**Repository:** Production home is **[AiDimag/aidimag-cloud](https://github.com/AiDimag/aidimag-cloud)** (`git@github.com:AiDimag/aidimag-cloud.git`). **During development**, the app lives in **`aidimag-cloud/`** inside the aidimag repo for convenience; migrate to the separate repo before launch (see §4).
 
 **Initial hosting target:** Hostinger Business Web Hosting (Node.js, ~3 GB RAM, **~200 GB disk**). The **included MySQL database** on the same account stores platform and sync data — recommended for multi-tenant architecture; no external DB vendor required for MVP.
 
@@ -53,19 +53,19 @@ The OSS product already ships a self-hostable sync server (`dim serve`), brain-s
 
 | Phase | Location | Notes |
 |-------|----------|-------|
-| **Development (now)** | `aidimag-cloud/` inside [anup-khanal/aidimag](https://github.com/anup-khanal/aidimag) | Local dev; use `"aidimag": "file:.."` in package.json; easy access to OSS sync source |
-| **Production (launch)** | [anup-khanal/aidimag-cloud](https://github.com/anup-khanal/aidimag-cloud) | Move folder contents to separate repo; switch dependency to `"aidimag": "^1.0.0"` from npm; deploy repo root to Hostinger |
+| **Development (now)** | `aidimag-cloud/` inside [AiDimag/aidimag](https://github.com/AiDimag/aidimag) | Local dev; use `"aidimag": "file:.."` in package.json; easy access to OSS sync source |
+| **Production (launch)** | [AiDimag/aidimag-cloud](https://github.com/AiDimag/aidimag-cloud) | Move folder contents to separate repo; switch dependency to `"aidimag": "^1.0.0"` from npm; deploy repo root to Hostinger |
 
 | Repo | Purpose |
 |------|---------|
-| **`anup-khanal/aidimag`** (OSS) | CLI, MCP, local memory, self-host `dim serve`, docs, IDE extensions; **`aidimag-cloud/` dev folder** |
-| **`anup-khanal/aidimag-cloud`** | Production Git remote — `git@github.com:anup-khanal/aidimag-cloud.git` |
+| **`AiDimag/aidimag`** (OSS) | CLI, MCP, local memory, self-host `dim serve`, docs, IDE extensions; **`aidimag-cloud/` dev folder** |
+| **`AiDimag/aidimag-cloud`** | Production Git remote — `git@github.com:AiDimag/aidimag-cloud.git` |
 
 **Migration (when MVP is ready):**
 ```sh
 cd aidimag-cloud
 git init
-git remote add origin git@github.com:anup-khanal/aidimag-cloud.git
+git remote add origin git@github.com:AiDimag/aidimag-cloud.git
 # Update package.json: "aidimag": "^1.0.0" instead of "file:.."
 git add . && git commit -m "Initial cloud MVP" && git push -u origin main
 # Optionally remove aidimag-cloud/ from OSS repo or keep a stub README pointing to the new repo
@@ -74,7 +74,7 @@ git add . && git commit -m "Initial cloud MVP" && git push -u origin main
 - Cloud **depends on** `aidimag` — `file:..` while developing inside aidimag; npm version in production.
 - Cloud **implements** the `/v1/*` sync protocol by porting logic from aidimag `src/sync/server.ts` — it does not embed or subprocess the OSS CLI.
 - Brand assets (logo, hero SVG) may be **copied** into `aidimag-cloud/public/` — do not git-submodule the whole aidimag repo.
-- OSS docs remain the technical reference; cloud marketing links out to [aidimag docs](https://github.com/anup-khanal/aidimag).
+- OSS docs remain the technical reference; cloud marketing links out to [aidimag docs](https://github.com/AiDimag/aidimag).
 
 ### What already exists in OSS (reference — do not reimplement in cloud)
 
@@ -507,7 +507,7 @@ Separate `/admin` shell (same design system, distinct nav). Restrict by `super_a
 | Toasts | **sonner** | shadcn-recommended toast library |
 | Forms | **react-hook-form** + **zod** + shadcn `Form` | Validation parity with backend |
 | Email | Resend (optional) | Verify + receipts |
-| Repository | **[anup-khanal/aidimag-cloud](https://github.com/anup-khanal/aidimag-cloud)** | Standalone app; deploy repo root to Hostinger |
+| Repository | **[AiDimag/aidimag-cloud](https://github.com/AiDimag/aidimag-cloud)** | Standalone app; deploy repo root to Hostinger |
 | OSS dependency | **`aidimag`** — `file:..` (dev) / `^1.0.0` npm (prod) | Local dev reads parent package; production uses published npm |
 
 ### Dependency on aidimag npm package
@@ -542,7 +542,7 @@ Optional separate PR to OSS repo to export types — **do not block cloud MVP on
 ### 15.2 Node app setup (aidimag-cloud repo)
 
 1. Build static marketing + server bundle (`npm run build`) in the **aidimag-cloud** repo root.
-2. Configure Hostinger **Node.js Web App** connected to **`anup-khanal/aidimag-cloud`** on GitHub (not aidimag OSS).
+2. Configure Hostinger **Node.js Web App** connected to **`AiDimag/aidimag-cloud`** on GitHub (not aidimag OSS).
 3. **Root directory:** repo root (`.` ) — no subdirectory; the app lives at the top level.
 4. Hostinger build settings:
    | Setting | Value |
@@ -586,7 +586,7 @@ SUPER_ADMIN_EMAIL=...
 |------|------------------|
 | Database | **Databases → MySQL Databases → Create** |
 | Web app | **Websites → Add Website → Deploy Web App** |
-| Source | **Import Git Repository** → [anup-khanal/aidimag-cloud](https://github.com/anup-khanal/aidimag-cloud) |
+| Source | **Import Git Repository** → [AiDimag/aidimag-cloud](https://github.com/AiDimag/aidimag-cloud) |
 | Node | **20.x** |
 | Env vars | Node dashboard → **Environment Variables** |
 | After deploy | **Restart** app; test `/v1/health` |

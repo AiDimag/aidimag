@@ -170,7 +170,7 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
       },
     ],
 
-    socialLinks: [{ icon: "github", link: "https://github.com/anup-khanal/aidimag" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/AiDimag/aidimag" }],
 
     search: { provider: "local" },
 
@@ -180,7 +180,7 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
     },
 
     editLink: {
-      pattern: "https://github.com/anup-khanal/aidimag/edit/main/docs/:path",
+      pattern: "https://github.com/AiDimag/aidimag/edit/main/docs/:path",
       text: "Edit this page on GitHub",
     },
   },
