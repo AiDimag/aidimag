@@ -154,7 +154,7 @@ async function main() {
       kind: z.enum(KINDS).optional().describe("Filter by memory kind"),
       status: z.enum(STATUSES).optional().describe("Filter by verification status"),
       paths: z.array(z.string()).optional().describe("Restrict to memories scoped to these paths"),
-      limit: z.number().int().min(1).max(50).optional(),
+      limit: z.number().int().min(1).max(50).optional().describe("Max results to return (1-50). Defaults to 10."),
     },
     async (args) => {
       const { results } = await hybridSearch(store, {
@@ -184,7 +184,7 @@ async function main() {
     "Get all memories relevant to specific files before editing them — conventions, gotchas, and invariants that apply to those paths.",
     {
       paths: z.array(z.string()).min(1).describe("Repo-relative file paths you are about to read or edit"),
-      limit: z.number().int().min(1).max(50).optional(),
+      limit: z.number().int().min(1).max(50).optional().describe("Max results to return (1-50). Defaults to 20."),
     },
     async (args) => {
       const results = store.getForFiles(args.paths, args.limit ?? 20);
@@ -196,7 +196,7 @@ async function main() {
     "memory_write",
     "Persist a new memory about this codebase. Write the claim as a FALSIFIABLE statement (something that could be checked against the code). Attach evidence whenever possible. For kind=GUARDRAIL, set guardrail_level (never|always|ask-first).",
     {
-      kind: z.enum(KINDS),
+      kind: z.enum(KINDS).describe("Memory kind, e.g. DECISION, CONVENTION, GOTCHA, GUARDRAIL"),
       claim: z.string().min(10).describe("Falsifiable statement, e.g. 'All DB access goes through src/db/store.ts; nothing else imports better-sqlite3'"),
       paths: z.array(z.string()).optional().describe("Paths this memory applies to (omit for repo-wide)"),
       symbols: z.array(z.string()).optional().describe("Symbols (functions/classes) this applies to"),
@@ -292,7 +292,7 @@ async function main() {
     "Read short-term working notes from the current session's scratchpad (newest first). Use at session start or when resuming a task to recover in-flight state. Expired notes are purged automatically.",
     {
       session_id: z.string().optional().describe("Only notes for this session key; omit for all"),
-      limit: z.number().int().min(1).max(100).optional(),
+      limit: z.number().int().min(1).max(100).optional().describe("Max notes to return (1-100). Defaults to 50."),
     },
     async (args) => {
       const notes = store.scratchpadRead(args.session_id, args.limit ?? 50);
@@ -345,17 +345,18 @@ async function main() {
     "memory_propose",
     "Propose a memory for the human review queue. Use at SESSION END for learnings that should persist but warrant review before becoming active memory. Prefer this over memory_write for inferred/uncertain knowledge.",
     {
-      kind: z.enum(KINDS),
+      kind: z.enum(KINDS).describe("Memory kind, e.g. DECISION, CONVENTION, GOTCHA, GUARDRAIL"),
       claim: z.string().min(10).describe("Falsifiable statement about the codebase"),
-      paths: z.array(z.string()).optional(),
-      symbols: z.array(z.string()).optional(),
+      paths: z.array(z.string()).optional().describe("Paths this memory applies to (omit for repo-wide)"),
+      symbols: z.array(z.string()).optional().describe("Symbols (functions/classes) this applies to"),
       guardrail_level: z
         .enum(GUARDRAIL_LEVELS)
         .optional()
         .describe("For kind=GUARDRAIL: never | always | ask-first"),
       evidence: z
         .array(z.object({ type: z.enum(EVIDENCE_TYPES), payload: z.string() }))
-        .optional(),
+        .optional()
+        .describe("Grounding evidence, e.g. {type:'COMMIT_REF', payload:'abc123'}"),
       rationale: z.string().optional().describe("Why this is worth remembering (helps the reviewer)"),
       ticket_ref: z
         .string()
@@ -661,7 +662,7 @@ async function main() {
     "proposals_pending",
     "List memory proposals awaiting human review.",
     {
-      limit: z.number().int().min(1).max(100).optional(),
+      limit: z.number().int().min(1).max(100).optional().describe("Max proposals to return (1-100). Defaults to 50."),
     },
     async (args) => {
       const pending = store.listProposals("PENDING", args.limit ?? 50);
