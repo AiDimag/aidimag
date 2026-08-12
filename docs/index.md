@@ -65,6 +65,7 @@ features:
   <a href="https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/VS%20Code-v1.0.6-blue?logo=visualstudiocode" alt="VS Code Marketplace"></a>
   <a href="https://plugins.jetbrains.com/plugin/33030-ai-dimag" target="_blank" rel="noopener"><img src="https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains&logo=jetbrains&color=blue" alt="JetBrains Marketplace"></a>
   <a href="https://registry.modelcontextprotocol.io/?q=aidimag" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/MCP-Registry-6366f1?logo=modelcontextprotocol" alt="MCP Registry"></a>
+  <a href="https://glama.ai/mcp/servers/AiDimag/aidimag" target="_blank" rel="noopener"><img src="https://glama.ai/mcp/servers/AiDimag/aidimag/badges/score.svg" alt="aidimag MCP server"></a>
   <a href="https://www.producthunt.com/products/ai-dimag?utm_source=other&utm_medium=social" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/Product%20Hunt-AI%20Dimag-da552f?logo=producthunt&logoColor=white" alt="Product Hunt"></a>
   <a href="https://github.com/AiDimag/aidimag/blob/main/LICENSE" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </div>
