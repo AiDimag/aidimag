@@ -58,6 +58,28 @@ features:
     details: Nothing enters memory without human review. Shell-command evidence that arrives via team sync is never executed until you inspect and approve it — a teammate's memory can't become code execution on your machine.
 ---
 
+<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:24px 0 8px;">
+  <a href="https://www.npmjs.com/package/aidimag" target="_blank" rel="noopener"><img src="https://img.shields.io/npm/v/aidimag?color=blue&logo=npm" alt="npm version"></a>
+  <a href="https://github.com/AiDimag/aidimag/actions/workflows/ci.yml" target="_blank" rel="noopener"><img src="https://github.com/AiDimag/aidimag/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/AiDimag/aidimag" target="_blank" rel="noopener"><img src="https://img.shields.io/github/stars/AiDimag/aidimag?style=flat&logo=github&color=blue" alt="GitHub stars"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/VS%20Code-v1.0.6-blue?logo=visualstudiocode" alt="VS Code Marketplace"></a>
+  <a href="https://plugins.jetbrains.com/plugin/33030-ai-dimag" target="_blank" rel="noopener"><img src="https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains&logo=jetbrains&color=blue" alt="JetBrains Marketplace"></a>
+  <a href="https://registry.modelcontextprotocol.io/?q=aidimag" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/MCP-Registry-6366f1?logo=modelcontextprotocol" alt="MCP Registry"></a>
+  <a href="https://www.producthunt.com/products/ai-dimag?utm_source=other&utm_medium=social" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/Product%20Hunt-AI%20Dimag-da552f?logo=producthunt&logoColor=white" alt="Product Hunt"></a>
+  <a href="https://github.com/AiDimag/aidimag/blob/main/LICENSE" target="_blank" rel="noopener"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+</div>
+
+<p style="text-align:center;margin:0 0 8px;">
+  <a href="https://github.com/AiDimag/aidimag" target="_blank" rel="noopener">GitHub</a> ·
+  <a href="https://www.npmjs.com/package/aidimag" target="_blank" rel="noopener">npm</a> ·
+  <a href="/benchmarks">Benchmarks</a> ·
+  <a href="/comparison">Comparison</a> ·
+  <a href="/cli-reference">CLI reference</a> ·
+  <a href="/mcp">MCP</a> ·
+  <a href="/ide-extensions">IDE extensions</a> ·
+  <a href="https://cloud.aidimag.com" target="_blank" rel="noopener">Cloud</a>
+</p>
+
 ## In one sentence
 
 **aiDimag is a memory system for software engineering**: it gives AI coding agents a
