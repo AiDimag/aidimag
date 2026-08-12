@@ -4,10 +4,17 @@
  * embedding provider does: OpenAI if OPENAI_API_KEY is set, else a local Ollama, else
  * none (in which case docs simply wait in the inbox until a provider/agent appears).
  *
- *   AIDIMAG_LLM = auto (default) | openai | ollama | off
- *   AIDIMAG_OPENAI_CHAT_MODEL  (default gpt-4o-mini)
- *   AIDIMAG_OLLAMA_CHAT_MODEL  (default llama3.1)
- *   AIDIMAG_OLLAMA_URL         (default http://localhost:11434)
+ *   AIDIMAG_LLM = auto (default) | openai | ollama | bedrock | off
+ *   AIDIMAG_OPENAI_CHAT_MODEL   (default gpt-4o-mini)
+ *   AIDIMAG_OLLAMA_CHAT_MODEL   (default llama3.1)
+ *   AIDIMAG_OLLAMA_URL          (default http://localhost:11434)
+ *   AIDIMAG_BEDROCK_CHAT_MODEL  (default us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+ *   AIDIMAG_BEDROCK_REGION      (default: AWS SDK resolution — env/profile/config)
+ *
+ * Bedrock is explicit-only (never auto-detected): probing it would make a billable
+ * AWS call, and ambient credentials on a machine are no signal the user wants them
+ * used. Set AIDIMAG_LLM=bedrock to opt in; credentials come from the standard AWS
+ * chain (env vars, ~/.aws profiles, SSO, instance roles).
  */
 
 export interface TextProvider {
@@ -84,6 +91,42 @@ class OllamaTextProvider implements TextProvider {
   }
 }
 
+const BEDROCK_CHAT_MODEL =
+  process.env.AIDIMAG_BEDROCK_CHAT_MODEL ?? "us.anthropic.claude-sonnet-4-5-20250929-v1:0";
+
+/**
+ * AWS Bedrock (Converse API). Explicit opt-in only (AIDIMAG_LLM=bedrock) — see
+ * module header. The SDK is imported lazily so the dependency never taxes CLI
+ * cold-start for the (majority of) users who don't use Bedrock.
+ */
+class BedrockTextProvider implements TextProvider {
+  readonly name = "bedrock";
+  readonly model = BEDROCK_CHAT_MODEL;
+  // BedrockRuntimeClient instance (lazily constructed; SDK types not imported at top level)
+  private client: import("@aws-sdk/client-bedrock-runtime").BedrockRuntimeClient | null = null;
+
+  async generate(system: string, user: string): Promise<string> {
+    const { BedrockRuntimeClient, ConverseCommand } = await import("@aws-sdk/client-bedrock-runtime");
+    if (!this.client) {
+      this.client = new BedrockRuntimeClient(
+        process.env.AIDIMAG_BEDROCK_REGION ? { region: process.env.AIDIMAG_BEDROCK_REGION } : {}
+      );
+    }
+    // Converse has no response_format — prompts already demand JSON, and Claude
+    // complies; callers parse tolerantly (see extract.ts).
+    const res = await this.client.send(
+      new ConverseCommand({
+        modelId: this.model,
+        system: [{ text: system }],
+        messages: [{ role: "user", content: [{ text: user }] }],
+        inferenceConfig: { temperature: 0.1, maxTokens: 4096 },
+      })
+    );
+    const parts = res.output?.message?.content ?? [];
+    return parts.map((p) => ("text" in p ? p.text : "")).join("");
+  }
+}
+
 let cached: TextProvider | null | undefined;
 
 /** Check if running inside an MCP client (e.g., Cursor AI with MCP enabled). */
@@ -106,6 +149,9 @@ export async function getTextProvider(): Promise<TextProvider | null> {
   if (mode === "openai") {
     if (!process.env.OPENAI_API_KEY) throw new Error("AIDIMAG_LLM=openai but OPENAI_API_KEY is not set");
     return (cached = new OpenAiTextProvider());
+  }
+  if (mode === "bedrock") {
+    return (cached = new BedrockTextProvider());
   }
   if (mode === "ollama") {
     const p = await OllamaTextProvider.detect();

@@ -1,10 +1,16 @@
 /**
  * Embedding providers — pluggable, zero-config auto-detection.
  *
- *   AIDIMAG_EMBEDDINGS = auto (default) | openai | ollama | off
+ *   AIDIMAG_EMBEDDINGS = auto (default) | openai | ollama | bedrock | off
  *
  * auto: OpenAI if OPENAI_API_KEY is set, else Ollama if reachable, else off
  * (search degrades gracefully to FTS-only — aidimag never *requires* embeddings).
+ *
+ * Bedrock is explicit-only (AIDIMAG_EMBEDDINGS=bedrock, never auto-detected —
+ * probing would make a billable AWS call). Credentials come from the standard
+ * AWS chain (env vars, ~/.aws profiles, SSO, instance roles).
+ *   AIDIMAG_BEDROCK_EMBED_MODEL (default amazon.titan-embed-text-v2:0, dim 1024)
+ *   AIDIMAG_BEDROCK_REGION      (default: AWS SDK resolution)
  */
 
 export interface EmbeddingProvider {
@@ -85,6 +91,44 @@ class OllamaProvider implements EmbeddingProvider {
 
 let cached: EmbeddingProvider | null | undefined;
 
+const BEDROCK_EMBED_MODEL = process.env.AIDIMAG_BEDROCK_EMBED_MODEL ?? "amazon.titan-embed-text-v2:0";
+
+/**
+ * AWS Bedrock embeddings (Titan Embed v2 by default, 1024-dim). Explicit
+ * opt-in only — see module header. SDK imported lazily to keep CLI cold-start
+ * unaffected for non-Bedrock users. Titan's API is single-text, so embed()
+ * issues one InvokeModel per text (reindex batches are small: 16).
+ */
+class BedrockEmbeddingProvider implements EmbeddingProvider {
+  readonly name = "bedrock";
+  readonly model = BEDROCK_EMBED_MODEL;
+  readonly dim = parseInt(process.env.AIDIMAG_BEDROCK_EMBED_DIM ?? "1024", 10);
+  private client: import("@aws-sdk/client-bedrock-runtime").BedrockRuntimeClient | null = null;
+
+  async embed(texts: string[]): Promise<number[][]> {
+    const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
+    if (!this.client) {
+      this.client = new BedrockRuntimeClient(
+        process.env.AIDIMAG_BEDROCK_REGION ? { region: process.env.AIDIMAG_BEDROCK_REGION } : {}
+      );
+    }
+    const out: number[][] = [];
+    for (const text of texts) {
+      const res = await this.client.send(
+        new InvokeModelCommand({
+          modelId: this.model,
+          contentType: "application/json",
+          body: JSON.stringify({ inputText: text, dimensions: this.dim }),
+        })
+      );
+      const body = JSON.parse(new TextDecoder().decode(res.body)) as { embedding?: number[] };
+      if (!body.embedding?.length) throw new Error(`Bedrock embeddings: empty response from ${this.model}`);
+      out.push(body.embedding);
+    }
+    return out;
+  }
+}
+
 /** Resolve the configured/auto-detected provider (cached per process). */
 export async function getEmbeddingProvider(): Promise<EmbeddingProvider | null> {
   if (cached !== undefined) return cached;
@@ -94,6 +138,9 @@ export async function getEmbeddingProvider(): Promise<EmbeddingProvider | null> 
   if (mode === "openai") {
     if (!process.env.OPENAI_API_KEY) throw new Error("AIDIMAG_EMBEDDINGS=openai but OPENAI_API_KEY is not set");
     return (cached = new OpenAiProvider());
+  }
+  if (mode === "bedrock") {
+    return (cached = new BedrockEmbeddingProvider());
   }
   if (mode === "ollama") {
     const p = await OllamaProvider.detect();
