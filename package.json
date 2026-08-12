@@ -32,6 +32,7 @@
     "dist",
     "!dist/test",
     "!dist/**/*.map",
+    "integrations/hermes/aidimag_hermes_provider.py",
     "server.json",
     "LICENSE",
     "README.md"

@@ -28,7 +28,7 @@ import { registerVerifyCommands } from "./commands/verify.js";
 import { registerSyncCommands } from "./commands/sync.js";
 import { registerTicketCommands } from "./commands/tickets.js";
 import { registerKnowledgeCommands } from "./commands/knowledge.js";
-import { registerHostCommands } from "./commands/hosts.js";
+import { registerHostCommands } from "./commands/hosts.js";import { registerHermesCommands } from "./commands/hermes.js";
 
 /** Version comes from package.json — single source of truth. */
 const PKG_VERSION: string = JSON.parse(
@@ -49,6 +49,7 @@ registerSyncCommands(program);
 registerTicketCommands(program);
 registerKnowledgeCommands(program);
 registerHostCommands(program);
+registerHermesCommands(program);
 
 program.parseAsync().catch((err) => fail(err instanceof Error ? err.message : String(err)));
 
