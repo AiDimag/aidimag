@@ -1,0 +1,584 @@
+{
+  "env": {
+    "date": "2026-08-12T02:06:38.714Z",
+    "node": "v24.7.0",
+    "platform": "darwin arm64",
+    "cpu": "Apple M4",
+    "distractors": 200,
+    "embeddingProvider": "amazon.titan-embed-text-v2:0 (dim 1024)"
+  },
+  "retrieval": {
+    "fts": {
+      "perQuery": [
+        {
+          "category": "keyword",
+          "query": "database access better-sqlite3",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "JWT access token expiry",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "exponential backoff retries",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "dead-letter queue delivery attempts",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "token-bucket rate limiting",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "cursor-based pagination",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "CSV formula injection",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "WebSocket heartbeat ping",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "how long before a login session needs refreshing",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 0
+          },
+          "rr": 0,
+          "firstRank": null
+        },
+        {
+          "category": "paraphrase",
+          "query": "what happens when an outgoing request fails temporarily",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 0
+          },
+          "rr": 0,
+          "firstRank": null
+        },
+        {
+          "category": "paraphrase",
+          "query": "where do broken background jobs end up",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 0
+          },
+          "rr": 0,
+          "firstRank": null
+        },
+        {
+          "category": "paraphrase",
+          "query": "can I remove a user row permanently",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "storing dates and handling timezones",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 0
+          },
+          "rr": 0,
+          "firstRank": null
+        },
+        {
+          "category": "paraphrase",
+          "query": "why did we stop using an object-relational mapper",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 0
+          },
+          "rr": 0,
+          "firstRank": null
+        },
+        {
+          "category": "paraphrase",
+          "query": "avoiding duplicate charges when Stripe calls us twice",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "sending a welcome message inside the signup route",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 1
+          },
+          "rr": 0.125,
+          "firstRank": 8
+        },
+        {
+          "category": "scoped",
+          "query": "validation",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 0
+          },
+          "rr": 0,
+          "firstRank": null
+        },
+        {
+          "category": "scoped",
+          "query": "cache TTL",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "scoped",
+          "query": "credentials",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "scoped",
+          "query": "hashed identifiers",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        }
+      ],
+      "aggregate": {
+        "ALL": {
+          "n": 20,
+          "mrr": 0.65625,
+          "recall@1": 0.65,
+          "recall@5": 0.65,
+          "recall@10": 0.7
+        },
+        "keyword": {
+          "n": 8,
+          "mrr": 1,
+          "recall@1": 1,
+          "recall@5": 1,
+          "recall@10": 1
+        },
+        "paraphrase": {
+          "n": 8,
+          "mrr": 0.265625,
+          "recall@1": 0.25,
+          "recall@5": 0.25,
+          "recall@10": 0.375
+        },
+        "scoped": {
+          "n": 4,
+          "mrr": 0.75,
+          "recall@1": 0.75,
+          "recall@5": 0.75,
+          "recall@10": 0.75
+        }
+      }
+    },
+    "hybrid": {
+      "perQuery": [
+        {
+          "category": "keyword",
+          "query": "database access better-sqlite3",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "JWT access token expiry",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "exponential backoff retries",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "dead-letter queue delivery attempts",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "token-bucket rate limiting",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "cursor-based pagination",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "CSV formula injection",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "keyword",
+          "query": "WebSocket heartbeat ping",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "how long before a login session needs refreshing",
+          "recallAt": {
+            "1": 0,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 0.3333333333333333,
+          "firstRank": 3
+        },
+        {
+          "category": "paraphrase",
+          "query": "what happens when an outgoing request fails temporarily",
+          "recallAt": {
+            "1": 0,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 0.3333333333333333,
+          "firstRank": 3
+        },
+        {
+          "category": "paraphrase",
+          "query": "where do broken background jobs end up",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 1
+          },
+          "rr": 0.14285714285714285,
+          "firstRank": 7
+        },
+        {
+          "category": "paraphrase",
+          "query": "can I remove a user row permanently",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "storing dates and handling timezones",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "why did we stop using an object-relational mapper",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "avoiding duplicate charges when Stripe calls us twice",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "paraphrase",
+          "query": "sending a welcome message inside the signup route",
+          "recallAt": {
+            "1": 0,
+            "5": 0,
+            "10": 1
+          },
+          "rr": 0.1111111111111111,
+          "firstRank": 9
+        },
+        {
+          "category": "scoped",
+          "query": "validation",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "scoped",
+          "query": "cache TTL",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "scoped",
+          "query": "credentials",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        },
+        {
+          "category": "scoped",
+          "query": "hashed identifiers",
+          "recallAt": {
+            "1": 1,
+            "5": 1,
+            "10": 1
+          },
+          "rr": 1,
+          "firstRank": 1
+        }
+      ],
+      "aggregate": {
+        "ALL": {
+          "n": 20,
+          "mrr": 0.846031746031746,
+          "recall@1": 0.8,
+          "recall@5": 0.9,
+          "recall@10": 1
+        },
+        "keyword": {
+          "n": 8,
+          "mrr": 1,
+          "recall@1": 1,
+          "recall@5": 1,
+          "recall@10": 1
+        },
+        "paraphrase": {
+          "n": 8,
+          "mrr": 0.615079365079365,
+          "recall@1": 0.5,
+          "recall@5": 0.75,
+          "recall@10": 1
+        },
+        "scoped": {
+          "n": 4,
+          "mrr": 1,
+          "recall@1": 1,
+          "recall@5": 1,
+          "recall@10": 1
+        }
+      }
+    }
+  },
+  "staleness": {
+    "baselineAllVerified": true,
+    "cases": [
+      {
+        "name": "grep constant (drifts)",
+        "evidenceType": "STATIC_CHECK",
+        "expected": "STALE",
+        "actual": "STALE",
+        "correct": true
+      },
+      {
+        "name": "file exists (deleted)",
+        "evidenceType": "STATIC_CHECK",
+        "expected": "STALE",
+        "actual": "STALE",
+        "correct": true
+      },
+      {
+        "name": "function name (renamed)",
+        "evidenceType": "STATIC_CHECK",
+        "expected": "STALE",
+        "actual": "STALE",
+        "correct": true
+      },
+      {
+        "name": "commit-anchored file (edited)",
+        "evidenceType": "COMMIT_REF",
+        "expected": "STALE",
+        "actual": "STALE",
+        "correct": true
+      },
+      {
+        "name": "grep constant (holds)",
+        "evidenceType": "STATIC_CHECK",
+        "expected": "VERIFIED",
+        "actual": "VERIFIED",
+        "correct": true
+      },
+      {
+        "name": "file exists (holds)",
+        "evidenceType": "STATIC_CHECK",
+        "expected": "VERIFIED",
+        "actual": "VERIFIED",
+        "correct": true
+      },
+      {
+        "name": "structured logging grep (holds)",
+        "evidenceType": "STATIC_CHECK",
+        "expected": "VERIFIED",
+        "actual": "VERIFIED",
+        "correct": true
+      },
+      {
+        "name": "commit-anchored file (untouched)",
+        "evidenceType": "COMMIT_REF",
+        "expected": "VERIFIED",
+        "actual": "VERIFIED",
+        "correct": true
+      }
+    ],
+    "detectionRate": 1,
+    "falsePositiveRate": 0,
+    "recoveryProposalsDrafted": 4
+  }
+}

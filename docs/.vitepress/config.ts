@@ -141,6 +141,7 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
           { text: "MCP integration", link: "/mcp" },
           { text: "IDE extensions", link: "/ide-extensions" },
           { text: "Web dashboard", link: "/dashboard" },
+          { text: "Benchmarks", link: "/benchmarks" },
         ],
       },
       {
