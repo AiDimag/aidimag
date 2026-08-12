@@ -11,6 +11,7 @@
 [![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-v1.0.6-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
 [![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains&logo=jetbrains&color=blue)](https://plugins.jetbrains.com/plugin/33030-ai-dimag)
 [![MCP Registry](https://img.shields.io/badge/MCP-Registry-6366f1?logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=aidimag)
+[![aidimag MCP server](https://glama.ai/mcp/servers/AiDimag/aidimag/badges/score.svg)](https://glama.ai/mcp/servers/AiDimag/aidimag)
 [![Product Hunt](https://img.shields.io/badge/Product%20Hunt-AI%20Dimag-da552f?logo=producthunt&logoColor=white)](https://www.producthunt.com/products/ai-dimag?utm_source=other&utm_medium=social)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-aidimag.com-blue)](https://aidimag.com)
