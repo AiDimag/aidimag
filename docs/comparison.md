@@ -25,8 +25,8 @@ skills — and the thing it optimizes for is whether those facts are **still tru
 code right now**.
 
 That focus produces a different design from the memory tools you may have seen. This page
-compares aiDimag against the common *categories* of memory systems, without naming
-specific products.
+compares aiDimag against the common *categories* of memory systems, then against the
+specific products people ask about most.
 
 ## The core difference: store-and-retrieve vs claim-and-verify
 
@@ -79,6 +79,46 @@ The practical consequences:
 | **Security of shared memory** | N/A (single user) | N/A | Committed file — anyone can edit | **Evidence trust gate**: synced-in shell checks never execute until you inspect and approve them |
 | **Team story** | Per-user cloud accounts | Shared collection | Merge conflicts in a markdown file | **Self-hosted sync with last-writer-wins, tombstones, and cross-machine verification consensus** |
 | **Failure mode** | Confidently recalls things that are no longer true | Retrieves whatever is similar, true or not | Instructions drift from reality | **Says "this went stale" instead of guessing** |
+
+## Product-by-product
+
+The tools people most often ask about, and where each one actually sits. Most of
+them are *conversational/agent* memory — excellent at remembering users and chat
+sessions, which is a different problem from remembering a living codebase:
+
+| | **aiDimag** | Mnemosyne | mem0 | Letta | Honcho | SuperMemory | Hindsight | ChromaDB |
+|---|---|---|---|---|---|---|---|---|
+| **Subject of memory** | **Your codebase** | Chat/agent sessions | User & agent facts | Agent's own context window | User/peer reasoning | Personal + agent memory | Agent memory | — (vector database) |
+| **Architecture** | Falsifiable claims + evidence, FTS5 + sqlite-vec hybrid | BEAM 3-tier (episodic/semantic/persona) | Session + extracted facts | OS-style virtual context (MemGPT) | Peer model + reasoning | 5-layer memory stack | Episodic + semantic + graph + BM25 | Vector store |
+| **Local-first** | ✅ One SQLite file per repo | ✅ SQLite | ⚠️ Hybrid (OSS + managed platform) | ❌ Docker + Postgres | ⚠️ Postgres + worker | ❌ SaaS | ✅ SQLite | ✅ Embedded |
+| **MCP server** | ✅ Built-in | ✅ Built-in | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **How memory gets in** | **Human-gated review queue** | Auto-capture | Auto-extraction | Agent-managed | Auto | Auto | Auto | You embed it |
+| **When the code changes** | **Evidence re-runs via git hooks; broken claims flip STALE** | Nothing | Nothing | Nothing | Nothing | Nothing | Nothing | Nothing |
+| **Enforcement** | ✅ Guardrails + pre-commit `dim check` + `memory_critique` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Team story** | Self-hosted sync, evidence trust gate, verification consensus | Sync service | Managed platform | Server deployment | Managed | SaaS | Self-hosted | Server mode |
+| **Open source** | ✅ MIT | ✅ MIT | ✅ Apache 2.0 | ✅ Apache 2.0 | ⚠️ AGPL | ❌ Proprietary | ✅ MIT | ✅ Apache 2.0 |
+| **Published benchmarks** | [Own reproducible suite](/benchmarks): 100% staleness detection / 0% FP | BEAM 65.2%, LongMemEval 98.9% R@All@5 (self-reported, v3.0.0) | LoCoMo | LoCoMo 83.2% | LongMemEval 90.4% | MemoryBench 85.2% | BEAM 73.4%, LongMemEval 94.6% | — |
+
+Competitor figures are the numbers those projects publish themselves (metrics and
+judges differ between them — see each project's methodology before comparing rows).
+
+**Why aiDimag doesn't publish LoCoMo / LongMemEval / BEAM scores:** those benchmarks
+measure recall over long *conversation histories* — the subject of memory is the
+user and the chat. aiDimag's subject is the repository, so the honest equivalents are
+different questions: *does recall return the right claim about the code?* and *does
+memory notice when the code drifts?* Both are measured in the
+[reproducible benchmark suite](/benchmarks) — retrieval Recall@k/MRR over a labeled
+query set, and staleness detection against a real mutating git repo (100% detection,
+0% false positives). No chat-memory benchmark measures the second property at all —
+in a store-and-retrieve system there is nothing to re-verify.
+
+- **Choose Mnemosyne / mem0 / Honcho / SuperMemory** when the thing to remember is a
+  *user or conversation* across sessions.
+- **Choose Letta** when you want a full agent runtime that manages its own context.
+- **Choose ChromaDB** when you need a vector database, not a memory system.
+- **Choose Hindsight** for general agent memory with strong published recall numbers.
+- **Choose aiDimag** when AI coding agents keep re-discovering or misremembering how
+  your *codebase* works — and you need memories that prove they're still true.
 
 ## What aiDimag deliberately does *not* do
 

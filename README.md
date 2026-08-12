@@ -7,8 +7,11 @@
 **Your codebase remembers its decisions, conventions, and rules — and proves they're still true.**
 
 [![npm version](https://img.shields.io/npm/v/aidimag?color=blue&logo=npm)](https://www.npmjs.com/package/aidimag)
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-v1.0.4-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
+[![CI](https://github.com/AiDimag/aidimag/actions/workflows/ci.yml/badge.svg)](https://github.com/AiDimag/aidimag/actions/workflows/ci.yml)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-v1.0.6-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=aidimag.aidimag-vscode)
 [![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/33030?label=JetBrains&logo=jetbrains&color=blue)](https://plugins.jetbrains.com/plugin/33030-ai-dimag)
+[![MCP Registry](https://img.shields.io/badge/MCP-Registry-6366f1?logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=aidimag)
+[![Product Hunt](https://img.shields.io/badge/Product%20Hunt-AI%20Dimag-da552f?logo=producthunt&logoColor=white)](https://www.producthunt.com/products/ai-dimag?utm_source=other&utm_medium=social)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-aidimag.com-blue)](https://aidimag.com)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
@@ -86,6 +89,8 @@ Add to your agent config (e.g. `.mcp.json` for Claude Code):
 
 **Non-MCP Tools**: `dim generate-context -f all` renders verified memory into `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, `.windsurfrules`, and `.github/copilot-instructions.md` (`--auto` keeps them refreshed).
 
+**Hermes Agent**: `dim hermes install` registers aidimag as a native Hermes memory provider — one command, no pip, no venv. A single stdlib-only Python bridge delegates to the MCP server: session briefings are injected into the system prompt, recall is prefetched per turn, and session learnings become review-queue *proposals* (never silent writes). Then: `hermes config set memory.provider aidimag`.
+
 ## ✨ Key Features
 
 ### 🛡️ Human-Gated Capture
@@ -130,6 +135,45 @@ AI Dimag follows a **claim-and-verify** model; other memory systems follow **sto
 | **Failure mode** | Confidently recalls outdated facts | Retrieves similar, true or not | Instructions drift from reality | **Says "this went STALE" instead of guessing** |
 
 Full comparison: **[aidimag.com/comparison](https://aidimag.com/comparison)**
+
+### vs. named tools
+
+How aiDimag relates to the memory tools people usually ask about. These solve a
+different problem (remembering *users and conversations*); aiDimag remembers your
+*repository* and proves its memories are still true:
+
+| | **aiDimag** | Mnemosyne | mem0 | Letta | Honcho | SuperMemory | Hindsight | ChromaDB |
+|---|---|---|---|---|---|---|---|---|
+| **Subject of memory** | **Your codebase** | Chat/agent sessions | User & agent facts | Agent's own context | User/peer reasoning | Personal + agent | Agent memory | — (vector DB) |
+| **Local-first** | ✅ SQLite per repo | ✅ SQLite | ⚠️ Hybrid | ❌ Docker+PG | ⚠️ PG+worker | ❌ SaaS | ✅ SQLite | ✅ Embedded |
+| **MCP server** | ✅ Built-in | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| **Verifies memories against code** | ✅ Evidence re-runs via git hooks | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Human-gated writes** | ✅ Review queue | ❌ Auto-capture | ❌ Auto | ❌ | ❌ | ❌ | ❌ | — |
+| **Enforcement** | ✅ Guardrails + pre-commit + critique | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Open source** | ✅ MIT | ✅ MIT | ✅ Apache 2.0 | ✅ Apache 2.0 | ⚠️ AGPL | ❌ Proprietary | ✅ MIT | ✅ Apache 2.0 |
+| **Published benchmark** | Own suite: 100% staleness detection, 0% FP | BEAM 65.2% / LongMemEval 98.9% R@All@5 (self-reported) | LoCoMo | LoCoMo 83.2% | LongMemEval 90.4% | MemoryBench 85.2% | BEAM 73.4% / LongMemEval 94.6% | — |
+
+Chat-memory benchmarks (LoCoMo, LongMemEval, BEAM) score recall over *conversation
+histories*, so they don't apply to aiDimag — its memory subject is the repo. Instead
+aiDimag publishes its own reproducible suite (below), including the metric none of
+the chat benchmarks measure: **does memory notice when the code changes?**
+
+## 📊 Benchmarks
+
+Reproducible performance and quality suites live in [`benchmark/`](./benchmark)
+(`npm run bench`, `npm run bench:quality`). Headline results (Apple M4, Node 24,
+10,000-memory brain — full tables at [aidimag.com/benchmarks](https://aidimag.com/benchmarks)):
+
+| Metric | Result |
+|---|---|
+| FTS keyword search | 1.45ms p50 |
+| Vector KNN (768-dim, sqlite-vec) | 4.15ms p50 |
+| Memory writes (transactional, incl. FTS + event log) | ~5,400/s |
+| CLI cold start (`dim --help`) | ~41ms p50 |
+| **Staleness detection** (broken claims → STALE, real git fixture) | **100%** (4/4) |
+| **False positives** (intact claims wrongly flagged) | **0%** (0/4) |
+| Retrieval, keyword queries (Recall@1 / MRR, FTS-only) | 1.00 / 1.00 |
+| Retrieval, paraphrase queries (FTS-only; hybrid closes this gap) | 0.25 / 0.27 |
 
 ## 📖 Documentation
 
