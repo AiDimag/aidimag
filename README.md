@@ -85,7 +85,7 @@ Add to your agent config (e.g. `.mcp.json` for Claude Code):
 }
 ```
 
-**MCP Tools** get `memory_search`, `memory_propose`, `context_note` (live in-chat fact capture), `memory_critique` (a second critic grounded in verified memory), session-start briefings, session-end extraction, and more.
+**MCP Tools** get `memory_search`, `memory_propose`, `context_note` (live in-chat fact capture), `chat_harvest` (live, tool-agnostic session harvesting with server-side secret redaction), `memory_critique` (a second critic grounded in verified memory), session-start briefings, session-end extraction, and more.
 
 **Non-MCP Tools**: `dim generate-context -f all` renders verified memory into `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, `.windsurfrules`, and `.github/copilot-instructions.md` (`--auto` keeps them refreshed).
 
@@ -94,7 +94,7 @@ Add to your agent config (e.g. `.mcp.json` for Claude Code):
 ## ✨ Key Features
 
 ### 🛡️ Human-Gated Capture
-Commits, PRs, AI-chat transcripts, and pasted docs are mined into *proposals*. Nothing enters memory until you approve it in `dim review` (auto-triaged best-first, `approve all --min-score 0.7` for batches).
+Commits, PRs, AI-chat transcripts (Claude Code, Codex, Copilot, Cursor), and pasted docs are mined into *proposals*. Nothing enters memory until you approve it in `dim review` (auto-triaged best-first, `approve all --min-score 0.7` for batches).
 
 ### ✅ Verification Lifecycle
 `STATIC_CHECK` / `COMMIT_REF` / `TEST_RESULT` / `EXEC_TRACE` / `HUMAN_ATTESTED` evidence. Failing evidence flips memories to STALE and auto-drafts a recovery proposal. Confidence decays without re-confirmation.
@@ -103,7 +103,7 @@ Commits, PRs, AI-chat transcripts, and pasted docs are mined into *proposals*. N
 Shell-command evidence that arrives via team sync is **never executed** until you inspect and approve it (`dim verify --trust`).
 
 ### 🔍 Hybrid Semantic Recall
-FTS5 keyword + vector KNN (OpenAI or local Ollama, auto-detected; works keyword-only with neither).
+FTS5 keyword + vector KNN (OpenAI, local Ollama, or AWS Bedrock; auto-detected except Bedrock, which is explicit opt-in; works keyword-only with none).
 
 ### 🚦 Guardrails & Skills
 Behavioral rules (`never` / `ask-first` / `always`) and step-by-step procedures, enforced by `dim check` (pre-commit) and `memory_critique`.
@@ -118,7 +118,7 @@ Drop design docs / ADRs / PDFs / DOCX into `knowledge/` and they're summarized i
 `dim scratch` (and the `scratchpad_*` MCP tools) hold short-term session notes — TTL-expiring, never synced, never durable memory. `dim audit` lists memories resting on the weakest ground (agent-authored, evidence-free, stale, or long-unverified) so you can fix them up like a dependency audit for your repo's knowledge.
 
 ### 🎨 Web Dashboard & Extensions
-`dim ui` plus VS Code and IntelliJ extensions.
+`dim ui` — run checks, session briefings, bootstrap, harvest, and context generation from the browser — plus VS Code and IntelliJ extensions.
 
 ## 🥊 How It Compares
 
