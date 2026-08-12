@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.AiDimag/aidimag",
+  "description": "Persistent, verified memory for AI coding agents: recall, capture, guardrails, review queue.",
+  "repository": {
+    "url": "https://github.com/AiDimag/aidimag",
+    "source": "github"
+  },
+  "version": "1.0.22",
+  "websiteUrl": "https://aidimag.com",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "aidimag",
+      "version": "1.0.22",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "Start the aidimag MCP server over stdio"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "AIDIMAG_REPO",
+          "description": "Absolute path to the git repository whose memory store to serve. Optional: defaults to walking up from the current working directory.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "AIDIMAG_LLM",
+          "description": "LLM provider for extraction features (chat_harvest, knowledge ingestion): openai | ollama | off. Optional: auto-detected.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "description": "OpenAI API key, used only if the OpenAI provider is selected/detected for extraction features.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

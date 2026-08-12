@@ -1,6 +1,6 @@
 {
   "name": "aidimag",
-  "version": "1.0.19",
+  "version": "1.0.22",
   "description": "Persistent, verified memory for AI coding agents. CLI: dim.",
   "type": "module",
   "license": "MIT",
@@ -13,6 +13,7 @@
     "url": "git+https://github.com/AiDimag/aidimag.git"
   },
   "homepage": "https://aidimag.com",
+  "mcpName": "io.github.AiDimag/aidimag",
   "bugs": {
     "url": "https://github.com/AiDimag/aidimag/issues"
   },
@@ -31,6 +32,7 @@
     "dist",
     "!dist/test",
     "!dist/**/*.map",
+    "server.json",
     "LICENSE",
     "README.md"
   ],
@@ -41,9 +43,12 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "mcp": "node dist/mcp/server.js",
+    "registry:sync": "node scripts/sync-server-json.mjs",
+    "registry:publish": "npm run registry:sync && npx mcp-publisher publish",
     "pretest": "tsc",
     "test": "node --test dist/test/*.test.js",
-    "prepublishOnly": "npm run build && npm test",
+    "version": "npm run registry:sync && git add server.json",
+    "prepublishOnly": "npm run build && npm test && npm run registry:sync",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"

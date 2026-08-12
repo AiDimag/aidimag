@@ -15,9 +15,14 @@ import { verifyAll } from "../verify/engine.js";
 import { mineCommits } from "../capture/commit-miner.js";
 import { hybridSearch, indexMemory, reindexAll } from "../embeddings/search.js";
 import { readCloudConfig, writeCloudConfig, getToken, sync as cloudSync, configPath } from "../sync/client.js";
-import { resolveKnowledgeConfig } from "../config.js";
-import { ingestAll } from "../knowledge/ingest.js";
+import { resolveKnowledgeConfig, type ContextFormat } from "../config.js";
+import { ingestAll, knowledgeStatus } from "../knowledge/ingest.js";
 import { isAllowedSyncServerUrl } from "../security/url.js";
+import { checkDiff } from "../verify/check.js";
+import { buildSessionBriefing, renderBriefing } from "../capture/session-briefing.js";
+import { bootstrapRepo } from "../capture/bootstrap.js";
+import { harvestClaudeSessions } from "../capture/harvest.js";
+import { generateContext } from "../context/generate.js";
 import {
   readTicketsConfig,
   writeTicketsConfig,
@@ -140,12 +145,18 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       if (req.method === "GET" && path === "/api/state") {
         const cloud = readCloudConfig(repoRoot);
         const tcfg = readTicketsConfig(repoRoot);
+        let gapCount = 0;
+        try { gapCount = store.searchGaps({ sinceDays: 30, limit: 100 }).length; } catch { /* pre-migration DB */ }
+        let scratchCount = 0;
+        try { scratchCount = store.scratchpadRead(undefined, 100).length; } catch { /* pre-migration DB */ }
         json(res, 200, {
           repoRoot,
           csrfToken,
           memories: store.list(1000),
           proposals: store.listProposals("PENDING", 200),
           summary: store.statusSummary(),
+          gapCount,
+          scratchCount,
           cloud: cloud
             ? { server: cloud.server, brain: cloud.brain, hasToken: !!getToken(cloud.server, repoRoot) }
             : null,
@@ -229,6 +240,119 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           indexed: r.indexed,
           provider: r.provider ? `${r.provider.name}/${r.provider.model}` : null,
         });
+        return;
+      }
+
+      // ---- knowledge gaps (dim gaps) ----
+      if (req.method === "GET" && path === "/api/gaps") {
+        const days = Number(url.searchParams.get("days") ?? "30") || 30;
+        let gaps: ReturnType<MemoryStore["searchGaps"]> = [];
+        try { gaps = store.searchGaps({ sinceDays: days, limit: 50 }); } catch { /* pre-migration DB */ }
+        json(res, 200, { gaps, days });
+        return;
+      }
+      if (req.method === "POST" && path === "/api/gaps/clear") {
+        json(res, 200, { cleared: store.clearSearchGaps() });
+        return;
+      }
+
+      // ---- scratchpad (dim scratch) ----
+      if (req.method === "GET" && path === "/api/scratchpad") {
+        json(res, 200, { notes: store.scratchpadRead(undefined, 100) });
+        return;
+      }
+      if (req.method === "POST" && path === "/api/scratchpad") {
+        const b = await readBody(req);
+        const content = String(b.content ?? "").trim();
+        if (!content) {
+          json(res, 400, { error: "content is required" });
+          return;
+        }
+        const ttlHours = Number(b.ttlHours) || 24;
+        json(res, 201, { note: store.scratchpadWrite(content, { ttlHours, createdBy: "human:dashboard" }) });
+        return;
+      }
+      if (req.method === "POST" && path === "/api/scratchpad/clear") {
+        json(res, 200, { cleared: store.scratchpadClear() });
+        return;
+      }
+
+      // ---- provenance audit (dim audit) ----
+      if (req.method === "GET" && path === "/api/audit") {
+        json(res, 200, { findings: store.auditMemories({ limit: 50 }) });
+        return;
+      }
+
+      // ---- session briefing (dim brief) ----
+      if (req.method === "GET" && path === "/api/brief") {
+        const b = buildSessionBriefing(store, repoRoot);
+        json(res, 200, { briefing: b, rendered: renderBriefing(b) });
+        return;
+      }
+
+      // ---- staged-diff contradiction check (dim check) ----
+      if (req.method === "POST" && path === "/api/check") {
+        json(res, 200, checkDiff(store, repoRoot));
+        return;
+      }
+
+      // ---- proposals gc (dim proposals gc) ----
+      if (req.method === "POST" && path === "/api/proposals/gc") {
+        const dryRun = url.searchParams.get("dryRun") === "1";
+        json(res, 200, { ...store.gcResolvedProposals({ dryRun }), dryRun });
+        return;
+      }
+
+      // ---- knowledge inbox (dim knowledge sync/status) ----
+      if (req.method === "GET" && path === "/api/knowledge/status") {
+        const cfg = resolveKnowledgeConfig(repoRoot);
+        const s = await knowledgeStatus(repoRoot, cfg);
+        json(res, 200, {
+          folder: s.folder,
+          pending: s.pending.map((d) => d.file),
+          unsupported: s.unsupported.length,
+          skipped: s.skippedOnDisk.length,
+          processed: s.processed.length,
+        });
+        return;
+      }
+      if (req.method === "POST" && path === "/api/knowledge/sync") {
+        const cfg = resolveKnowledgeConfig(repoRoot);
+        const report = await ingestAll(store, repoRoot, cfg);
+        json(res, 200, {
+          processed: report.processed.length,
+          duplicates: report.duplicates.length,
+          pendingNoSummarizer: report.pendingNoSummarizer.length,
+        });
+        return;
+      }
+
+      // ---- bootstrap (dim bootstrap) — long-running, needs an LLM ----
+      if (req.method === "POST" && path === "/api/bootstrap") {
+        const force = url.searchParams.get("force") === "1";
+        const r = await bootstrapRepo(store, repoRoot, { force });
+        json(res, 200, r);
+        return;
+      }
+
+      // ---- harvest AI chats (dim harvest) — needs an LLM ----
+      if (req.method === "POST" && path === "/api/harvest") {
+        const all = url.searchParams.get("all") === "1";
+        const r = await harvestClaudeSessions(store, repoRoot, { all });
+        json(res, 200, r);
+        return;
+      }
+
+      // ---- generate context files (dim generate-context) ----
+      if (req.method === "POST" && path === "/api/generate-context") {
+        const b = await readBody(req);
+        const format = String(b.format ?? "claude") as ContextFormat;
+        if (!["claude", "cursorrules", "copilot", "windsurfrules", "agents", "all"].includes(format)) {
+          json(res, 400, { error: "invalid format" });
+          return;
+        }
+        const r = generateContext(store, repoRoot, format);
+        json(res, 200, { files: r.files, total: r.total, pinned: r.pinned });
         return;
       }
 

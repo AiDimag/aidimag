@@ -195,6 +195,135 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   html:not(.dark) .theme-icon-moon { display: none; }
   html.dark .theme-icon-sun { display: none; }
   html.dark .theme-icon-moon { display: block; }
+
+  /* ---------------------------------------------------------- tabs */
+  .tabs {
+    display: flex; gap: 4px; padding: 4px;
+    background: hsl(var(--muted) / 0.55);
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 999px;
+  }
+  .tab {
+    border: none; background: transparent; color: hsl(var(--muted-foreground));
+    padding: 6px 16px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+  }
+  .tab:hover { background: hsl(var(--card) / 0.7); color: hsl(var(--foreground)); border-color: transparent; }
+  .tab.active {
+    background: hsl(var(--card)); color: hsl(var(--foreground));
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12), 0 0 0 1px hsl(var(--border) / 0.8);
+  }
+  .tab .tab-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 17px; height: 17px; padding: 0 5px; margin-left: 6px;
+    border-radius: 999px; font-size: 10px; font-weight: 700;
+    background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+  }
+  body.tab-actions #view-overview, body.tab-actions .legend, body.tab-actions #toolbar-overview { display: none; }
+  body:not(.tab-actions) #view-actions { display: none; }
+
+  /* ---------------------------------------------------------- actions view */
+  #view-actions { flex: 1; overflow-y: auto; padding: 24px clamp(16px, 5vw, 56px) 56px; }
+  .actions-hero { max-width: 1160px; margin: 0 auto 20px; }
+  .actions-hero h2 { margin: 0 0 4px; font-size: 20px; font-weight: 700; letter-spacing: -0.03em; }
+  .actions-hero p { font-size: 13px; color: hsl(var(--muted-foreground)); max-width: 640px; }
+  .status-strip {
+    max-width: 1160px; margin: 0 auto 28px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;
+  }
+  .stat {
+    background: hsl(var(--card) / 0.9); border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--surface-glow);
+  }
+  .stat .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: hsl(var(--muted-foreground)); }
+  .stat .stat-value { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
+  .stat .stat-sub { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat.attention .stat-value { color: hsl(var(--primary)); }
+
+  .action-groups { max-width: 1160px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+  .action-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .action-group-head .g-icon { font-size: 16px; }
+  .action-group-head h3 { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+  .action-group-head .g-sub { font-size: 12px; color: hsl(var(--muted-foreground)); }
+  .action-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .action-card {
+    position: relative; text-align: left; display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+    background: hsl(var(--card) / 0.9); border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: var(--radius); padding: 14px 15px 13px; cursor: pointer;
+    box-shadow: var(--surface-glow); white-space: normal; font: inherit; color: hsl(var(--foreground));
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+  .action-card:hover {
+    border-color: hsl(var(--primary) / 0.45); transform: translateY(-1px); background: hsl(var(--card));
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.15), 0 12px 32px rgba(37, 99, 235, 0.14);
+  }
+  .action-card:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+  .action-card[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; transform: none; }
+  .action-card .ac-top { display: flex; align-items: center; gap: 9px; }
+  .action-card .ac-icon {
+    width: 30px; height: 30px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+    border-radius: 9px; font-size: 15px;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.05));
+    border: 1px solid hsl(var(--primary) / 0.18);
+  }
+  .action-card.danger .ac-icon { background: color-mix(in srgb, var(--refuted) 12%, transparent); border-color: color-mix(in srgb, var(--refuted) 25%, transparent); }
+  .action-card .ac-title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; flex: 1; min-width: 0; }
+  .action-card .ac-desc { font-size: 11.5px; line-height: 1.45; color: hsl(var(--muted-foreground)); }
+  .action-card .ac-badge {
+    min-width: 18px; height: 18px; padding: 0 6px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+  }
+  .action-card .ac-cli {
+    font-size: 10px; font-family: ui-monospace, monospace; color: hsl(var(--muted-foreground) / 0.85);
+    background: hsl(var(--muted) / 0.55); border-radius: 6px; padding: 2px 7px; align-self: flex-start;
+  }
+  .action-card .ac-term {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--stale); border: 1px solid color-mix(in srgb, var(--stale) 40%, transparent);
+    border-radius: 5px; padding: 1px 5px;
+  }
+  .action-card.busy { pointer-events: none; }
+  .action-card.busy .ac-icon { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+
+  /* ---------------------------------------------------------- help tooltip */
+  .help {
+    flex: 0 0 auto; width: 17px; height: 17px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; cursor: help; position: relative;
+    color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border));
+    background: hsl(var(--muted) / 0.5);
+  }
+  .help:hover, .help:focus-visible { color: hsl(var(--primary)); border-color: hsl(var(--primary) / 0.5); }
+  .help::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 8px); right: -8px; z-index: 60;
+    width: 280px; padding: 9px 11px;
+    background: hsl(var(--card)); color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border)); border-radius: 10px;
+    font-size: 11.5px; font-weight: 400; line-height: 1.5; text-align: left; white-space: normal;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+    opacity: 0; pointer-events: none; transform: translateY(4px);
+    transition: opacity 0.12s, transform 0.12s;
+  }
+  .help:hover::after, .help:focus-visible::after { opacity: 1; transform: translateY(0); }
+
+  /* ---------------------------------------------------------- output panel */
+  #dlg-output { width: 640px; max-height: 80vh; display: none; flex-direction: column; }
+  #dlg-output[open] { display: flex; }
+  #dlg-output .out-body {
+    flex: 1; overflow-y: auto; margin-top: 10px;
+    background: hsl(var(--background) / 0.6); border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: calc(var(--radius) - 2px); padding: 12px 14px;
+    font-size: 12.5px; line-height: 1.6;
+  }
+  #dlg-output .out-body pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.6 ui-monospace, monospace; }
+  #dlg-output .out-row { padding: 8px 0; border-bottom: 1px solid hsl(var(--border) / 0.5); }
+  #dlg-output .out-row:last-child { border-bottom: none; }
+  #dlg-output .out-row .out-meta { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
+
 </style>
 <script>
 (function () {
@@ -237,8 +366,12 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     </div>
   </div>
   <span class="pill" id="counts"></span>
+  <nav class="tabs" role="tablist" aria-label="Dashboard views">
+    <button class="tab active" id="tab-overview" role="tab" aria-selected="true" onclick="switchTab('overview')">Overview</button>
+    <button class="tab" id="tab-actions" role="tab" aria-selected="false" onclick="switchTab('actions')">Actions<span class="tab-badge" id="tab-actions-badge" style="display:none"></span></button>
+  </nav>
   <div class="spacer"></div>
-  <div class="toolbar">
+  <div class="toolbar" id="toolbar-overview">
   <button class="primary" onclick="document.getElementById('dlg-new').showModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New memory</button>
   <button onclick="runMine()" title="Mine new commits since the last run (Shift+click: rescan all history)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 18 9"/><path d="M2 22l8-8"/><path d="M20.5 7.5 22 6a2.83 2.83 0 0 0-4-4l-1.5 1.5"/><path d="m9 11 4 4"/><path d="M16 2 8.5 9.5"/></svg>Mine commits</button>
   <button class="primary" onclick="runVerify(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>Verify</button>
@@ -248,13 +381,13 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   <button onclick="openCloud()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Cloud</button>
   <button onclick="openTickets()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>Tickets</button>
   <button onclick="load()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button>
+  </div>
   <button class="icon" type="button" onclick="toggleTheme()" id="btn-theme" aria-label="Toggle light/dark theme">
     <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
     <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
   </button>
-  </div>
 </header>
-<main>
+<main id="view-overview">
   <div id="graph"></div>
   <aside>
     <h2 id="proposals-h">Pending proposals</h2>
@@ -272,6 +405,16 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     <div id="memories"></div>
   </aside>
 </main>
+
+<!-- ============================================================ Actions view -->
+<div id="view-actions" role="tabpanel" aria-labelledby="tab-actions">
+  <div class="actions-hero">
+    <h2>Actions</h2>
+    <p>Everything the <code>dim</code> CLI can do, one click away. Hover any <b>?</b> to learn what an action does before running it.</p>
+  </div>
+  <div class="status-strip" id="status-strip"></div>
+  <div class="action-groups" id="action-groups"></div>
+</div>
 
 <!-- New memory dialog (dim remember) -->
 <dialog id="dlg-new">
@@ -380,6 +523,60 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   </div>
 </dialog>
 
+<!-- Scratchpad jot dialog (dim scratch) -->
+<dialog id="dlg-note">
+  <h3>✏️ Jot a scratchpad note</h3>
+  <div class="hint">Session-only working memory. Expires automatically (default 24 h), never synced, never becomes durable memory.</div>
+  <label>Note</label>
+  <textarea id="note-content" placeholder="Hypothesis: the flaky test is the retry timing in src/net/retry.ts"></textarea>
+  <label>Expires after (hours)</label>
+  <input id="note-ttl" type="number" min="1" max="168" value="24">
+  <div class="dialog-actions">
+    <button onclick="document.getElementById('dlg-note').close()">Cancel</button>
+    <button class="primary" onclick="saveNote()">Save note</button>
+  </div>
+</dialog>
+
+<!-- Generate context files dialog (dim generate-context) -->
+<dialog id="dlg-context">
+  <h3>🧭 Generate context files</h3>
+  <div class="hint">Renders your trustworthy (verified/unverified, non-refuted) memory into static context files that AI agents read automatically.</div>
+  <label>Format</label>
+  <select id="ctx-format">
+    <option value="claude">CLAUDE.md (Claude Code)</option>
+    <option value="cursorrules">.cursorrules (Cursor)</option>
+    <option value="copilot">.github/copilot-instructions.md (GitHub Copilot)</option>
+    <option value="windsurfrules">.windsurfrules (Windsurf)</option>
+    <option value="agents">AGENTS.md (generic agents)</option>
+    <option value="all">All formats</option>
+  </select>
+  <div class="dialog-actions">
+    <button onclick="document.getElementById('dlg-context').close()">Cancel</button>
+    <button class="primary" onclick="runGenerateContext()">Generate</button>
+  </div>
+</dialog>
+
+<!-- Show ticket dialog (dim ticket show) -->
+<dialog id="dlg-ticket-show">
+  <h3>👁 Show ticket</h3>
+  <div class="hint">Fetches the ticket from your connected provider (Jira / GitHub / Linear / …).</div>
+  <label>Ticket id</label>
+  <input id="ticket-show-id" placeholder="PROJ-123 or #42">
+  <div class="dialog-actions">
+    <button onclick="document.getElementById('dlg-ticket-show').close()">Cancel</button>
+    <button class="primary" onclick="runShowTicket()">Fetch</button>
+  </div>
+</dialog>
+
+<!-- Generic output panel for action results -->
+<dialog id="dlg-output">
+  <h3 id="out-title"></h3>
+  <div class="out-body" id="out-body"></div>
+  <div class="dialog-actions" id="out-actions">
+    <button onclick="document.getElementById('dlg-output').close()">Close</button>
+  </div>
+</dialog>
+
 <div class="legend">
   <span><span class="dot" style="background:var(--verified)"></span>VERIFIED</span>
   <span><span class="dot" style="background:var(--unverified)"></span>UNVERIFIED</span>
@@ -447,6 +644,8 @@ async function load() {
   document.getElementById("counts").innerHTML =
     \`<b>\${state.summary.total}</b> memories · ✓\${s.VERIFIED} ?\${s.UNVERIFIED} ~\${s.STALE} ✗\${s.REFUTED}\`;
   renderProposals(); renderMemories(); renderGraph();
+  renderActionsView();
+  refreshKnowledgeStatus();
 }
 
 function esc(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -777,6 +976,466 @@ async function ticketsShare(remove) {
     toast(remove ? "Team ticket config removed" : "Team credentials stored on the server — teammates use provider 'remote'");
   } catch (e) { toast("Error: " + e.message); }
 }
+
+// ---------------------------------------------------------------- actions tab
+
+let knowledgeInfo = null;
+
+function switchTab(name) {
+  document.body.classList.toggle("tab-actions", name === "actions");
+  document.getElementById("tab-overview").classList.toggle("active", name === "overview");
+  document.getElementById("tab-actions").classList.toggle("active", name === "actions");
+  document.getElementById("tab-overview").setAttribute("aria-selected", String(name === "overview"));
+  document.getElementById("tab-actions").setAttribute("aria-selected", String(name === "actions"));
+  localStorage.setItem("aidimag-ui-tab", name);
+  if (name === "overview" && state) renderGraph();
+}
+
+async function refreshKnowledgeStatus() {
+  try {
+    knowledgeInfo = await api("/api/knowledge/status");
+    renderActionsView();
+  } catch { /* endpoint unavailable — badge stays hidden */ }
+}
+
+function showOutput(title, html, followUps) {
+  document.getElementById("out-title").textContent = title;
+  document.getElementById("out-body").innerHTML = html;
+  const actions = document.getElementById("out-actions");
+  actions.innerHTML = "";
+  (followUps || []).forEach((f) => {
+    const b = document.createElement("button");
+    if (f.primary) b.className = "primary";
+    if (f.danger) b.className = "danger";
+    b.textContent = f.label;
+    b.onclick = f.onClick;
+    actions.appendChild(b);
+  });
+  const close = document.createElement("button");
+  close.textContent = "Close";
+  close.onclick = () => document.getElementById("dlg-output").close();
+  actions.appendChild(close);
+  document.getElementById("dlg-output").showModal();
+}
+
+function copyCli(cmd, why) {
+  navigator.clipboard.writeText(cmd)
+    .then(() => toast("Copied '" + cmd + "' — " + (why || "paste it into your terminal")))
+    .catch(() => toast("Run in your terminal: " + cmd));
+}
+
+// The catalog: every aidimag capability as a grouped, self-explaining card.
+const ACTION_GROUPS = [
+  {
+    icon: "🧲", title: "Capture", sub: "Feed the brain — everything lands in the review queue first",
+    actions: [
+      { id: "add-memory", icon: "➕", title: "Add Memory", cli: "dim remember",
+        desc: "Write a falsifiable claim about this repo, with optional evidence.",
+        help: "Stores a durable memory: a claim a check could verify (e.g. 'all DB access goes through src/db/store.ts'). Add kind, scope paths, evidence, and pin it if it should never decay.",
+        run: () => document.getElementById("dlg-new").showModal() },
+      { id: "mine", icon: "⛏", title: "Mine Commits", cli: "dim mine",
+        desc: "Scan new git commits for memory-worthy decisions and gotchas.",
+        help: "Reads commit history since the last run and turns strong signals (reverts, fixes, decision keywords) into proposals for your review. Shift-click to rescan all history. For LLM-deep or PR mining run 'dim mine --llm' / 'dim mine --prs' in a terminal.",
+        run: (ev) => runMine(ev) },
+      { id: "bootstrap", icon: "🧠", title: "Bootstrap Repo", cli: "dim bootstrap",
+        desc: "Instant brain: LLM reads README, docs & structure → first memories.",
+        help: "Surveys README/docs/manifests/directory shape/churn and asks your LLM (Ollama or OPENAI_API_KEY) to extract 5–30 initial claims. Everything is queued for review — nothing is auto-saved. May take a few minutes.",
+        run: () => runBootstrap() },
+      { id: "harvest", icon: "💬", title: "Harvest AI Chats", cli: "dim harvest",
+        desc: "Extract durable facts you typed into Claude Code sessions.",
+        help: "Scans local Claude Code transcripts for this repo, redacts secrets, and LLM-extracts durable facts *you* stated into proposals. Local-only; needs an LLM provider.",
+        run: () => runHarvest() },
+      { id: "knowledge", icon: "📚", title: "Sync Knowledge Inbox", cli: "dim knowledge sync",
+        desc: "Summarize docs dropped in the knowledge/ folder into proposals.",
+        help: "Any md/pdf/docx dropped into the knowledge inbox is LLM-summarized into falsifiable claims and queued for review. The dashboard also auto-ingests while it's running.",
+        badge: () => knowledgeInfo && knowledgeInfo.pending.length ? knowledgeInfo.pending.length : 0,
+        run: () => runKnowledgeSync() },
+    ],
+  },
+  {
+    icon: "🧹", title: "Review & hygiene", sub: "Humans gate everything — keep the brain trustworthy",
+    actions: [
+      { id: "review", icon: "✅", title: "Review Proposals", cli: "dim review",
+        desc: "Approve or reject everything mined, harvested or ingested.",
+        help: "Nothing captured automatically becomes memory until you approve it. Opens the Overview tab where each pending proposal has Approve / Reject buttons.",
+        badge: () => state ? state.proposals.length : 0,
+        run: () => { switchTab("overview"); document.getElementById("proposals-h").scrollIntoView({ behavior: "smooth" }); } },
+      { id: "audit", icon: "🔍", title: "Provenance Audit", cli: "dim audit",
+        desc: "Surface memories standing on the weakest ground.",
+        help: "Lists memories that are agent-authored, evidence-free, stale, or long-unverified — ranked by risk — so you can confirm, add evidence, or forget them.",
+        run: () => runAudit() },
+      { id: "gaps", icon: "🕳", title: "Knowledge Gaps", cli: "dim gaps",
+        desc: "Searches (yours or agents') that found nothing.",
+        help: "Every memory search that returned zero results is logged as a gap — the facts your brain is missing, most-asked first. Fill them with Add Memory.",
+        badge: () => state ? state.gapCount : 0,
+        run: () => runGaps() },
+      { id: "gc", icon: "🗑", title: "Proposals GC", cli: "dim proposals gc", danger: true,
+        desc: "Purge resolved proposal rows (dry-run first).",
+        help: "Removes already approved/rejected proposal rows (tombstoned for team sync). Shows a dry-run count first, then asks for confirmation.",
+        run: () => runProposalsGc() },
+    ],
+  },
+  {
+    icon: "🛡", title: "Verify & trust", sub: "Evidence keeps memory honest",
+    actions: [
+      { id: "verify", icon: "✔", title: "Verify", cli: "dim verify",
+        desc: "Re-run cheap evidence and update memory statuses.",
+        help: "Re-runs COMMIT_REF and STATIC_CHECK evidence. Passing evidence marks memories VERIFIED; failing evidence marks them STALE. Unverified memories decay in confidence over time.",
+        run: () => runVerify(false) },
+      { id: "verify-deep", icon: "🔬", title: "Deep Verify", cli: "dim verify --deep",
+        desc: "Also re-run TEST_RESULT and EXEC_TRACE evidence.",
+        help: "The expensive tier: executes test commands and traced executions too. Can take a while on large evidence sets.",
+        run: () => runVerify(true) },
+      { id: "verify-trust", icon: "🛂", title: "Review Synced Evidence", cli: "dim verify --trust", terminal: true,
+        desc: "Approve evidence commands that arrived via team sync.",
+        help: "Synced-in evidence commands are NEVER executed until you inspect and approve them. This flow is interactive, so it runs in your terminal — clicking copies the command.",
+        run: () => copyCli("dim verify --trust", "interactive review runs in a real terminal") },
+      { id: "check", icon: "🧪", title: "Check Staged Changes", cli: "dim check",
+        desc: "Pre-commit contradiction check against active memories.",
+        help: "Analyzes your staged git diff against memories and guardrails scoped to the changed files: re-runs STATIC_CHECKs, trips 'never' guardrails, and reminds you of invariants.",
+        run: () => runCheck() },
+      { id: "brief", icon: "📋", title: "Session Briefing", cli: "dim brief",
+        desc: "What to know before this session: memory, guardrails, warnings.",
+        help: "Builds a briefing from your branch diff: in-scope memories, guardrails, stale warnings, coverage gaps, and clarifying questions to answer before coding.",
+        run: () => runBrief() },
+    ],
+  },
+  {
+    icon: "📝", title: "Scratchpad", sub: "Short-term session notes — expire automatically, never synced",
+    actions: [
+      { id: "jot", icon: "✏️", title: "Jot Note", cli: "dim scratch",
+        desc: "Quick working note. Expires in 24 h by default.",
+        help: "Session working memory for hypotheses, plans and intermediate findings. TTL-expiring, local-only, never becomes durable memory — promote anything worth keeping via Add Memory.",
+        run: () => document.getElementById("dlg-note").showModal() },
+      { id: "notes", icon: "📖", title: "Show Notes", cli: "dim scratch --all",
+        desc: "List current (unexpired) scratchpad notes.",
+        help: "Shows all unexpired scratchpad notes across sessions, newest first.",
+        badge: () => state ? state.scratchCount : 0,
+        run: () => runShowNotes() },
+      { id: "clear-notes", icon: "🧹", title: "Clear Notes", cli: "dim scratch --clear --all", danger: true,
+        desc: "Delete all scratchpad notes.",
+        help: "Permanently deletes every scratchpad note in every session. They would expire on their own anyway.",
+        run: () => runClearNotes() },
+    ],
+  },
+  {
+    icon: "☁️", title: "Team & sync", sub: "Optional — share memory with your team's brain",
+    actions: [
+      { id: "sync", icon: "🔄", title: "Sync Now", cli: "dim sync",
+        desc: "Push & pull memory with the linked team server.",
+        help: "Exchanges memory events with your team brain. Synced-in executable evidence stays quarantined until you approve it via Review Synced Evidence.",
+        disabled: () => state && !state.cloud ? "Link a cloud server first" : null,
+        run: () => runSync() },
+      { id: "cloud", icon: "🔗", title: "Link / Unlink Cloud", cli: "dim cloud link",
+        desc: "Bind this repo to a team sync server ('brain').",
+        help: "Connect a self-hosted (dim serve) or cloud sync server. The token is stored on this machine only, never in the repo. Also manages brain-scoped API keys.",
+        run: () => openCloud() },
+      { id: "login", icon: "🔐", title: "Login (approve device)", cli: "dim login", terminal: true,
+        desc: "Device-code login, approved in your browser.",
+        help: "Starts a device-code flow: the CLI prints a code and opens the server's approval page. Runs in your terminal — clicking copies the command.",
+        run: () => copyCli("dim login") },
+      { id: "logout", icon: "🚪", title: "Logout", cli: "dim logout", terminal: true, danger: true,
+        desc: "Remove this device's stored token.",
+        help: "Deletes the sync token stored for this device. Runs in your terminal — clicking copies the command.",
+        run: () => copyCli("dim logout") },
+    ],
+  },
+  {
+    icon: "🎫", title: "Tickets", sub: "Bring the 'why' from Jira / GitHub / Linear into your memory",
+    actions: [
+      { id: "tickets", icon: "🎫", title: "Connect Ticketing App", cli: "dim ticket connect",
+        desc: "Jira, GitHub Issues, Linear, HTTP middleware or team server.",
+        help: "Once connected, proposals mined from commits carry ticket context, and branch-naming conventions can be enforced by git hooks. Credentials stay on this machine.",
+        run: () => openTickets() },
+      { id: "ticket-show", icon: "👁", title: "Show Ticket", cli: "dim ticket show <id>",
+        desc: "Fetch a ticket by id from the connected provider.",
+        help: "Round-trips a ticket id through your provider config — great for checking the connection works and peeking at ticket context.",
+        disabled: () => state && !state.tickets ? "Connect a ticket provider first" : null,
+        run: () => document.getElementById("dlg-ticket-show").showModal() },
+      { id: "branch", icon: "🌿", title: "Create Ticket Branch", cli: "dim branch <ticketId>", terminal: true,
+        desc: "Create a convention-conforming branch for a ticket.",
+        help: "Fetches the ticket title and creates a branch like feature/PROJ-123-fix-retries. Creates the branch in your working tree, so it runs in your terminal — clicking copies the command.",
+        run: () => { const id = prompt("Ticket id (e.g. PROJ-123):"); if (id) copyCli("dim branch " + id.trim()); } },
+    ],
+  },
+  {
+    icon: "🛠", title: "Maintenance & output", sub: "Keep search sharp and export memory to your agents",
+    actions: [
+      { id: "gen-context", icon: "🧭", title: "Generate Context Files", cli: "dim generate-context",
+        desc: "Render trusted memory → CLAUDE.md, .cursorrules, and more.",
+        help: "Writes your verified/unverified memory into static context files that coding agents read automatically (Claude Code, Cursor, Copilot, Windsurf, generic AGENTS.md).",
+        run: () => document.getElementById("dlg-context").showModal() },
+      { id: "reindex", icon: "🧮", title: "Reindex Embeddings", cli: "dim reindex",
+        desc: "Rebuild semantic search vectors for all memories.",
+        help: "Regenerates embeddings with your provider (Ollama or OpenAI). Run after switching embedding models or if semantic search feels off.",
+        run: () => runReindex() },
+      { id: "refresh", icon: "🔃", title: "Refresh Data", cli: "—",
+        desc: "Reload memories, proposals and status from disk.",
+        help: "Re-reads the local aidimag database and refreshes every widget on this page.",
+        run: () => { toast("Refreshing…"); load(); } },
+    ],
+  },
+];
+
+function statCard(label, value, sub, attention) {
+  return '<div class="stat' + (attention ? " attention" : "") + '">' +
+    '<div class="stat-label">' + label + '</div>' +
+    '<div class="stat-value">' + value + '</div>' +
+    (sub ? '<div class="stat-sub">' + sub + '</div>' : "") + '</div>';
+}
+
+function renderActionsView() {
+  if (!state) return;
+  const s = state.summary.byStatus;
+
+  // header badge = things awaiting a human
+  const pendingTotal = state.proposals.length + (knowledgeInfo ? knowledgeInfo.pending.length : 0);
+  const tb = document.getElementById("tab-actions-badge");
+  tb.style.display = pendingTotal ? "" : "none";
+  tb.textContent = pendingTotal;
+
+  document.getElementById("status-strip").innerHTML = [
+    statCard("Memories", state.summary.total, "✓" + s.VERIFIED + " · ?" + s.UNVERIFIED + " · ~" + s.STALE + " · ✗" + s.REFUTED),
+    statCard("Pending review", state.proposals.length, state.proposals.length ? "proposals await your judgment" : "queue is empty", state.proposals.length > 0),
+    statCard("Knowledge inbox", knowledgeInfo ? knowledgeInfo.pending.length : "–", knowledgeInfo ? knowledgeInfo.processed + " docs processed" : "checking…", knowledgeInfo && knowledgeInfo.pending.length > 0),
+    statCard("Knowledge gaps", state.gapCount, state.gapCount ? "unanswered searches (30 d)" : "no unanswered searches", state.gapCount > 0),
+    statCard("Scratchpad", state.scratchCount, "session notes (auto-expiring)"),
+    statCard("Team sync", state.cloud ? "linked" : "off", state.cloud ? esc(state.cloud.brain) + " @ " + esc(state.cloud.server) : "link a server to share memory"),
+    statCard("Tickets", state.tickets ? esc(state.tickets.provider) : "off", state.tickets ? (state.tickets.hasCredential ? "credential stored" : "⚠ no credential") : "connect Jira / GitHub / Linear"),
+  ].join("");
+
+  const groupsEl = document.getElementById("action-groups");
+  groupsEl.innerHTML = "";
+  for (const group of ACTION_GROUPS) {
+    const section = document.createElement("section");
+    section.innerHTML =
+      '<div class="action-group-head"><span class="g-icon">' + group.icon + '</span>' +
+      '<h3>' + group.title + '</h3><span class="g-sub">' + group.sub + '</span></div>';
+    const grid = document.createElement("div");
+    grid.className = "action-grid";
+    for (const a of group.actions) {
+      const disabledReason = a.disabled ? a.disabled() : null;
+      const badge = a.badge ? a.badge() : 0;
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "action-card" + (a.danger ? " danger" : "");
+      card.id = "act-" + a.id;
+      if (disabledReason) card.setAttribute("aria-disabled", "true");
+      card.innerHTML =
+        '<div class="ac-top"><span class="ac-icon">' + a.icon + '</span>' +
+        '<span class="ac-title">' + a.title + '</span>' +
+        (badge ? '<span class="ac-badge">' + badge + '</span>' : "") +
+        (a.terminal ? '<span class="ac-term" title="Interactive — runs in your terminal; clicking copies the command">CLI</span>' : "") +
+        '<span class="help" tabindex="0" role="note" aria-label="What does this do?" data-tip="' +
+          esc(a.help + (a.cli && a.cli !== "—" ? " (CLI: " + a.cli + ")" : "")) + '" onclick="event.stopPropagation()">?</span></div>' +
+        '<div class="ac-desc">' + esc(a.desc) + '</div>' +
+        '<span class="ac-cli">' + esc(a.cli) + '</span>';
+      card.onclick = (ev) => {
+        if (ev.target.classList.contains("help")) return;
+        if (disabledReason) { toast(disabledReason); return; }
+        a.run(ev);
+      };
+      if (disabledReason) card.title = disabledReason;
+      grid.appendChild(card);
+    }
+    section.appendChild(grid);
+    groupsEl.appendChild(section);
+  }
+}
+
+function setBusy(id, busy) {
+  const el = document.getElementById("act-" + id);
+  if (el) el.classList.toggle("busy", busy);
+}
+
+// ---------------------------------------------------------------- action handlers
+
+async function runBootstrap() {
+  if (!confirm("Bootstrap surveys your README/docs/structure and asks your LLM to draft initial memories.\\nIt may take a few minutes. Continue?")) return;
+  setBusy("bootstrap", true);
+  toast("Bootstrapping… the LLM is reading your repo (this can take minutes)");
+  try {
+    let r = await api("/api/bootstrap", { method: "POST" });
+    if (r.alreadyBootstrapped) {
+      if (confirm("This repo was already bootstrapped. Run again anyway?")) {
+        r = await api("/api/bootstrap?force=1", { method: "POST" });
+      } else { setBusy("bootstrap", false); return; }
+    }
+    if (!r.provider) toast("No LLM provider found — run Ollama or set OPENAI_API_KEY");
+    else toast("Bootstrap: " + r.proposed + " proposal(s) queued for review (" + r.provider + ")");
+    load();
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("bootstrap", false); }
+}
+
+async function runHarvest() {
+  setBusy("harvest", true);
+  toast("Harvesting Claude Code transcripts…");
+  try {
+    const r = await api("/api/harvest", { method: "POST" });
+    if (!r.transcriptDir) toast("No Claude Code transcripts found for this repo");
+    else if (!r.provider) toast("No LLM provider found — run Ollama or set OPENAI_API_KEY");
+    else toast("Harvest: " + r.sessionsScanned + " session(s) scanned, " + r.proposed + " proposal(s) queued");
+    load();
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("harvest", false); }
+}
+
+async function runKnowledgeSync() {
+  setBusy("knowledge", true);
+  toast("Summarizing knowledge inbox…");
+  try {
+    const r = await api("/api/knowledge/sync", { method: "POST" });
+    if (r.pendingNoSummarizer) toast("No LLM provider — " + r.pendingNoSummarizer + " doc(s) left in the inbox");
+    else toast("Knowledge: " + r.processed + " doc(s) processed" + (r.duplicates ? ", " + r.duplicates + " duplicate(s) retired" : ""));
+    load();
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("knowledge", false); }
+}
+
+async function runAudit() {
+  setBusy("audit", true);
+  try {
+    const r = await api("/api/audit");
+    const body = r.findings.length
+      ? r.findings.map((f) =>
+          '<div class="out-row"><b>risk ' + f.risk + '</b> · <span class="kind">' + f.memory.kind + '</span> ' + esc(f.memory.claim) +
+          '<div class="out-meta">' + f.reasons.map(esc).join(" · ") + '</div></div>').join("")
+      : '<div class="empty">Nothing risky found — your memory rests on solid ground. 🎉</div>';
+    showOutput("🔍 Provenance audit — weakest-ground memories first", body, r.findings.length ? [
+      { label: "Verify memories", primary: true, onClick: () => { document.getElementById("dlg-output").close(); runVerify(false); } },
+    ] : []);
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("audit", false); }
+}
+
+async function runGaps() {
+  setBusy("gaps", true);
+  try {
+    const r = await api("/api/gaps");
+    const body = r.gaps.length
+      ? r.gaps.map((g) =>
+          '<div class="out-row">“' + esc(g.query) + '”' +
+          '<div class="out-meta">missed ' + g.misses + '×' + (g.paths.length ? " · " + esc(g.paths.join(", ")) : "") +
+          ' · last asked ' + new Date(g.lastAsked).toLocaleString() + '</div></div>').join("")
+      : '<div class="empty">No unanswered searches in the last ' + r.days + ' days.</div>';
+    showOutput("🕳 Knowledge gaps — searches that found nothing", body, r.gaps.length ? [
+      { label: "Add memory", primary: true, onClick: () => { document.getElementById("dlg-output").close(); document.getElementById("dlg-new").showModal(); } },
+      { label: "Clear gaps", danger: true, onClick: async () => {
+          if (!confirm("Clear the whole search-gap log?")) return;
+          try { const c = await api("/api/gaps/clear", { method: "POST" }); toast("Cleared " + c.cleared + " logged search(es)"); document.getElementById("dlg-output").close(); load(); }
+          catch (e) { toast("Error: " + e.message); }
+        } },
+    ] : []);
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("gaps", false); }
+}
+
+async function runProposalsGc() {
+  setBusy("gc", true);
+  try {
+    const dry = await api("/api/proposals/gc?dryRun=1", { method: "POST" });
+    if (!dry.removed) { toast("Nothing to purge — no resolved proposal rows"); return; }
+    if (!confirm("Purge " + dry.removed + " resolved proposal row(s)? (They are tombstoned for team sync.)")) return;
+    const r = await api("/api/proposals/gc", { method: "POST" });
+    toast("Purged " + r.removed + " resolved proposal(s)");
+    load();
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("gc", false); }
+}
+
+async function runCheck() {
+  setBusy("check", true);
+  toast("Checking staged changes against memory…");
+  try {
+    const r = await api("/api/check", { method: "POST" });
+    if (!r.changedFiles.length) { showOutput("🧪 Check staged changes", '<div class="empty">No staged changes — stage files with git add first.</div>'); return; }
+    const body =
+      '<div class="out-meta" style="margin-bottom:8px">' + r.changedFiles.length + ' changed file(s) · ' + r.checked + ' memories checked</div>' +
+      (r.violations.length
+        ? r.violations.map((v) =>
+            '<div class="out-row">' + (v.severity === "fail" ? "❌" : "⚠️") + ' <b>' + v.severity.toUpperCase() + '</b> · <span class="kind">' + v.memory.kind + '</span> ' + esc(v.memory.claim) +
+            '<div class="out-meta">' + esc(v.detail) + '</div></div>').join("")
+        : '<div class="empty">✅ No contradictions — your staged diff agrees with active memory.</div>');
+    showOutput("🧪 Check staged changes", body);
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("check", false); }
+}
+
+async function runBrief() {
+  setBusy("brief", true);
+  try {
+    const r = await api("/api/brief");
+    showOutput("📋 Session briefing", "<pre>" + esc(r.rendered) + "</pre>");
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("brief", false); }
+}
+
+async function saveNote() {
+  const content = document.getElementById("note-content").value.trim();
+  if (!content) { toast("Write something first"); return; }
+  const ttlHours = Number(document.getElementById("note-ttl").value) || 24;
+  try {
+    await api("/api/scratchpad", { method: "POST", body: JSON.stringify({ content, ttlHours }) });
+    document.getElementById("dlg-note").close();
+    document.getElementById("note-content").value = "";
+    toast("Note saved — expires in " + ttlHours + " h, never synced");
+    load();
+  } catch (e) { toast("Error: " + e.message); }
+}
+
+async function runShowNotes() {
+  setBusy("notes", true);
+  try {
+    const r = await api("/api/scratchpad");
+    const body = r.notes.length
+      ? r.notes.map((n) =>
+          '<div class="out-row">' + esc(n.content) +
+          '<div class="out-meta">' + esc(n.createdBy) + ' · ' + new Date(n.createdAt).toLocaleString() + ' · expires ' + new Date(n.expiresAt).toLocaleString() + '</div></div>').join("")
+      : '<div class="empty">Scratchpad is empty. Notes expire automatically.</div>';
+    showOutput("📖 Scratchpad notes", body, r.notes.length ? [
+      { label: "Clear all", danger: true, onClick: () => { document.getElementById("dlg-output").close(); runClearNotes(); } },
+    ] : []);
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("notes", false); }
+}
+
+async function runClearNotes() {
+  if (!confirm("Delete ALL scratchpad notes? They would expire on their own anyway.")) return;
+  try {
+    const r = await api("/api/scratchpad/clear", { method: "POST" });
+    toast("Cleared " + r.cleared + " note(s)");
+    load();
+  } catch (e) { toast("Error: " + e.message); }
+}
+
+async function runGenerateContext() {
+  const format = document.getElementById("ctx-format").value;
+  document.getElementById("dlg-context").close();
+  setBusy("gen-context", true);
+  toast("Generating context files…");
+  try {
+    const r = await api("/api/generate-context", { method: "POST", body: JSON.stringify({ format }) });
+    toast("Wrote " + r.files.join(", ") + " (" + r.total + " memories, " + r.pinned + " pinned)");
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("gen-context", false); }
+}
+
+async function runShowTicket() {
+  const id = document.getElementById("ticket-show-id").value.trim();
+  if (!id) { toast("Enter a ticket id"); return; }
+  document.getElementById("dlg-ticket-show").close();
+  try {
+    const r = await api("/api/tickets/show?id=" + encodeURIComponent(id));
+    const t = r.ticket;
+    showOutput("🎫 " + esc(t.id) + " — " + esc(t.title),
+      '<div class="out-meta" style="margin-bottom:8px">' + esc(t.status || "") + (t.type ? " · " + esc(t.type) : "") + (t.labels && t.labels.length ? " · " + esc(t.labels.join(", ")) : "") + (t.url ? ' · <a href="' + esc(t.url) + '" target="_blank" rel="noreferrer">open ↗</a>' : "") + '</div>' +
+      "<pre>" + esc(t.body || "(no description)") + "</pre>");
+  } catch (e) { toast("Error: " + e.message); }
+}
+
+// restore last-used tab
+if (localStorage.getItem("aidimag-ui-tab") === "actions") switchTab("actions");
 
 let sim = null;
 function renderGraph() {
