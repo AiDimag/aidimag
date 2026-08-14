@@ -23,9 +23,6 @@ hero:
   name: AI Dimag
   text: Verified memory for AI coding agents
   tagline: Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true.
-  image:
-    src: /hero-illustration.svg
-    alt: The aiDimag memory loop — remember, verify, flag stale facts, deliver to AI tools
   actions:
     - theme: brand
       text: Get started
@@ -37,25 +34,6 @@ hero:
       text: Pricing
       link: /pricing
 
-features:
-  - icon: 🧠
-    title: Never explain your codebase twice
-    details: Your coding agent remembers the architecture decisions, conventions, invariants, gotchas, and dead ends your team already worked through — every session starts where the last one left off, not from a cold repo scan.
-  - icon: ✅
-    title: Claim-and-verify, not store-and-retrieve
-    details: Every memory is a falsifiable claim with evidence — a shell check, an anchored commit, a test. Git hooks re-verify on every pull and rebase; claims the code has outgrown flip to STALE instead of silently misleading your agent.
-  - icon: 🚦
-    title: Guardrails your agent must respect
-    details: Encode engineering rules as never / ask-first / always guardrails. They surface in every session briefing, ground the memory_critique second-critic, and dim check can block a violating commit before it lands.
-  - icon: 🔌
-    title: Wired into your development tools
-    details: Live MCP tools for Claude Code, Cursor, and Copilot — plus generated CLAUDE.md, .cursorrules, and copilot-instructions.md for everything else. VS Code and IntelliJ extensions, git-hook capture, ticket integration.
-  - icon: 👥
-    title: Local-first, team-ready
-    details: One SQLite file in your repo — no account, no cloud required. Scale to a team with a self-hosted sync server, brain-scoped API keys, and cross-machine verification consensus.
-  - icon: 🔒
-    title: Engineered for repo security
-    details: Nothing enters memory without human review. Shell-command evidence that arrives via team sync is never executed until you inspect and approve it — a teammate's memory can't become code execution on your machine.
 ---
 
 <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:24px 0 8px;">

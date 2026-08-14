@@ -12,6 +12,7 @@
     "sourceMap": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["docs", "node_modules", "dist"]
 }
 

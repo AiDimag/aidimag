@@ -1,9 +1,17 @@
 import DefaultTheme from "vitepress/theme";
+import Layout from "./Layout.vue";
 import "./custom.css";
 import { onMounted } from "vue";
 
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
 export default {
   extends: DefaultTheme,
+  Layout,
   setup() {
     onMounted(() => {
       const consent = localStorage.getItem("aidimag-cookie-consent");
@@ -71,8 +79,8 @@ function showCookieBanner() {
 }
 
 function enableAnalytics() {
-  if (typeof gtag !== "undefined") {
-    gtag("consent", "update", {
+  if (typeof window !== "undefined" && window.gtag) {
+    window.gtag("consent", "update", {
       analytics_storage: "granted",
     });
   }
