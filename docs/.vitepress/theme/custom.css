@@ -196,6 +196,36 @@ body {
 }
 
 /* Hero */
+.VPHero {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: calc(var(--vp-nav-height) + 12px) !important;
+}
+
+@media (min-width: 960px) {
+  .VPHero {
+    padding-top: calc(var(--vp-nav-height) + 48px) !important;
+  }
+
+  .VPHero .image {
+    padding-left: 24px !important;
+  }
+}
+
+.VPHero .container {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.VPHero .main {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.VPHero .image {
+  padding: 0;
+}
+
 .VPHero .name {
   font-family: var(--font-display);
   font-weight: 700;
@@ -215,8 +245,8 @@ body {
 }
 
 .VPHero .image-src {
-  max-width: 440px;
-  max-height: 440px;
+  max-width: 520px;
+  max-height: 520px;
   filter: drop-shadow(0 24px 48px rgba(37, 99, 235, 0.2));
 }
 
@@ -399,12 +429,13 @@ body {
 }
 
 .vp-doc table {
-  display: block;
   width: 100%;
   max-width: 100%;
   border-radius: var(--aid-radius);
-  overflow-x: auto;
   border: 1px solid hsl(var(--aid-border) / 0.6);
+  border-collapse: collapse;
+  display: table;
+  overflow: hidden;
 }
 
 .vp-doc th {
@@ -492,7 +523,7 @@ body {
   }
 
   .hero-illustration svg {
-    width: 320px !important;
+    width: 420px !important;
     height: auto !important;
   }
 
@@ -702,6 +733,31 @@ body {
 .vp-doc .pricing-button-primary:hover {
   background: #1d4ed8;
   color: #fff !important;
+}
+
+.vp-doc .pricing-table {
+  table-layout: fixed;
+}
+
+.vp-doc .pricing-table th,
+.vp-doc .pricing-table td {
+  padding: 0.625rem 0.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  word-break: break-word;
+}
+
+.vp-doc .pricing-table th {
+  font-weight: 600;
+  background: hsl(var(--aid-muted) / 0.5);
+}
+
+@media (max-width: 480px) {
+  .vp-doc .pricing-table th,
+  .vp-doc .pricing-table td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.75rem;
+  }
 }
 
 /* Diagrams */

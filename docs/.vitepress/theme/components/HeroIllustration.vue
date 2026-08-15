@@ -65,8 +65,8 @@ onUnmounted(() => {
       :style="{ transform: `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)` }"
     >
       <svg
-        width="480"
-        height="440"
+        width="560"
+        height="500"
         viewBox="0 0 480 440"
         fill="none"
         font-family="Space Grotesk, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif"
