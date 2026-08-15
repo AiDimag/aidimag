@@ -162,7 +162,7 @@ body {
   background-image: radial-gradient(rgba(37, 99, 235, 0.025) 1px, transparent 1px);
   background-size: 4px 4px;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
 }
 
 .dark .Layout {
@@ -178,6 +178,11 @@ body {
 
 /* Glass nav */
 .VPNav {
+  background-color: transparent !important;
+  border-bottom: none !important;
+}
+
+.VPNavBar {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   background-color: hsl(var(--aid-card) / 0.72) !important;
@@ -461,12 +466,34 @@ body {
 
   .VPHero .image {
     order: -1;
-    margin-bottom: 2rem;
+    margin: 0 auto 2rem !important;
+  }
+
+  .VPHero .image-container {
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .VPHero .image-bg {
+    display: none !important;
   }
 
   .VPHero .image-src {
+    position: static !important;
+    transform: none !important;
     max-width: 280px;
     max-height: 280px;
+  }
+
+  /* Constrain hero illustration on mobile */
+  .hero-illustration {
+    max-width: 100%;
+  }
+
+  .hero-illustration svg {
+    width: 320px !important;
+    height: auto !important;
   }
 
   /* Fix tagline text - make it visible with gradient on mobile too */

@@ -70,6 +70,7 @@ onUnmounted(() => {
         viewBox="0 0 480 440"
         fill="none"
         font-family="Space Grotesk, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        style="max-width: 100%; height: auto;"
       >
         <defs>
           <linearGradient id="heroGrad" x1="60" y1="40" x2="420" y2="400" gradientUnits="userSpaceOnUse">
