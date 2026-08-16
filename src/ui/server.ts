@@ -128,7 +128,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://localhost:${port}`);
-    const path = url.pathname;
+    const pathname = url.pathname;
 
     try {
       if (isMutation(req.method) && !requireCsrf(req)) {
@@ -136,13 +136,13 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         return;
       }
 
-      if (req.method === "GET" && path === "/") {
+      if (req.method === "GET" && pathname === "/") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(PAGE_HTML);
         return;
       }
 
-      if (req.method === "GET" && path === "/api/state") {
+      if (req.method === "GET" && pathname === "/api/state") {
         const cloud = readCloudConfig(repoRoot);
         const tcfg = readTicketsConfig(repoRoot);
         let gapCount = 0;
@@ -179,7 +179,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- search (hybrid when embeddings configured) ----
-      if (req.method === "GET" && path === "/api/search") {
+      if (req.method === "GET" && pathname === "/api/search") {
         const { results, semantic } = await hybridSearch(store, {
           query: url.searchParams.get("q") ?? "",
           kind: (url.searchParams.get("kind") as MemoryKind) || undefined,
@@ -192,7 +192,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- create memory (dim remember) ----
-      if (req.method === "POST" && path === "/api/memories") {
+      if (req.method === "POST" && pathname === "/api/memories") {
         const b = await readBody(req);
         if (!b.kind || !b.claim) {
           json(res, 400, { error: "kind and claim are required" });
@@ -213,14 +213,14 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         return;
       }
 
-      if (req.method === "POST" && path === "/api/verify") {
+      if (req.method === "POST" && pathname === "/api/verify") {
         const deep = url.searchParams.get("deep") === "1";
         json(res, 200, verifyAll(store, repoRoot, { deep }));
         return;
       }
 
       // ---- mine git history ----
-      if (req.method === "POST" && path === "/api/mine") {
+      if (req.method === "POST" && pathname === "/api/mine") {
         const full = url.searchParams.get("full") === "1";
         const r = mineCommits(store, repoRoot, { full });
         json(res, 200, {
@@ -235,7 +235,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- embeddings reindex ----
-      if (req.method === "POST" && path === "/api/reindex") {
+      if (req.method === "POST" && pathname === "/api/reindex") {
         const r = await reindexAll(store);
         json(res, 200, {
           indexed: r.indexed,
@@ -245,24 +245,24 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- knowledge gaps (dim gaps) ----
-      if (req.method === "GET" && path === "/api/gaps") {
+      if (req.method === "GET" && pathname === "/api/gaps") {
         const days = Number(url.searchParams.get("days") ?? "30") || 30;
         let gaps: ReturnType<MemoryStore["searchGaps"]> = [];
         try { gaps = store.searchGaps({ sinceDays: days, limit: 50 }); } catch { /* pre-migration DB */ }
         json(res, 200, { gaps, days });
         return;
       }
-      if (req.method === "POST" && path === "/api/gaps/clear") {
+      if (req.method === "POST" && pathname === "/api/gaps/clear") {
         json(res, 200, { cleared: store.clearSearchGaps() });
         return;
       }
 
       // ---- scratchpad (dim scratch) ----
-      if (req.method === "GET" && path === "/api/scratchpad") {
+      if (req.method === "GET" && pathname === "/api/scratchpad") {
         json(res, 200, { notes: store.scratchpadRead(undefined, 100) });
         return;
       }
-      if (req.method === "POST" && path === "/api/scratchpad") {
+      if (req.method === "POST" && pathname === "/api/scratchpad") {
         const b = await readBody(req);
         const content = String(b.content ?? "").trim();
         if (!content) {
@@ -273,39 +273,39 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         json(res, 201, { note: store.scratchpadWrite(content, { ttlHours, createdBy: "human:dashboard" }) });
         return;
       }
-      if (req.method === "POST" && path === "/api/scratchpad/clear") {
+      if (req.method === "POST" && pathname === "/api/scratchpad/clear") {
         json(res, 200, { cleared: store.scratchpadClear() });
         return;
       }
 
       // ---- provenance audit (dim audit) ----
-      if (req.method === "GET" && path === "/api/audit") {
+      if (req.method === "GET" && pathname === "/api/audit") {
         json(res, 200, { findings: store.auditMemories({ limit: 50 }) });
         return;
       }
 
       // ---- session briefing (dim brief) ----
-      if (req.method === "GET" && path === "/api/brief") {
+      if (req.method === "GET" && pathname === "/api/brief") {
         const b = buildSessionBriefing(store, repoRoot);
         json(res, 200, { briefing: b, rendered: renderBriefing(b) });
         return;
       }
 
       // ---- staged-diff contradiction check (dim check) ----
-      if (req.method === "POST" && path === "/api/check") {
+      if (req.method === "POST" && pathname === "/api/check") {
         json(res, 200, checkDiff(store, repoRoot));
         return;
       }
 
       // ---- proposals gc (dim proposals gc) ----
-      if (req.method === "POST" && path === "/api/proposals/gc") {
+      if (req.method === "POST" && pathname === "/api/proposals/gc") {
         const dryRun = url.searchParams.get("dryRun") === "1";
         json(res, 200, { ...store.gcResolvedProposals({ dryRun }), dryRun });
         return;
       }
 
       // ---- knowledge inbox (dim knowledge sync/status) ----
-      if (req.method === "GET" && path === "/api/knowledge/status") {
+      if (req.method === "GET" && pathname === "/api/knowledge/status") {
         const cfg = resolveKnowledgeConfig(repoRoot);
         const s = await knowledgeStatus(repoRoot, cfg);
         json(res, 200, {
@@ -317,7 +317,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         });
         return;
       }
-      if (req.method === "POST" && path === "/api/knowledge/sync") {
+      if (req.method === "POST" && pathname === "/api/knowledge/sync") {
         const cfg = resolveKnowledgeConfig(repoRoot);
         const report = await ingestAll(store, repoRoot, cfg);
         json(res, 200, {
@@ -329,7 +329,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- bootstrap (dim bootstrap) — long-running, needs an LLM ----
-      if (req.method === "POST" && path === "/api/bootstrap") {
+      if (req.method === "POST" && pathname === "/api/bootstrap") {
         const force = url.searchParams.get("force") === "1";
         const r = await bootstrapRepo(store, repoRoot, { force });
         json(res, 200, r);
@@ -337,7 +337,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- harvest AI chats (dim harvest) — needs an LLM ----
-      if (req.method === "POST" && path === "/api/harvest") {
+      if (req.method === "POST" && pathname === "/api/harvest") {
         const all = url.searchParams.get("all") === "1";
         const r = await harvestClaudeSessions(store, repoRoot, { all });
         json(res, 200, r);
@@ -345,7 +345,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- generate context files (dim generate-context) ----
-      if (req.method === "POST" && path === "/api/generate-context") {
+      if (req.method === "POST" && pathname === "/api/generate-context") {
         const b = await readBody(req);
         const format = String(b.format ?? "claude") as ContextFormat;
         if (!["claude", "cursorrules", "copilot", "windsurfrules", "agents", "all"].includes(format)) {
@@ -358,14 +358,14 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- team sync ----
-      if (req.method === "POST" && path === "/api/sync") {
+      if (req.method === "POST" && pathname === "/api/sync") {
         const r = await cloudSync(store, repoRoot);
         json(res, 200, r);
         return;
       }
 
       // ---- cloud link/unlink ----
-      if (req.method === "POST" && path === "/api/cloud/link") {
+      if (req.method === "POST" && pathname === "/api/cloud/link") {
         const b = await readBody(req);
         if (!b.server || !b.brain) {
           json(res, 400, { error: "server and brain are required" });
@@ -394,14 +394,14 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         json(res, 200, { ok: true, hasToken: !!getToken(serverUrl, repoRoot) });
         return;
       }
-      if (req.method === "POST" && path === "/api/cloud/unlink") {
+      if (req.method === "POST" && pathname === "/api/cloud/unlink") {
         writeCloudConfig(repoRoot, { server: "", brain: "" } as never);
         json(res, 200, { ok: true });
         return;
       }
 
       // ---- tickets (T2 connect + T3 team share) ----
-      if (req.method === "POST" && path === "/api/tickets/connect") {
+      if (req.method === "POST" && pathname === "/api/tickets/connect") {
         const b = await readBody(req);
         const provider = String(b.provider ?? "");
         if (!["jira", "github", "linear", "http", "remote"].includes(provider)) {
@@ -434,13 +434,13 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         json(res, 200, { ok: true, validated });
         return;
       }
-      if (req.method === "POST" && path === "/api/tickets/disconnect") {
+      if (req.method === "POST" && pathname === "/api/tickets/disconnect") {
         const existing = readTicketsConfig(repoRoot);
         writeTicketsConfig(repoRoot, { branch: existing.branch }); // keep branch rules
         json(res, 200, { ok: true });
         return;
       }
-      if (req.method === "GET" && path === "/api/tickets/show") {
+      if (req.method === "GET" && pathname === "/api/tickets/show") {
         const ticketId = url.searchParams.get("id");
         if (!ticketId) {
           json(res, 400, { error: "missing ?id=" });
@@ -458,7 +458,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
       // admin: push/remove team-shared credentials on the sync server
       // (proxied like /api/keys — the admin token is per-request, never stored)
-      if (req.method === "POST" && path === "/api/tickets/share") {
+      if (req.method === "POST" && pathname === "/api/tickets/share") {
         const b = await readBody(req);
         const cloud = readCloudConfig(repoRoot);
         if (!cloud) {
@@ -485,7 +485,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
 
       // ---- API key management (proxies to the sync server; admin token is
       //      passed per-request from the UI and never stored) ----
-      if (path === "/api/keys") {
+      if (pathname === "/api/keys") {
         const b = req.method === "GET" ? {} : await readBody(req);
         const cloud = readCloudConfig(repoRoot);
         // Admin token is sent in a header (or POST body) — never the query
@@ -526,19 +526,81 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // ---- onboarding ----
-      if (req.method === "POST" && path === "/api/onboard") {
+      if (req.method === "POST" && pathname === "/api/onboard") {
         writeConfig(repoRoot, { onboarded: true });
         json(res, 200, { ok: true });
         return;
       }
-      if (req.method === "POST" && path === "/api/onboard/reset") {
+      if (req.method === "POST" && pathname === "/api/onboard/reset") {
         writeConfig(repoRoot, { onboarded: false });
         json(res, 200, { ok: true });
         return;
       }
 
+      // ---- MCP / integration status ----
+      if (req.method === "GET" && pathname === "/api/mcp/status") {
+        const mcpCommand = `npx -y aidimag mcp`;
+        const envVar = `AIDIMAG_REPO=${repoRoot}`;
+        const snippet = JSON.stringify({
+          mcpServers: {
+            aidimag: {
+              command: "npx",
+              args: ["-y", "aidimag", "mcp"],
+              env: { AIDIMAG_REPO: repoRoot },
+            },
+          },
+        }, null, 2);
+
+        // Agent config files that agents read at startup
+        const agentConfigs = [
+          { name: "Claude Code", file: ".mcp.json", path: path.join(repoRoot, ".mcp.json"), exists: false, mtime: null as string | null },
+          { name: "Cursor", file: ".cursorrules", path: path.join(repoRoot, ".cursorrules"), exists: false, mtime: null as string | null },
+          { name: "GitHub Copilot", file: ".github/copilot-instructions.md", path: path.join(repoRoot, ".github", "copilot-instructions.md"), exists: false, mtime: null as string | null },
+          { name: "Windsurf", file: ".windsurfrules", path: path.join(repoRoot, ".windsurfrules"), exists: false, mtime: null as string | null },
+          { name: "Generic (AGENTS.md)", file: "AGENTS.md", path: path.join(repoRoot, "AGENTS.md"), exists: false, mtime: null as string | null },
+          { name: "Claude (CLAUDE.md)", file: "CLAUDE.md", path: path.join(repoRoot, "CLAUDE.md"), exists: false, mtime: null as string | null },
+        ];
+        for (const ac of agentConfigs) {
+          try {
+            const stat = await import("node:fs/promises").then((fs) => fs.stat(ac.path));
+            ac.exists = true;
+            ac.mtime = stat.mtime.toISOString();
+          } catch { /* not present */ }
+        }
+
+        // Hermes install status
+        let hermes: { installed: boolean; path: string | null } = { installed: false, path: null };
+        try {
+          const hermesHome = process.env.HERMES_HOME ?? path.join(process.env.HOME ?? "~", ".hermes");
+          const hermesPluginDir = path.join(hermesHome, "plugins", "aidimag");
+          const initPy = path.join(hermesPluginDir, "__init__.py");
+          if (existsSync(initPy)) {
+            hermes = { installed: true, path: hermesPluginDir };
+          }
+        } catch { /* best-effort */ }
+
+        // MCP registry info
+        const registry = {
+          name: "io.github.AiDimag/aidimag",
+          mcpRegistry: "https://registry.modelcontextprotocol.io/?q=aidimag",
+          glama: "https://glama.ai/mcp/servers/AiDimag/aidimag",
+          serverJson: "https://github.com/AiDimag/aidimag/blob/main/server.json",
+        };
+
+        json(res, 200, {
+          mcpCommand,
+          envVar,
+          snippet,
+          agentConfigs,
+          hermes,
+          registry,
+          docsUrl: "https://aidimag.com/mcp",
+        });
+        return;
+      }
+
       // POST /api/proposals/:id/(approve|reject)
-      const propMatch = path.match(/^\/api\/proposals\/([^/]+)\/(approve|reject)$/);
+      const propMatch = pathname.match(/^\/api\/proposals\/([^/]+)\/(approve|reject)$/);
       if (req.method === "POST" && propMatch) {
         const [, id, action] = propMatch;
         if (action === "approve") {
@@ -550,7 +612,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       }
 
       // POST /api/memories/:id/(refute|forget|pin|unpin)
-      const memMatch = path.match(/^\/api\/memories\/([^/]+)\/(refute|forget|pin|unpin)$/);
+      const memMatch = pathname.match(/^\/api\/memories\/([^/]+)\/(refute|forget|pin|unpin)$/);
       if (req.method === "POST" && memMatch) {
         const [, id, action] = memMatch;
         const full = store.list(1000).find((m) => m.id === id || m.id.startsWith(id));

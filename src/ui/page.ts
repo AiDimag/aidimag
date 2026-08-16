@@ -266,6 +266,33 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   .stat.attention .stat-value { color: hsl(var(--primary)); }
 
   .action-groups { max-width: 1160px; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+
+  /* integration panel */
+  #integration-panel { max-width: 100%; margin: 0; }
+  .ip-card { background: hsl(var(--card) / 0.9); border: 1px solid hsl(var(--border) / 0.6); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--surface-glow); }
+  .ip-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
+  .ip-head .ip-icon { font-size: 18px; }
+  .ip-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  .ip-head .ip-sub { font-size: 12px; color: hsl(var(--muted-foreground)); }
+  .ip-section { margin-bottom: 14px; }
+  .ip-section:last-child { margin-bottom: 0; }
+  .ip-label { font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); margin-bottom: 4px; }
+  .ip-hint { font-size: 11px; color: hsl(var(--muted-foreground)); font-weight: 400; }
+  .ip-cmd-row { display: flex; align-items: center; gap: 8px; }
+  .ip-cmd-row code { font-size: 12px; background: hsl(var(--muted) / 0.4); padding: 3px 8px; border-radius: 4px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ip-snippet { font-size: 12px; background: hsl(var(--muted) / 0.4); padding: 10px 12px; border-radius: 6px; overflow-x: auto; margin: 4px 0 6px; line-height: 1.5; }
+  .ip-copy { font-size: 11px; padding: 3px 10px; border: 1px solid hsl(var(--border) / 0.6); border-radius: 4px; background: hsl(var(--card)); color: hsl(var(--foreground)); cursor: pointer; white-space: nowrap; }
+  .ip-copy:hover { border-color: hsl(var(--primary) / 0.5); }
+  .ip-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+  .ip-table th { text-align: left; padding: 4px 8px; font-weight: 600; color: hsl(var(--muted-foreground)); border-bottom: 1px solid hsl(var(--border) / 0.4); }
+  .ip-table td { padding: 4px 8px; border-bottom: 1px solid hsl(var(--border) / 0.2); }
+  .ip-table code { font-size: 11px; }
+  .ip-ok { color: hsl(142 71% 45%); font-size: 12px; }
+  .ip-off { color: hsl(var(--muted-foreground)); font-size: 12px; }
+  .ip-registry { font-size: 12px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .ip-reg-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: hsl(var(--muted) / 0.4); padding: 2px 8px; border-radius: 4px; }
+  .ip-registry a { color: hsl(var(--primary)); text-decoration: none; font-size: 12px; }
+  .ip-registry a:hover { text-decoration: underline; }
   .action-group-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
   .action-group-head .g-icon { font-size: 16px; }
   .action-group-head h3 { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
@@ -713,6 +740,7 @@ async function load() {
   renderProposals(); renderMemories(); renderGraph();
   renderActionsView();
   refreshKnowledgeStatus();
+  refreshMcpStatus();
   if (!state.onboarded) startTour();
 }
 
@@ -1383,6 +1411,98 @@ function statCard(label, value, sub, attention) {
     (sub ? '<div class="stat-sub">' + sub + '</div>' : "") + '</div>';
 }
 
+let mcpStatus = null;
+
+async function refreshMcpStatus() {
+  try {
+    mcpStatus = await api("/api/mcp/status");
+    renderIntegrationPanel();
+  } catch { /* endpoint unavailable */ }
+}
+
+function renderIntegrationPanel() {
+  const el = document.getElementById("integration-panel");
+  if (!el || !mcpStatus) return;
+
+  const cfg = mcpStatus;
+  const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const attrEsc = (s) => esc(s).replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+
+  const configRows = cfg.agentConfigs.map((ac) => {
+    const icon = ac.exists ? "✅" : "⚪";
+    const mtime = ac.mtime ? new Date(ac.mtime).toLocaleDateString() : "";
+    return '<tr><td>' + icon + '</td><td>' + esc(ac.name) + '</td><td><code>' + esc(ac.file) + '</code></td><td>' + (ac.exists ? '<span class="ip-ok">exists' + (mtime ? " · " + mtime : "") + '</span>' : '<span class="ip-off">not generated</span>') + '</td></tr>';
+  }).join("");
+
+  const hermesBadge = cfg.hermes.installed
+    ? '<span class="ip-ok">✅ Installed' + (cfg.hermes.path ? ' · <code>' + esc(cfg.hermes.path) + '</code>' : '') + '</span>'
+    : '<span class="ip-off">⚪ Not installed</span>';
+
+  el.innerHTML =
+    '<div class="ip-card">' +
+      '<div class="ip-head"><span class="ip-icon">🔌</span><h3>Integrations</h3>' +
+        '<span class="ip-sub">MCP server, agent config files, and Hermes status</span></div>' +
+
+      '<div class="ip-section">' +
+        '<div class="ip-label">MCP server command</div>' +
+        '<div class="ip-cmd-row"><code>' + esc(cfg.mcpCommand) + '</code>' +
+          '<button class="ip-copy" data-copy="' + attrEsc(cfg.mcpCommand) + '">Copy</button></div>' +
+        '<div class="ip-label" style="margin-top:8px">Env var</div>' +
+        '<div class="ip-cmd-row"><code>' + esc(cfg.envVar) + '</code>' +
+          '<button class="ip-copy" data-copy="' + attrEsc(cfg.envVar) + '">Copy</button></div>' +
+      '</div>' +
+
+      '<div class="ip-section">' +
+        '<div class="ip-label">Agent config snippet <span class="ip-hint">(paste into .mcp.json or your agent&#39;s MCP settings)</span></div>' +
+        '<pre class="ip-snippet">' + esc(cfg.snippet) + '</pre>' +
+        '<button class="ip-copy" data-copy="' + attrEsc(cfg.snippet) + '">Copy snippet</button>' +
+      '</div>' +
+
+      '<div class="ip-section">' +
+        '<div class="ip-label">Agent config files</div>' +
+        '<table class="ip-table"><thead><tr><th></th><th>Agent</th><th>File</th><th>Status</th></tr></thead><tbody>' +
+          configRows +
+        '</tbody></table>' +
+        '<div class="ip-hint" style="margin-top:6px">Generate with <code>dim generate-context --format all</code> or the Generate Agent Context action below.</div>' +
+      '</div>' +
+
+      '<div class="ip-section">' +
+        '<div class="ip-label">Hermes Agent</div>' +
+        '<div class="ip-cmd-row">' + hermesBadge +
+          '<button class="ip-copy" data-copy="dim hermes install">Copy install command</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="ip-section">' +
+        '<div class="ip-label">Registries</div>' +
+        '<div class="ip-registry">' +
+          '<span class="ip-reg-name">' + esc(cfg.registry.name) + '</span>' +
+          ' · <a href="' + esc(cfg.registry.mcpRegistry) + '" target="_blank" rel="noopener">MCP Registry ↗</a>' +
+          ' · <a href="' + esc(cfg.registry.glama) + '" target="_blank" rel="noopener">Glama ↗</a>' +
+          ' · <a href="' + esc(cfg.registry.serverJson) + '" target="_blank" rel="noopener">server.json ↗</a>' +
+          ' · <a href="' + esc(cfg.docsUrl) + '" target="_blank" rel="noopener">Docs ↗</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function copyToClip(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = "✓ Copied";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+// Delegated click handler for [data-copy] buttons inside the integration panel
+document.addEventListener("click", (e) => {
+  const el = e.target;
+  if (!(el instanceof Element)) return;
+  const btn = el.closest("[data-copy]");
+  if (!btn) return;
+  copyToClip(btn, btn.getAttribute("data-copy"));
+});
+
 function renderActionsView() {
   if (!state) return;
   const s = state.summary.byStatus;
@@ -1405,7 +1525,8 @@ function renderActionsView() {
 
   const groupsEl = document.getElementById("action-groups");
   groupsEl.innerHTML = "";
-  for (const group of ACTION_GROUPS) {
+  for (let gi = 0; gi < ACTION_GROUPS.length; gi++) {
+    const group = ACTION_GROUPS[gi];
     const section = document.createElement("section");
     section.innerHTML =
       '<div class="action-group-head"><span class="g-icon">' + group.icon + '</span>' +
@@ -1439,6 +1560,13 @@ function renderActionsView() {
     }
     section.appendChild(grid);
     groupsEl.appendChild(section);
+    // Insert integration panel after the Analysis group
+    if (group.title === "Analysis") {
+      const panel = document.createElement("div");
+      panel.id = "integration-panel";
+      groupsEl.appendChild(panel);
+      renderIntegrationPanel();
+    }
   }
 }
 
