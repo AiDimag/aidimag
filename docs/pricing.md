@@ -76,8 +76,8 @@ head:
 <tr>
 <th>Plan</th>
 <th>Memories</th>
-<th>API Keys</th>
-<th>Sync Rate</th>
+<th>Keys</th>
+<th>Sync</th>
 <th>Price</th>
 </tr>
 </thead>
@@ -91,24 +91,24 @@ head:
 </tr>
 <tr>
 <td><strong>Starter</strong></td>
-<td>1,000</td>
+<td>1K</td>
 <td>1</td>
-<td>Unlimited</td>
-<td>$5/mo</td>
+<td>∞</td>
+<td>$5/m</td>
 </tr>
 <tr>
-<td><strong>Developer</strong></td>
-<td>10,000</td>
+<td><strong>Dev</strong></td>
+<td>10K</td>
 <td>3</td>
-<td>Unlimited</td>
-<td>$15/mo</td>
+<td>∞</td>
+<td>$15/m</td>
 </tr>
 <tr>
 <td><strong>Team</strong></td>
-<td>50,000</td>
+<td>50K</td>
 <td>10</td>
-<td>Unlimited</td>
-<td>$50/mo</td>
+<td>∞</td>
+<td>$50/m</td>
 </tr>
 </tbody>
 </table>

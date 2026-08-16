@@ -4,7 +4,7 @@
 
 # AI Dimag — Verified Memory for AI Coding Agents
 
-**Your codebase remembers its decisions, conventions, and rules — and proves they're still true.**
+**Your coding agent forgets your codebase. AIDimag doesn't.**
 
 [![npm version](https://img.shields.io/npm/v/aidimag?color=blue&logo=npm)](https://www.npmjs.com/package/aidimag)
 [![CI](https://github.com/AiDimag/aidimag/actions/workflows/ci.yml/badge.svg)](https://github.com/AiDimag/aidimag/actions/workflows/ci.yml)
@@ -17,7 +17,7 @@
 [![Documentation](https://img.shields.io/badge/docs-aidimag.com-blue)](https://aidimag.com)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
 
-[**Documentation**](https://aidimag.com) • [**Getting Started**](https://aidimag.com/getting-started) • [**AI Dimag Cloud**](https://cloud.aidimag.com) • [**Pricing**](https://aidimag.com/pricing)
+[**Documentation**](https://aidimag.com) • [**Why AIDimag?**](https://aidimag.com/why-aidimag) • [**Getting Started**](https://aidimag.com/getting-started) • [**Use Cases**](https://aidimag.com/use-cases) • [**Benchmarks**](https://aidimag.com/benchmarks) • [**AI Dimag Cloud**](https://cloud.aidimag.com) • [**Pricing**](https://aidimag.com/pricing)
 
 </div>
 
@@ -190,7 +190,11 @@ Reproducible performance and quality suites live in [`benchmark/`](./benchmark)
 </td>
 <td width="33%">
 
-**Reference**
+**Overview**
+- [Why AIDimag?](https://aidimag.com/why-aidimag)
+- [Use Cases](https://aidimag.com/use-cases)
+- [How it Works](https://aidimag.com/how-it-works)
+- [Comparison](https://aidimag.com/comparison)
 - [CLI Reference](https://aidimag.com/cli-reference)
 - [MCP Integration](https://aidimag.com/mcp)
 - [Configuration](https://aidimag.com/configuration)

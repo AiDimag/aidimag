@@ -44,6 +44,7 @@ export interface AidimagConfig {
   generateContext?: GenerateContextConfig;
   preCommitCheck?: PreCommitCheckConfig;
   knowledge?: KnowledgeConfig;
+  onboarded?: boolean;
   [k: string]: unknown;
 }
 

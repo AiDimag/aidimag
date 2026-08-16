@@ -1,0 +1,1 @@
+Do not create explainer documents or other documentation unless specifically asked to. Always use "| cat" to see results on command line queries like git show and git log. do not look for shortcuts while finding solutions, look for what is best even if it take more effort or work.

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="180" viewBox="0 0 880 180" fill="none" font-family="Inter, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <marker id="cvArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#94a3b8"/>
+    </marker>
+    <marker id="cvArrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#10b981"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="880" height="180" rx="16" fill="#0f172a"/>
+
+  <!-- 1. Remember -->
+  <g>
+    <rect x="30" y="40" width="170" height="80" rx="14" fill="#172554" stroke="#2563eb" stroke-width="2"/>
+    <text x="115" y="70" text-anchor="middle" fill="#bfdbfe" font-size="15" font-weight="800">Remember</text>
+    <text x="115" y="94" text-anchor="middle" fill="#93c5fd" font-size="12">dim remember</text>
+  </g>
+
+  <!-- 2. Verify -->
+  <g>
+    <rect x="248" y="40" width="170" height="80" rx="14" fill="#052e2b" stroke="#10b981" stroke-width="2"/>
+    <text x="333" y="70" text-anchor="middle" fill="#a7f3d0" font-size="15" font-weight="800">Verify</text>
+    <text x="333" y="94" text-anchor="middle" fill="#34d399" font-size="12">dim verify</text>
+  </g>
+
+  <!-- 3. Retrieve -->
+  <g>
+    <rect x="466" y="40" width="170" height="80" rx="14" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="2"/>
+    <text x="551" y="70" text-anchor="middle" fill="#bae6fd" font-size="15" font-weight="800">Retrieve</text>
+    <text x="551" y="94" text-anchor="middle" fill="#7dd3fc" font-size="12">dim recall</text>
+  </g>
+
+  <!-- 4. Trust -->
+  <g>
+    <rect x="684" y="40" width="166" height="80" rx="14" fill="#082f49" stroke="#06b6d4" stroke-width="2"/>
+    <text x="767" y="70" text-anchor="middle" fill="#a5f3fc" font-size="15" font-weight="800">Trust</text>
+    <text x="767" y="94" text-anchor="middle" fill="#67e8f9" font-size="12">agent uses with confidence</text>
+  </g>
+
+  <!-- arrows between steps -->
+  <path d="M202 80h40" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#cvArrow)"/>
+  <path d="M420 80h40" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#cvArrow)"/>
+  <path d="M638 80h40" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#cvArrow)"/>
+
+  <!-- THE DIFFERENCE arrow pointing up to Verify -->
+  <path d="M333 140v-16" stroke="#10b981" stroke-width="2.5" marker-end="url(#cvArrowGreen)"/>
+  <text x="333" y="160" text-anchor="middle" fill="#34d399" font-size="13" font-weight="800">THE DIFFERENCE</text>
+</svg>

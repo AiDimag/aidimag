@@ -25,9 +25,13 @@ dim ui stop -p 5000 # stop server on custom port
   Filter and search to find what you need.
 - **Review queue** — approve, reword, or reject pending proposals from the commit miner and
   agent sessions.
+- **Dashboard stats** — at-a-glance cards for total memories, Review Queue, Knowledge Inbox,
+  and Knowledge Gaps.
+- **Actions tab** — manage, review, verify, and sync your project's memory. Actions are
+  grouped into Core (capture, review, verify), Analysis (audit, gaps, search log),
+  Collaboration (sync, cloud, knowledge), and Advanced (context files, guardrails, tickets,
+  scratchpad).
 - **Verify buttons** — re-run evidence on demand and watch statuses update.
-- **Mine** — scan git history for new candidates.
-- **Sync & cloud** — link to a team server, sync, and manage API keys.
 - **Memory graph** — a force-directed visualization of memories and their links
   (supports / contradicts / refines), so you can see how knowledge connects.
 

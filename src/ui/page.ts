@@ -8,6 +8,9 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>aiDimag — repo brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <meta name="color-scheme" content="light dark">
 <style>
@@ -29,6 +32,8 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     --stale: #eab308;
     --refuted: #ef4444;
     --path: #2563eb;
+    --icon-stroke: #1e293b;
+    --grad-highlight: #f8fafc;
   }
   .dark {
     --background: 222 47% 6%;
@@ -43,6 +48,8 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     --surface-glow: 0 0 0 1px rgba(96, 165, 250, 0.12), 0 8px 32px rgba(0, 0, 0, 0.35);
     --path: #60a5fa;
     --unverified: #94a3b8;
+    --icon-stroke: #fff;
+    --grad-highlight: #fff;
   }
   * { box-sizing: border-box; margin: 0; }
   html { color-scheme: light dark; }
@@ -53,7 +60,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
       radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.1) 0, transparent 50%),
       radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.08) 0, transparent 50%);
     color: hsl(var(--foreground));
-    font: 14px/1.5 "Inter", ui-sans-serif, system-ui, sans-serif;
+    font: 500 14px/1.5 "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     height: 100vh;
     display: flex;
@@ -79,7 +86,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
   header .subtitle {
     display: block; font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground));
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;
+    white-space: normal; word-break: break-all; line-height: 1.3; max-width: 320px;
   }
   .pill {
     padding: 3px 10px; border-radius: 999px; font-size: 12px;
@@ -107,7 +114,24 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   button.icon { padding: 8px; width: 36px; height: 36px; }
   button.danger:hover { background: color-mix(in srgb, var(--refuted) 12%, transparent); border-color: var(--refuted); }
   main { flex: 1; display: flex; min-height: 0; }
-  #graph { flex: 1; min-width: 0; background: hsl(var(--background) / 0.35); }
+  #graph { flex: 1; min-width: 0; background: hsl(var(--background) / 0.35); position: relative; overflow: hidden; }
+  #graph svg { display: block; }
+  @keyframes dash-flow { to { stroke-dashoffset: -20; } }
+  #graph-tip {
+    position: absolute; pointer-events: none; display: none; z-index: 10;
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border) / 0.6);
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500;
+    color: hsl(var(--foreground)); max-width: 260px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  #graph-stats {
+    position: absolute; top: 8px; right: 12px; z-index: 5;
+    font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground));
+    background: hsl(var(--card) / 0.7); backdrop-filter: blur(8px);
+    padding: 4px 10px; border-radius: 6px; border: 1px solid hsl(var(--border) / 0.4);
+    pointer-events: none;
+  }
   aside {
     width: 460px; border-left: 1px solid hsl(var(--border) / 0.6);
     overflow-y: auto; padding: 16px;
@@ -138,6 +162,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     background: hsl(var(--card) / 0.65); backdrop-filter: blur(12px);
   }
   .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .licn { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; flex-shrink: 0; }
   #toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: hsl(var(--card)); color: hsl(var(--foreground));
@@ -324,18 +349,56 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   #dlg-output .out-row:last-child { border-bottom: none; }
   #dlg-output .out-row .out-meta { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 2px; }
 
+  /* ---------------------------------------------------------- onboarding tour */
+  #tour-backdrop {
+    position: fixed; inset: 0; z-index: 100; pointer-events: none;
+  }
+  #tour-spotlight {
+    position: absolute; border-radius: 8px;
+    box-shadow: 0 0 0 9999px hsl(var(--background) / 0.82);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+  #tour-spotlight::after {
+    content: ""; position: absolute; inset: -4px;
+    border: 2px solid hsl(var(--primary) / 0.6); border-radius: 10px;
+    pointer-events: none;
+  }
+  #tour-tooltip {
+    position: absolute; z-index: 101; max-width: 320px;
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: var(--radius); padding: 16px 18px;
+    box-shadow: var(--surface-glow);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+  }
+  #tour-tooltip .tour-step-num {
+    font-size: 11px; font-weight: 600; color: hsl(var(--primary));
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+  }
+  #tour-tooltip h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  #tour-tooltip p { font-size: 12.5px; color: hsl(var(--muted-foreground)); line-height: 1.55; margin: 0 0 14px; }
+  #tour-tooltip .tour-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  #tour-tooltip .tour-dots { display: flex; gap: 5px; margin-right: auto; }
+  #tour-tooltip .tour-dot { width: 7px; height: 7px; border-radius: 50%; background: hsl(var(--border)); transition: background 0.2s; }
+  #tour-tooltip .tour-dot.active { background: hsl(var(--primary)); }
+  #tour-tooltip .tour-actions button { padding: 6px 16px; font-size: 12px; }
+  #tour-tooltip .tour-skip { background: transparent; border-color: transparent; color: hsl(var(--muted-foreground)); }
+  #tour-tooltip .tour-skip:hover { color: hsl(var(--foreground)); }
+
 </style>
 <script>
 (function () {
   var k = "aidimag-ui-theme";
   var saved = localStorage.getItem(k);
-  // Default dark; only use light when explicitly chosen.
-  if (saved !== "light") document.documentElement.classList.add("dark");
+  if (saved === "dark") document.documentElement.classList.add("dark");
+  else if (saved === "light") document.documentElement.classList.remove("dark");
+  else if (window.matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.classList.add("dark");
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -372,15 +435,10 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   </nav>
   <div class="spacer"></div>
   <div class="toolbar" id="toolbar-overview">
-  <button class="primary" onclick="document.getElementById('dlg-new').showModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New memory</button>
-  <button onclick="runMine()" title="Mine new commits since the last run (Shift+click: rescan all history)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 18 9"/><path d="M2 22l8-8"/><path d="M20.5 7.5 22 6a2.83 2.83 0 0 0-4-4l-1.5 1.5"/><path d="m9 11 4 4"/><path d="M16 2 8.5 9.5"/></svg>Mine commits</button>
+  <button class="primary" onclick="document.getElementById('dlg-new').showModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New Memory</button>
+  <button onclick="runMine()" title="Mine new commits since the last run (Shift+click: rescan all history)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5 18 9"/><path d="M2 22l8-8"/><path d="M20.5 7.5 22 6a2.83 2.83 0 0 0-4-4l-1.5 1.5"/><path d="m9 11 4 4"/><path d="M16 2 8.5 9.5"/></svg>Mine Commits</button>
   <button class="primary" onclick="runVerify(false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>Verify</button>
-  <button onclick="runVerify(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="m8 11 2 2 4-4"/></svg>Verify --deep</button>
   <button onclick="runSync()" id="btn-sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>Sync</button>
-  <button onclick="runReindex()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Reindex</button>
-  <button onclick="openCloud()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>Cloud</button>
-  <button onclick="openTickets()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>Tickets</button>
-  <button onclick="load()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button>
   </div>
   <button class="icon" type="button" onclick="toggleTheme()" id="btn-theme" aria-label="Toggle light/dark theme">
     <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -388,7 +446,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   </button>
 </header>
 <main id="view-overview">
-  <div id="graph"></div>
+  <div id="graph"><div id="graph-stats"></div><div id="graph-tip"></div></div>
   <aside>
     <h2 id="proposals-h">Pending proposals</h2>
     <div id="proposals"></div>
@@ -410,7 +468,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
 <div id="view-actions" role="tabpanel" aria-labelledby="tab-actions">
   <div class="actions-hero">
     <h2>Actions</h2>
-    <p>Everything the <code>dim</code> CLI can do, one click away. Hover any <b>?</b> to learn what an action does before running it.</p>
+    <p>Manage, review, verify, and sync your project's AI memory. Hover any <b>?</b> to learn what an action does before running it.</p>
   </div>
   <div class="status-strip" id="status-strip"></div>
   <div class="action-groups" id="action-groups"></div>
@@ -578,14 +636,21 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
 </dialog>
 
 <div class="legend">
-  <span><span class="dot" style="background:var(--verified)"></span>VERIFIED</span>
-  <span><span class="dot" style="background:var(--unverified)"></span>UNVERIFIED</span>
-  <span><span class="dot" style="background:var(--stale)"></span>STALE</span>
-  <span><span class="dot" style="background:var(--refuted)"></span>REFUTED</span>
-  <span><span class="dot" style="background:var(--path); border-radius:2px"></span>scope path</span>
-  <span style="margin-left:auto">node size = confidence · drag to rearrange · scroll to zoom</span>
+  <span><svg class="licn" viewBox="0 0 24 24" fill="none" stroke="var(--verified)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>Verified</span>
+  <span><svg class="licn" viewBox="0 0 24 24" fill="none" stroke="var(--unverified)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 3"><circle cx="12" cy="12" r="10"/></svg>Unverified</span>
+  <span><svg class="licn" viewBox="0 0 24 24" fill="none" stroke="var(--stale)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Stale</span>
+  <span><svg class="licn" viewBox="0 0 24 24" fill="none" stroke="var(--refuted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>Refuted</span>
+  <span><svg class="licn" viewBox="0 0 24 24" fill="none" stroke="var(--verified)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/></svg>Memory</span>
+  <span><svg class="licn" viewBox="0 0 24 24" fill="none" stroke="var(--path)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="m9 18 3-3-3-3"/><path d="m5 12-3 3 3 3"/></svg>Scope</span>
+  <span style="margin-left:auto">node size = confidence · click a memory to fire a signal · drag to rearrange · scroll to zoom</span>
 </div>
 <div id="toast"></div>
+
+<!-- Onboarding tour (first-time only, interactive spotlight) -->
+<div id="tour-backdrop">
+  <div id="tour-spotlight" style="display:none"></div>
+  <div id="tour-tooltip" style="display:none"></div>
+</div>
 
 <script>
 const COLORS = { VERIFIED: "#22c55e", UNVERIFIED: "#94a3b8", STALE: "#eab308", REFUTED: "#ef4444" };
@@ -598,6 +663,7 @@ function cssVar(name, fallback) {
 }
 
 function graphPalette() {
+  const dark = document.documentElement.classList.contains("dark");
   return {
     VERIFIED: cssVar("--verified", COLORS.VERIFIED),
     UNVERIFIED: cssVar("--unverified", COLORS.UNVERIFIED),
@@ -606,6 +672,7 @@ function graphPalette() {
     path: cssVar("--path", "#60a5fa"),
     link: "hsl(" + cssVar("--border", "217 33% 16%") + ")",
     primary: "hsl(" + cssVar("--primary", "217 91% 53%") + ")",
+    iconStroke: dark ? "#fff" : "#1e293b",
   };
 }
 
@@ -642,10 +709,149 @@ async function load() {
   document.getElementById("repo").textContent = state.repoRoot;
   const s = state.summary.byStatus;
   document.getElementById("counts").innerHTML =
-    \`<b>\${state.summary.total}</b> memories · ✓\${s.VERIFIED} ?\${s.UNVERIFIED} ~\${s.STALE} ✗\${s.REFUTED}\`;
+    \`<b>\${state.summary.total}</b> memories · ✓\${s.VERIFIED} verified · ?\${s.UNVERIFIED} unverified · ~\${s.STALE} stale · ✗\${s.REFUTED} refuted\`;
   renderProposals(); renderMemories(); renderGraph();
   renderActionsView();
   refreshKnowledgeStatus();
+  if (!state.onboarded) startTour();
+}
+
+// ── Interactive onboarding tour ──────────────────────────────────────────────
+
+const TOUR_STEPS = [
+  {
+    selector: "#graph",
+    title: "Memory Graph",
+    desc: "The force-directed graph shows memories (circles) linked to scope paths (squares). Node size = confidence, color = trust status. Click a memory to fire a neural signal through its connections.",
+  },
+  {
+    selector: "#proposals-h",
+    title: "Pending Proposals",
+    desc: "Everything captured — mined commits, harvested chats, knowledge docs — lands in this review queue first. Nothing becomes memory until you approve it.",
+  },
+  {
+    selector: "#tab-actions",
+    title: "Actions Tab",
+    desc: "Manage, review, verify, and sync your project's AI memory — verify, sync, mine, bootstrap, generate context files, and more. Hover the ? on any card for details.",
+    onShow: () => switchTab("actions"),
+  },
+  {
+    selector: "#act-knowledge",
+    title: "Knowledge Inbox",
+    desc: "Drop docs into the knowledge/ folder and they're auto-summarized into reviewable proposals while the dashboard is running. Click this card to sync manually.",
+    onShow: () => switchTab("actions"),
+  },
+  {
+    selector: "#toolbar-overview .primary",
+    title: "Verify & Create",
+    desc: "Use Verify to re-check evidence and update trust statuses. Click New memory to write a falsifiable claim. Sync pushes and pulls memory from your team server.",
+    onShow: () => switchTab("overview"),
+  },
+  {
+    selector: "#btn-theme",
+    title: "You're All Set!",
+    desc: "Toggle light/dark theme here. Explore the dashboard, add memories, and run actions. You can replay this tour anytime via Actions \u2192 Reset Onboarding.",
+    onShow: () => switchTab("overview"),
+  },
+];
+
+let tourStep = 0;
+
+function startTour() {
+  tourStep = 0;
+  showTourStep();
+}
+
+function showTourStep() {
+  const step = TOUR_STEPS[tourStep];
+  if (!step) { endTour(); return; }
+  if (step.onShow) step.onShow();
+
+  // Wait for any tab switch DOM updates before measuring position
+  requestAnimationFrame(() => {
+    const el = document.querySelector(step.selector);
+    const spotlight = document.getElementById("tour-spotlight");
+    const tooltip = document.getElementById("tour-tooltip");
+
+    if (!el) {
+      // Element not found (e.g. no proposals header) — skip to next step
+      tourStep++;
+      showTourStep();
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const pad = 6;
+    // Scroll the target into view so the spotlight is always visible
+    el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    // Re-measure after scroll
+    requestAnimationFrame(() => {
+      const rect2 = el.getBoundingClientRect();
+      spotlight.style.display = "block";
+      spotlight.style.left = (rect2.left - pad) + "px";
+      spotlight.style.top = (rect2.top - pad) + "px";
+      spotlight.style.width = (rect2.width + pad * 2) + "px";
+      spotlight.style.height = (rect2.height + pad * 2) + "px";
+
+      // Position tooltip — clamp within viewport at all times
+      const ttW = 320, ttH = 160;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let ttLeft = rect2.left + (rect2.width / 2) - (ttW / 2);
+      let ttTop;
+
+      if (rect2.bottom + 14 + ttH <= vh) {
+        // Fits below
+        ttTop = rect2.bottom + 14;
+      } else if (rect2.top - 14 - ttH >= 0) {
+        // Fits above
+        ttTop = rect2.top - ttH - 14;
+      } else {
+        // Element is too tall — place tooltip at top of viewport, overlapping
+        ttTop = Math.max(8, rect2.top + 14);
+      }
+
+      ttLeft = Math.max(8, Math.min(ttLeft, vw - ttW - 8));
+      ttTop = Math.max(8, Math.min(ttTop, vh - ttH - 8));
+
+      tooltip.innerHTML =
+        '<div class="tour-step-num">Step ' + (tourStep + 1) + ' of ' + TOUR_STEPS.length + '</div>' +
+        '<h3>' + esc(step.title) + '</h3>' +
+        '<p>' + esc(step.desc) + '</p>' +
+        '<div class="tour-actions">' +
+          '<div class="tour-dots">' +
+            TOUR_STEPS.map((_, i) => '<div class="tour-dot' + (i === tourStep ? " active" : "") + '"></div>').join("") +
+          '</div>' +
+          (tourStep < TOUR_STEPS.length - 1
+            ? '<button class="tour-skip" onclick="skipTour()">Skip</button>' +
+              (tourStep > 0 ? '<button onclick="prevTourStep()">Back</button>' : '') +
+              '<button class="primary" onclick="nextTourStep()">Next</button>'
+            : '<button class="primary" onclick="endTour()">Done</button>') +
+        '</div>';
+      tooltip.style.display = "block";
+      tooltip.style.left = ttLeft + "px";
+      tooltip.style.top = ttTop + "px";
+    });
+  });
+}
+
+function nextTourStep() {
+  tourStep++;
+  if (tourStep >= TOUR_STEPS.length) { endTour(); return; }
+  showTourStep();
+}
+
+function prevTourStep() {
+  if (tourStep > 0) { tourStep--; showTourStep(); }
+}
+
+function skipTour() { endTour(); }
+
+async function endTour() {
+  document.getElementById("tour-spotlight").style.display = "none";
+  document.getElementById("tour-tooltip").style.display = "none";
+  try { await api("/api/onboard", { method: "POST" }); }
+  catch (e) { /* non-critical */ }
+  toast("Welcome! Explore the dashboard and check the Actions tab to get started.");
 }
 
 function esc(s) { return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
@@ -1027,9 +1233,9 @@ function copyCli(cmd, why) {
 // The catalog: every aidimag capability as a grouped, self-explaining card.
 const ACTION_GROUPS = [
   {
-    icon: "🧲", title: "Capture", sub: "Feed the brain — everything lands in the review queue first",
+    icon: "◆", title: "Core", sub: "Capture, review, and verify your project's memory",
     actions: [
-      { id: "add-memory", icon: "➕", title: "Add Memory", cli: "dim remember",
+      { id: "add-memory", icon: "＋", title: "Add Memory", cli: "dim remember",
         desc: "Write a falsifiable claim about this repo, with optional evidence.",
         help: "Stores a durable memory: a claim a check could verify (e.g. 'all DB access goes through src/db/store.ts'). Add kind, scope paths, evidence, and pin it if it should never decay.",
         run: () => document.getElementById("dlg-new").showModal() },
@@ -1037,117 +1243,77 @@ const ACTION_GROUPS = [
         desc: "Scan new git commits for memory-worthy decisions and gotchas.",
         help: "Reads commit history since the last run and turns strong signals (reverts, fixes, decision keywords) into proposals for your review. Shift-click to rescan all history. For LLM-deep or PR mining run 'dim mine --llm' / 'dim mine --prs' in a terminal.",
         run: (ev) => runMine(ev) },
-      { id: "bootstrap", icon: "🧠", title: "Bootstrap Repo", cli: "dim bootstrap",
-        desc: "Instant brain: LLM reads README, docs & structure → first memories.",
+      { id: "bootstrap", icon: "🧠", title: "Build Initial Memory", cli: "dim bootstrap",
+        desc: "Analyze the README, docs, and repository structure to create your first memories.",
         help: "Surveys README/docs/manifests/directory shape/churn and asks your LLM (Ollama or OPENAI_API_KEY) to extract 5–30 initial claims. Everything is queued for review — nothing is auto-saved. May take a few minutes.",
         run: () => runBootstrap() },
       { id: "harvest", icon: "💬", title: "Harvest AI Chats", cli: "dim harvest",
-        desc: "Extract durable facts you typed into Claude Code sessions.",
+        desc: "Extract durable facts from Claude Code sessions.",
         help: "Scans local Claude Code transcripts for this repo, redacts secrets, and LLM-extracts durable facts *you* stated into proposals. Local-only; needs an LLM provider.",
         run: () => runHarvest() },
-      { id: "knowledge", icon: "📚", title: "Sync Knowledge Inbox", cli: "dim knowledge sync",
-        desc: "Summarize docs dropped in the knowledge/ folder into proposals.",
+      { id: "knowledge", icon: "📚", title: "Import Knowledge", cli: "dim knowledge sync",
+        desc: "Summarize documents in the knowledge/ folder into memory proposals.",
         help: "Any md/pdf/docx dropped into the knowledge inbox is LLM-summarized into falsifiable claims and queued for review. The dashboard also auto-ingests while it's running.",
         badge: () => knowledgeInfo && knowledgeInfo.pending.length ? knowledgeInfo.pending.length : 0,
         run: () => runKnowledgeSync() },
-    ],
-  },
-  {
-    icon: "🧹", title: "Review & hygiene", sub: "Humans gate everything — keep the brain trustworthy",
-    actions: [
       { id: "review", icon: "✅", title: "Review Proposals", cli: "dim review",
-        desc: "Approve or reject everything mined, harvested or ingested.",
+        desc: "Approve or reject memories mined, harvested, or imported into the review queue.",
         help: "Nothing captured automatically becomes memory until you approve it. Opens the Overview tab where each pending proposal has Approve / Reject buttons.",
         badge: () => state ? state.proposals.length : 0,
         run: () => { switchTab("overview"); document.getElementById("proposals-h").scrollIntoView({ behavior: "smooth" }); } },
-      { id: "audit", icon: "🔍", title: "Provenance Audit", cli: "dim audit",
-        desc: "Surface memories standing on the weakest ground.",
-        help: "Lists memories that are agent-authored, evidence-free, stale, or long-unverified — ranked by risk — so you can confirm, add evidence, or forget them.",
-        run: () => runAudit() },
-      { id: "gaps", icon: "🕳", title: "Knowledge Gaps", cli: "dim gaps",
-        desc: "Searches (yours or agents') that found nothing.",
-        help: "Every memory search that returned zero results is logged as a gap — the facts your brain is missing, most-asked first. Fill them with Add Memory.",
-        badge: () => state ? state.gapCount : 0,
-        run: () => runGaps() },
-      { id: "gc", icon: "🗑", title: "Proposals GC", cli: "dim proposals gc", danger: true,
-        desc: "Purge resolved proposal rows (dry-run first).",
-        help: "Removes already approved/rejected proposal rows (tombstoned for team sync). Shows a dry-run count first, then asks for confirmation.",
-        run: () => runProposalsGc() },
-    ],
-  },
-  {
-    icon: "🛡", title: "Verify & trust", sub: "Evidence keeps memory honest",
-    actions: [
-      { id: "verify", icon: "✔", title: "Verify", cli: "dim verify",
-        desc: "Re-run cheap evidence and update memory statuses.",
+      { id: "verify", icon: "✔", title: "Verify Memory", cli: "dim verify",
+        desc: "Re-run available evidence and update memory statuses.",
         help: "Re-runs COMMIT_REF and STATIC_CHECK evidence. Passing evidence marks memories VERIFIED; failing evidence marks them STALE. Unverified memories decay in confidence over time.",
         run: () => runVerify(false) },
-      { id: "verify-deep", icon: "🔬", title: "Deep Verify", cli: "dim verify --deep",
-        desc: "Also re-run TEST_RESULT and EXEC_TRACE evidence.",
-        help: "The expensive tier: executes test commands and traced executions too. Can take a while on large evidence sets.",
-        run: () => runVerify(true) },
-      { id: "verify-trust", icon: "🛂", title: "Review Synced Evidence", cli: "dim verify --trust", terminal: true,
-        desc: "Approve evidence commands that arrived via team sync.",
-        help: "Synced-in evidence commands are NEVER executed until you inspect and approve them. This flow is interactive, so it runs in your terminal — clicking copies the command.",
-        run: () => copyCli("dim verify --trust", "interactive review runs in a real terminal") },
-      { id: "check", icon: "🧪", title: "Check Staged Changes", cli: "dim check",
-        desc: "Pre-commit contradiction check against active memories.",
-        help: "Analyzes your staged git diff against memories and guardrails scoped to the changed files: re-runs STATIC_CHECKs, trips 'never' guardrails, and reminds you of invariants.",
-        run: () => runCheck() },
-      { id: "brief", icon: "📋", title: "Session Briefing", cli: "dim brief",
+      { id: "brief", icon: "📋", title: "Generate Session Briefing", cli: "dim brief",
         desc: "What to know before this session: memory, guardrails, warnings.",
         help: "Builds a briefing from your branch diff: in-scope memories, guardrails, stale warnings, coverage gaps, and clarifying questions to answer before coding.",
         run: () => runBrief() },
     ],
   },
   {
-    icon: "📝", title: "Scratchpad", sub: "Short-term session notes — expire automatically, never synced",
+    icon: "🔍", title: "Analysis", sub: "Audit evidence, find gaps, and check for contradictions",
     actions: [
-      { id: "jot", icon: "✏️", title: "Jot Note", cli: "dim scratch",
-        desc: "Quick working note. Expires in 24 h by default.",
-        help: "Session working memory for hypotheses, plans and intermediate findings. TTL-expiring, local-only, never becomes durable memory — promote anything worth keeping via Add Memory.",
-        run: () => document.getElementById("dlg-note").showModal() },
-      { id: "notes", icon: "📖", title: "Show Notes", cli: "dim scratch --all",
-        desc: "List current (unexpired) scratchpad notes.",
-        help: "Shows all unexpired scratchpad notes across sessions, newest first.",
-        badge: () => state ? state.scratchCount : 0,
-        run: () => runShowNotes() },
-      { id: "clear-notes", icon: "🧹", title: "Clear Notes", cli: "dim scratch --clear --all", danger: true,
-        desc: "Delete all scratchpad notes.",
-        help: "Permanently deletes every scratchpad note in every session. They would expire on their own anyway.",
-        run: () => runClearNotes() },
+      { id: "audit", icon: "🔍", title: "Audit Memory Evidence", cli: "dim audit",
+        desc: "Find memories supported by weak or missing evidence.",
+        help: "Lists memories that are agent-authored, evidence-free, stale, or long-unverified — ranked by risk — so you can confirm, add evidence, or forget them.",
+        run: () => runAudit() },
+      { id: "gaps", icon: "🕳", title: "Review Knowledge Gaps", cli: "dim gaps",
+        desc: "Find questions your agents or searches couldn't answer.",
+        help: "Every memory search that returned zero results is logged as a gap — the facts your brain is missing, most-asked first. Fill them with Add Memory.",
+        badge: () => state ? state.gapCount : 0,
+        run: () => runGaps() },
+      { id: "check", icon: "🧪", title: "Check Changes", cli: "dim check",
+        desc: "Check staged changes for contradictions with active memories before committing.",
+        help: "Analyzes your staged git diff against memories and guardrails scoped to the changed files: re-runs STATIC_CHECKs, trips 'never' guardrails, and reminds you of invariants.",
+        run: () => runCheck() },
     ],
   },
   {
-    icon: "☁️", title: "Team & sync", sub: "Optional — share memory with your team's brain",
+    icon: "☁", title: "Collaboration", sub: "Sync with your team and connect ticketing",
     actions: [
       { id: "sync", icon: "🔄", title: "Sync Now", cli: "dim sync",
         desc: "Push & pull memory with the linked team server.",
         help: "Exchanges memory events with your team brain. Synced-in executable evidence stays quarantined until you approve it via Review Synced Evidence.",
-        disabled: () => state && !state.cloud ? "Link a cloud server first" : null,
+        disabled: () => state && !state.cloud ? "Connect a cloud server first" : null,
         run: () => runSync() },
-      { id: "cloud", icon: "🔗", title: "Link / Unlink Cloud", cli: "dim cloud link",
-        desc: "Bind this repo to a team sync server ('brain').",
+      { id: "cloud", icon: "🔗", title: "Connect Cloud", cli: "dim cloud link",
+        desc: "Sync this project's memory with your team.",
         help: "Connect a self-hosted (dim serve) or cloud sync server. The token is stored on this machine only, never in the repo. Also manages brain-scoped API keys.",
         run: () => openCloud() },
-      { id: "login", icon: "🔐", title: "Login (approve device)", cli: "dim login", terminal: true,
-        desc: "Device-code login, approved in your browser.",
+      { id: "login", icon: "🔐", title: "Sign In", cli: "dim login", terminal: true,
+        desc: "Approve this device using your browser.",
         help: "Starts a device-code flow: the CLI prints a code and opens the server's approval page. Runs in your terminal — clicking copies the command.",
         run: () => copyCli("dim login") },
-      { id: "logout", icon: "🚪", title: "Logout", cli: "dim logout", terminal: true, danger: true,
+      { id: "logout", icon: "🚪", title: "Sign Out", cli: "dim logout", terminal: true, danger: true,
         desc: "Remove this device's stored token.",
         help: "Deletes the sync token stored for this device. Runs in your terminal — clicking copies the command.",
         run: () => copyCli("dim logout") },
-    ],
-  },
-  {
-    icon: "🎫", title: "Tickets", sub: "Bring the 'why' from Jira / GitHub / Linear into your memory",
-    actions: [
       { id: "tickets", icon: "🎫", title: "Connect Ticketing App", cli: "dim ticket connect",
         desc: "Jira, GitHub Issues, Linear, HTTP middleware or team server.",
         help: "Once connected, proposals mined from commits carry ticket context, and branch-naming conventions can be enforced by git hooks. Credentials stay on this machine.",
         run: () => openTickets() },
-      { id: "ticket-show", icon: "👁", title: "Show Ticket", cli: "dim ticket show <id>",
+      { id: "ticket-show", icon: "👁", title: "View Ticket", cli: "dim ticket show <id>",
         desc: "Fetch a ticket by id from the connected provider.",
         help: "Round-trips a ticket id through your provider config — great for checking the connection works and peeking at ticket context.",
         disabled: () => state && !state.tickets ? "Connect a ticket provider first" : null,
@@ -1156,23 +1322,56 @@ const ACTION_GROUPS = [
         desc: "Create a convention-conforming branch for a ticket.",
         help: "Fetches the ticket title and creates a branch like feature/PROJ-123-fix-retries. Creates the branch in your working tree, so it runs in your terminal — clicking copies the command.",
         run: () => { const id = prompt("Ticket id (e.g. PROJ-123):"); if (id) copyCli("dim branch " + id.trim()); } },
+      { id: "hermes", icon: "🪽", title: "Install Hermes Agent", cli: "dim hermes install", terminal: true,
+        desc: "Register aidimag as a native Hermes memory provider.",
+        help: "Installs a stdlib-only Python bridge into $HERMES_HOME/plugins/aidimag that delegates to the MCP server. Session briefings are injected into the system prompt, recall is prefetched per turn, and learnings become review-queue proposals. Runs in your terminal — clicking copies the command.",
+        run: () => copyCli("dim hermes install") },
     ],
   },
   {
-    icon: "🛠", title: "Maintenance & output", sub: "Keep search sharp and export memory to your agents",
+    icon: "⚙", title: "Advanced", sub: "Deep verification, maintenance, and agent context export",
     actions: [
-      { id: "gen-context", icon: "🧭", title: "Generate Context Files", cli: "dim generate-context",
-        desc: "Render trusted memory → CLAUDE.md, .cursorrules, and more.",
+      { id: "verify-deep", icon: "🔬", title: "Deep Verify", cli: "dim verify --deep",
+        desc: "Re-run all available evidence, including test results and execution traces.",
+        help: "The expensive tier: executes test commands and traced executions too. Can take a while on large evidence sets.",
+        run: () => runVerify(true) },
+      { id: "verify-trust", icon: "🛂", title: "Review Synced Evidence", cli: "dim verify --trust", terminal: true,
+        desc: "Approve evidence commands received through team sync before they can affect memory verification.",
+        help: "Synced-in evidence commands are NEVER executed until you inspect and approve them. This flow is interactive, so it runs in your terminal — clicking copies the command.",
+        run: () => copyCli("dim verify --trust", "interactive review runs in a real terminal") },
+      { id: "gc", icon: "🗑", title: "Clean Up Proposals", cli: "dim proposals gc", danger: true,
+        desc: "Remove resolved proposals from the database. Runs as a dry-run first.",
+        help: "Removes already approved/rejected proposal rows (tombstoned for team sync). Shows a dry-run count first, then asks for confirmation.",
+        run: () => runProposalsGc() },
+      { id: "gen-context", icon: "🧭", title: "Generate Agent Context", cli: "dim generate-context",
+        desc: "Export trusted memory into CLAUDE.md, .cursorrules, and other agent context files.",
         help: "Writes your verified/unverified memory into static context files that coding agents read automatically (Claude Code, Cursor, Copilot, Windsurf, generic AGENTS.md).",
         run: () => document.getElementById("dlg-context").showModal() },
       { id: "reindex", icon: "🧮", title: "Reindex Embeddings", cli: "dim reindex",
         desc: "Rebuild semantic search vectors for all memories.",
         help: "Regenerates embeddings with your provider (Ollama or OpenAI). Run after switching embedding models or if semantic search feels off.",
         run: () => runReindex() },
+      { id: "scratch-jot", icon: "✏️", title: "Jot Note", cli: "dim scratch",
+        desc: "Quick working note. Expires in 24 h by default.",
+        help: "Session working memory for hypotheses, plans and intermediate findings. TTL-expiring, local-only, never becomes durable memory — promote anything worth keeping via Add Memory.",
+        run: () => document.getElementById("dlg-note").showModal() },
+      { id: "scratch-view", icon: "📖", title: "View Notes", cli: "dim scratch --all",
+        desc: "List current (unexpired) scratchpad notes.",
+        help: "Shows all unexpired scratchpad notes across sessions, newest first.",
+        badge: () => state ? state.scratchCount : 0,
+        run: () => runShowNotes() },
+      { id: "scratch-clear", icon: "🧹", title: "Clear Notes", cli: "dim scratch --clear --all", danger: true,
+        desc: "Delete all scratchpad notes.",
+        help: "Permanently deletes every scratchpad note in every session. They would expire on their own anyway.",
+        run: () => runClearNotes() },
       { id: "refresh", icon: "🔃", title: "Refresh Data", cli: "—",
         desc: "Reload memories, proposals and status from disk.",
         help: "Re-reads the local aidimag database and refreshes every widget on this page.",
         run: () => { toast("Refreshing…"); load(); } },
+      { id: "reset-onboarding", icon: "🎓", title: "Reset Onboarding", cli: "—",
+        desc: "Show the first-time dashboard tour again.",
+        help: "Re-enables the onboarding overlay that appears on first dashboard open. Reload the page after clicking to see it.",
+        run: () => runResetOnboarding() },
     ],
   },
 ];
@@ -1195,10 +1394,10 @@ function renderActionsView() {
   tb.textContent = pendingTotal;
 
   document.getElementById("status-strip").innerHTML = [
-    statCard("Memories", state.summary.total, "✓" + s.VERIFIED + " · ?" + s.UNVERIFIED + " · ~" + s.STALE + " · ✗" + s.REFUTED),
-    statCard("Pending review", state.proposals.length, state.proposals.length ? "proposals await your judgment" : "queue is empty", state.proposals.length > 0),
-    statCard("Knowledge inbox", knowledgeInfo ? knowledgeInfo.pending.length : "–", knowledgeInfo ? knowledgeInfo.processed + " docs processed" : "checking…", knowledgeInfo && knowledgeInfo.pending.length > 0),
-    statCard("Knowledge gaps", state.gapCount, state.gapCount ? "unanswered searches (30 d)" : "no unanswered searches", state.gapCount > 0),
+    statCard("Memories", state.summary.total, "✓" + s.VERIFIED + " verified · ?" + s.UNVERIFIED + " unverified · ~" + s.STALE + " stale · ✗" + s.REFUTED + " refuted"),
+    statCard("Review Queue", state.proposals.length, state.proposals.length ? "proposals awaiting review" : "queue is empty", state.proposals.length > 0),
+    statCard("Knowledge Inbox", knowledgeInfo ? knowledgeInfo.pending.length : "–", knowledgeInfo ? knowledgeInfo.processed + " docs processed" : "checking…", knowledgeInfo && knowledgeInfo.pending.length > 0),
+    statCard("Knowledge Gaps", state.gapCount, state.gapCount ? "unanswered searches (30 d)" : "no unanswered searches", state.gapCount > 0),
     statCard("Scratchpad", state.scratchCount, "session notes (auto-expiring)"),
     statCard("Team sync", state.cloud ? "linked" : "off", state.cloud ? esc(state.cloud.brain) + " @ " + esc(state.cloud.server) : "link a server to share memory"),
     statCard("Tickets", state.tickets ? esc(state.tickets.provider) : "off", state.tickets ? (state.tickets.hasCredential ? "credential stored" : "⚠ no credential") : "connect Jira / GitHub / Linear"),
@@ -1385,7 +1584,7 @@ async function saveNote() {
 }
 
 async function runShowNotes() {
-  setBusy("notes", true);
+  setBusy("scratch-view", true);
   try {
     const r = await api("/api/scratchpad");
     const body = r.notes.length
@@ -1397,7 +1596,7 @@ async function runShowNotes() {
       { label: "Clear all", danger: true, onClick: () => { document.getElementById("dlg-output").close(); runClearNotes(); } },
     ] : []);
   } catch (e) { toast("Error: " + e.message); }
-  finally { setBusy("notes", false); }
+  finally { setBusy("scratch-view", false); }
 }
 
 async function runClearNotes() {
@@ -1421,6 +1620,16 @@ async function runGenerateContext() {
   finally { setBusy("gen-context", false); }
 }
 
+async function runResetOnboarding() {
+  setBusy("reset-onboarding", true);
+  try {
+    await api("/api/onboard/reset", { method: "POST" });
+    toast("Onboarding reset — reloading…");
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { toast("Error: " + e.message); }
+  finally { setBusy("reset-onboarding", false); }
+}
+
 async function runShowTicket() {
   const id = document.getElementById("ticket-show-id").value.trim();
   if (!id) { toast("Enter a ticket id"); return; }
@@ -1438,9 +1647,57 @@ async function runShowTicket() {
 if (localStorage.getItem("aidimag-ui-tab") === "actions") switchTab("actions");
 
 let sim = null;
+let _simTimer = null;
+
+function fireSignal(src, links, g, palette) {
+  const wave1 = new Set(), wave2 = new Set();
+  for (const l of links) {
+    const s = l.source.id || l.source, t = l.target.id || l.target;
+    if (s === src.id) wave1.add(t);
+    if (t === src.id) wave1.add(s);
+  }
+  for (const l of links) {
+    const s = l.source.id || l.source, t = l.target.id || l.target;
+    if (wave1.has(s) && !wave1.has(t) && t !== src.id) wave2.add(t);
+    if (wave1.has(t) && !wave1.has(s) && s !== src.id) wave2.add(s);
+  }
+
+  // Traveling pulse particles along edges from source
+  for (const l of links) {
+    const s = l.source.id || l.source, t = l.target.id || l.target;
+    if (s !== src.id && t !== src.id) continue;
+    const fx = s === src.id ? l.source.x : l.target.x;
+    const fy = s === src.id ? l.source.y : l.target.y;
+    const tx = s === src.id ? l.target.x : l.source.x;
+    const ty = s === src.id ? l.target.y : l.source.y;
+    g.append("circle")
+      .attr("r", 4).attr("cx", fx).attr("cy", fy)
+      .attr("fill", palette.primary).attr("opacity", 0.9)
+      .attr("filter", "url(#signal-glow)")
+      .transition().duration(700).ease(d3.easeQuadOut)
+      .attr("cx", tx).attr("cy", ty)
+      .attr("r", 1.5).attr("opacity", 0)
+      .remove();
+  }
+
+  // Cascading node pulse: source → wave1 → wave2
+  const pulse = (id, scale, delay) => setTimeout(() => {
+    const sel = g.select(".nodes").selectAll("g").filter(d => d.id === id);
+    const c = sel.select("circle");
+    if (c.empty()) return;
+    const r = +c.attr("r");
+    c.transition().duration(250).attr("r", r * scale)
+      .transition().duration(400).attr("r", r);
+  }, delay);
+  pulse(src.id, 1.6, 0);
+  wave1.forEach(id => pulse(id, 1.4, 400));
+  wave2.forEach(id => pulse(id, 1.25, 800));
+}
+
 function renderGraph() {
   const container = document.getElementById("graph");
-  container.innerHTML = "";
+  const oldSvg = container.querySelector("svg");
+  if (oldSvg) oldSvg.remove();
   const W = container.clientWidth, H = container.clientHeight;
 
   const nodes = [], links = [], pathNodes = new Map();
@@ -1456,54 +1713,242 @@ function renderGraph() {
   }
   nodes.push(...pathNodes.values());
 
+  const stats = document.getElementById("graph-stats");
+  if (stats) stats.textContent = nodes.length + " nodes · " + links.length + " edges";
+
+  const palette = graphPalette();
+
   const svg = d3.select(container).append("svg").attr("width", W).attr("height", H);
+  const defs = svg.append("defs");
+
+  // Glow filter for nodes
+  const glow = defs.append("filter").attr("id", "node-glow").attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+  glow.append("feGaussianBlur").attr("stdDeviation", 2.5).attr("result", "blur");
+  const gm = glow.append("feMerge");
+  gm.append("feMergeNode").attr("in", "blur");
+  gm.append("feMergeNode").attr("in", "SourceGraphic");
+
+  // Brighter glow for signal particles
+  const sg = defs.append("filter").attr("id", "signal-glow").attr("x", "-100%").attr("y", "-100%").attr("width", "300%").attr("height", "300%");
+  sg.append("feGaussianBlur").attr("stdDeviation", 4).attr("result", "blur");
+  const sgm = sg.append("feMerge");
+  sgm.append("feMergeNode").attr("in", "blur");
+  sgm.append("feMergeNode").attr("in", "blur");
+  sgm.append("feMergeNode").attr("in", "SourceGraphic");
+
   const g = svg.append("g");
   svg.call(d3.zoom().scaleExtent([0.3, 4]).on("zoom", e => g.attr("transform", e.transform)));
 
   if (sim) sim.stop();
+  const LARGE = nodes.length > 200;
   sim = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(90))
-    .force("charge", d3.forceManyBody().strength(-220))
+    .force("link", d3.forceLink(links).id(d => d.id).distance(LARGE ? 60 : 90))
+    .force("charge", d3.forceManyBody().strength(LARGE ? -80 : -220))
     .force("center", d3.forceCenter(W / 2, H / 2))
-    .force("collide", d3.forceCollide(28));
+    .force("collide", d3.forceCollide(LARGE ? 12 : 28))
+    .alphaDecay(LARGE ? 0.05 : 0.023);
 
-  const palette = graphPalette();
+  // Links — animated flow on "supports" edges for small graphs
+  const linkG = g.append("g").attr("class", "links");
+  const link = linkG.selectAll("line").data(links).join("line")
+    .attr("stroke", d => d.kind === "contradicts" ? palette.REFUTED : d.kind === "supports" ? palette.VERIFIED : palette.link)
+    .attr("stroke-width", d => d.kind === "supports" ? 1.8 : 1.2)
+    .attr("stroke-opacity", 0.55);
+  if (!LARGE) {
+    link.filter(d => d.kind === "supports")
+      .attr("stroke-dasharray", "5 5")
+      .style("animation", "dash-flow 2s linear infinite");
+  }
 
-  const link = g.append("g").selectAll("line").data(links).join("line")
-    .attr("stroke", d => d.kind === "contradicts" ? palette.REFUTED : palette.link)
-    .attr("stroke-width", 1.2);
-
-  const node = g.append("g").selectAll("g").data(nodes).join("g")
+  const node = g.append("g").attr("class", "nodes").selectAll("g").data(nodes).join("g")
     .style("cursor", "pointer")
     .call(d3.drag()
       .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
       .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
       .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }));
 
-  node.filter(d => d.type === "memory").append("circle")
-    .attr("r", d => 7 + d.conf * 10)
+  // Memory nodes — brain icon on colored status ring with breathing pulse
+  const memNode = node.filter(d => d.type === "memory");
+  const memRadius = d => 9 + d.conf * 8;
+  // Colored background ring
+  memNode.append("circle")
+    .attr("r", memRadius)
     .attr("fill", d => palette[d.status] || palette.UNVERIFIED)
-    .attr("fill-opacity", 0.85);
-  node.filter(d => d.type === "path").append("rect")
-    .attr("x", -7).attr("y", -7).attr("width", 14).attr("height", 14).attr("rx", 3)
-    .attr("fill", palette.path).attr("fill-opacity", 0.85);
+    .attr("fill-opacity", 0.9)
+    .attr("stroke", d => palette[d.status] || palette.UNVERIFIED)
+    .attr("stroke-width", 2)
+    .attr("stroke-opacity", 0.5)
+    .attr("filter", LARGE ? null : "url(#node-glow)")
+    .each(function(d) {
+      if (LARGE) return;
+      const r0 = memRadius(d);
+      const el = d3.select(this);
+      const period = 2800 + (d.conf * 1000);
+      (function breathe() {
+        el.transition().duration(period).ease(d3.easeSinInOut)
+          .attr("r", r0 * 1.12)
+          .transition().duration(period).ease(d3.easeSinInOut)
+          .attr("r", r0)
+          .on("end", breathe);
+      })();
+    });
 
-  node.append("text").attr("dy", d => d.type === "memory" ? 7 + d.conf * 10 + 12 : 22).attr("text-anchor", "middle").text(d => d.label);
+  // Lucide Brain icon — stroke-based, scaled to fit inside the node circle
+  {
+    const brainPaths = [
+      "M12 18V5",
+      "M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4",
+      "M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5",
+      "M17.997 5.125a4 4 0 0 1 2.526 5.77",
+      "M18 18a4 4 0 0 0 2-7.464",
+      "M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517",
+      "M6 18a4 4 0 0 1-2-7.464",
+      "M6.003 5.125a4 4 0 0 0-2.526 5.77",
+    ];
+    memNode.each(function(d) {
+      const r = memRadius(d);
+      const s = (r * 1.3) / 24;
+      const g = d3.select(this).append("g")
+        .attr("transform", "scale(" + s + ") translate(-12,-12)")
+        .attr("pointer-events", "none");
+      for (const p of brainPaths) {
+        g.append("path")
+          .attr("d", p)
+          .attr("fill", "none")
+          .attr("stroke", palette.iconStroke)
+          .attr("stroke-width", 2)
+          .attr("stroke-linecap", "round")
+          .attr("stroke-linejoin", "round");
+      }
+    });
+  }
+
+  // Pulsing halo for verified nodes — brain-neuron ripple (continuous)
+  if (!LARGE) {
+    memNode.filter(d => d.status === "VERIFIED").append("circle")
+      .attr("r", memRadius)
+      .attr("fill", "none")
+      .attr("stroke", d => palette[d.status])
+      .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0.5)
+      .each(function(d) {
+        const r0 = memRadius(d);
+        const el = d3.select(this);
+        (function repeat() {
+          el.attr("r", r0).attr("stroke-width", 2).attr("stroke-opacity", 0.5)
+            .transition().duration(2200).ease(d3.easeSinOut)
+            .attr("r", r0 + 16).attr("stroke-width", 0.3).attr("stroke-opacity", 0)
+            .on("end", repeat);
+        })();
+      });
+  }
+
+  // Scope nodes — Lucide FileCode2 icon on blue circle
+  const pathNode = node.filter(d => d.type === "path");
+  pathNode.append("circle")
+    .attr("r", 12)
+    .attr("fill", palette.path).attr("fill-opacity", 0.9)
+    .attr("stroke", palette.path).attr("stroke-width", 2).attr("stroke-opacity", 0.5)
+    .attr("filter", LARGE ? null : "url(#node-glow)");
+  {
+    const fileCodePaths = [
+      "M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4",
+      "M14 2L14 8L20 8",
+      "m9 18 3-3-3-3",
+      "m5 12-3 3 3 3",
+    ];
+    pathNode.each(function() {
+      const s = 14 / 24;
+      const g = d3.select(this).append("g")
+        .attr("transform", "scale(" + s + ") translate(-12,-12)")
+        .attr("pointer-events", "none");
+      for (const p of fileCodePaths) {
+        g.append("path")
+          .attr("d", p)
+          .attr("fill", "none")
+          .attr("stroke", palette.iconStroke)
+          .attr("stroke-width", 2)
+          .attr("stroke-linecap", "round")
+          .attr("stroke-linejoin", "round");
+      }
+    });
+  }
+
+  // Labels — hidden on large graphs to reduce DOM clutter
+  if (!LARGE) {
+    node.append("text")
+      .attr("dy", d => d.type === "memory" ? memRadius(d) + 12 : 26)
+      .attr("text-anchor", "middle")
+      .attr("font-size", 10)
+      .attr("fill", "hsl(" + cssVar("--muted-foreground", "215 16% 47%") + ")")
+      .attr("pointer-events", "none")
+      .text(d => d.label);
+  }
 
   node.on("click", (e, d) => {
     if (d.type !== "memory") return;
+    if (!LARGE) fireSignal(d, links, g, palette);
     const card = document.getElementById("mem-" + d.id);
     if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.style.outline = "2px solid " + palette.primary; setTimeout(() => card.style.outline = "", 1500); }
   });
+
+  // Hover tooltip for large graphs (since labels are hidden)
+  if (LARGE) {
+    const tip = document.getElementById("graph-tip");
+    node.on("mouseenter", function(e, d) {
+      d3.select(this).select("circle").attr("fill-opacity", 1);
+      if (tip) { tip.textContent = d.label; tip.style.display = "block"; }
+    }).on("mousemove", function(e) {
+      if (tip) {
+        const rect = container.getBoundingClientRect();
+        tip.style.left = (e.clientX - rect.left + 12) + "px";
+        tip.style.top = (e.clientY - rect.top - 8) + "px";
+      }
+    }).on("mouseleave", function(e, d) {
+      d3.select(this).select("circle").attr("fill-opacity", 0.88);
+      if (tip) tip.style.display = "none";
+    });
+  }
 
   sim.on("tick", () => {
     link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
     node.attr("transform", d => \`translate(\${d.x},\${d.y})\`);
   });
+
+  // Recurring neural cascade — fires signals through random nodes continuously
+  if (_simTimer) { clearInterval(_simTimer); _simTimer = null; }
+  if (!LARGE) {
+    const memNodes = nodes.filter(n => n.type === "memory");
+    const verified = memNodes.filter(n => n.status === "VERIFIED");
+    const pool = verified.length >= 2 ? verified : memNodes;
+    if (pool.length) {
+      _simTimer = setInterval(() => {
+        if (sim.alpha() < 0.08 && document.visibilityState === "visible") {
+          const seed = pool[Math.floor(Math.random() * pool.length)];
+          fireSignal(seed, links, g, palette);
+        }
+      }, 3500);
+      // Fire one shortly after settle for immediate feedback
+      setTimeout(() => {
+        if (sim.alpha() < 0.1) fireSignal(pool[0], links, g, palette);
+      }, 2500);
+    }
+  }
 }
 
 window.addEventListener("resize", () => state && renderGraph());
 load();
+// Reset onboarding: hold Shift+R+O for 2 seconds on the dashboard
+let _resetTimer = null;
+window.addEventListener("keydown", (e) => {
+  if (e.shiftKey && (e.key === "R" || e.key === "r") && e.altKey) {
+    if (_resetTimer) clearTimeout(_resetTimer);
+    _resetTimer = setTimeout(async () => {
+      try { await api("/api/onboard/reset", { method: "POST" }); toast("Onboarding reset — reload to see it again"); }
+      catch (e) { toast("Reset failed: " + e.message); }
+    }, 2000);
+  }
+});
 </script>
 </body>
 </html>`;

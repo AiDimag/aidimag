@@ -32,7 +32,7 @@ export default defineConfig({
     ["meta", { name: "viewport", content: "width=device-width, initial-scale=1.0" }],
     ["meta", { name: "robots", content: "index, follow" }],
     ["meta", { name: "author", content: "Anup Khanal" }],
-    ["meta", { name: "keywords", content: "AI coding assistant, AI memory, code memory, AI agent, verified memory, coding agent, Claude Code, Cursor, GitHub Copilot, MCP, Model Context Protocol, dim CLI, aiDimag, codebase memory, AI tools" }],
+    ["meta", { name: "keywords", content: "coding agent memory, codebase memory, verified memory, AI coding assistant, Claude Code memory, Cursor memory, GitHub Copilot, MCP, dim CLI, aiDimag, codebase knowledge, stale context detection, repository context for AI agents" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: "AI Dimag" }],
     ["meta", { property: "og:url", content: "https://aidimag.com" }],
@@ -42,7 +42,7 @@ export default defineConfig({
       {
         property: "og:description",
         content:
-          "Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true.",
+          "Your coding agent forgets your codebase. AIDimag doesn't. Persistent, evidence-backed memory that verifies itself against the code.",
       },
     ],
     ["meta", { property: "og:image", content: "https://aidimag.com/logo.svg" }],
@@ -50,7 +50,7 @@ export default defineConfig({
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:site", content: "@aidimag" }],
     ["meta", { name: "twitter:title", content: "AI Dimag — verified memory for AI coding agents" }],
-    ["meta", { name: "twitter:description", content: "Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true." }],
+    ["meta", { name: "twitter:description", content: "Your coding agent forgets your codebase. AIDimag doesn't. Persistent, evidence-backed memory that verifies itself against the code." }],
     ["meta", { name: "twitter:image", content: "https://aidimag.com/logo.svg" }],
     [
       "script",
@@ -109,10 +109,11 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
 
     nav: [
       { text: "Home", link: "/" },
-      { text: "Introduction", link: "/introduction" },
+      { text: "Why AIDimag", link: "/why-aidimag" },
+      { text: "Use Cases", link: "/use-cases" },
       { text: "Getting Started", link: "/getting-started" },
-      { text: "CLI Reference", link: "/cli-reference" },
-      { text: "Guides", link: "/guides/claims-and-evidence" },
+      { text: "Docs", link: "/introduction" },
+      { text: "Benchmarks", link: "/benchmarks" },
       { text: "Pricing", link: "/pricing" },
     ],
 
@@ -120,6 +121,8 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
       {
         text: "Overview",
         items: [
+          { text: "Why AIDimag?", link: "/why-aidimag" },
+          { text: "Use cases", link: "/use-cases" },
           { text: "Introduction", link: "/introduction" },
           { text: "Core concepts", link: "/concepts" },
           { text: "How it works", link: "/how-it-works" },

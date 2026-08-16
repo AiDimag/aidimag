@@ -15,7 +15,7 @@ import { verifyAll } from "../verify/engine.js";
 import { mineCommits } from "../capture/commit-miner.js";
 import { hybridSearch, indexMemory, reindexAll } from "../embeddings/search.js";
 import { readCloudConfig, writeCloudConfig, getToken, sync as cloudSync, configPath } from "../sync/client.js";
-import { resolveKnowledgeConfig, type ContextFormat } from "../config.js";
+import { resolveKnowledgeConfig, readConfig, writeConfig, type ContextFormat } from "../config.js";
 import { ingestAll, knowledgeStatus } from "../knowledge/ingest.js";
 import { isAllowedSyncServerUrl } from "../security/url.js";
 import { checkDiff } from "../verify/check.js";
@@ -173,6 +173,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
               }
             : null,
           vecAvailable: store.vecAvailable,
+          onboarded: !!readConfig(repoRoot).onboarded,
         });
         return;
       }
@@ -521,6 +522,18 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           upstream = await fetch(`${target}/v1/keys`, { headers });
         }
         json(res, upstream.status, await upstream.json());
+        return;
+      }
+
+      // ---- onboarding ----
+      if (req.method === "POST" && path === "/api/onboard") {
+        writeConfig(repoRoot, { onboarded: true });
+        json(res, 200, { ok: true });
+        return;
+      }
+      if (req.method === "POST" && path === "/api/onboard/reset") {
+        writeConfig(repoRoot, { onboarded: false });
+        json(res, 200, { ok: true });
         return;
       }
 

@@ -61,6 +61,18 @@ tool doesn't speak MCP, use [generated context files](/guides/generate-context) 
 
 `dim init` prints a ready-to-paste snippet for you.
 
+### Hermes Agent
+
+`dim hermes install` registers aidimag as a native Hermes memory provider — one command,
+no pip, no venv. A single stdlib-only Python bridge delegates to the MCP server: session
+briefings are injected into the system prompt, recall is prefetched per turn, and session
+learnings become review-queue *proposals* (never silent writes).
+
+```sh
+dim hermes install
+hermes config set memory.provider aidimag
+```
+
 ### From the MCP Registry
 
 aidimag is published to the [official MCP Registry](https://registry.modelcontextprotocol.io)
