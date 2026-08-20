@@ -29,10 +29,10 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     --ring: 199 89% 48%;
     --radius: 0.75rem;
     --surface-glow: 0 0 0 1px rgba(37, 99, 235, 0.08), 0 8px 32px rgba(37, 99, 235, 0.08);
-    --verified: #22c55e;
-    --unverified: #64748b;
-    --stale: #eab308;
-    --refuted: #ef4444;
+    --verified: #15803d;
+    --unverified: #475569;
+    --stale: #a16207;
+    --refuted: #dc2626;
     --path: #2563eb;
     --icon-stroke: #1e293b;
     --grad-highlight: #f8fafc;
@@ -50,6 +50,9 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     --surface-glow: 0 0 0 1px rgba(96, 165, 250, 0.12), 0 8px 32px rgba(0, 0, 0, 0.35);
     --path: #60a5fa;
     --unverified: #94a3b8;
+    --verified: #22c55e;
+    --stale: #eab308;
+    --refuted: #ef4444;
     --icon-stroke: #fff;
     --grad-highlight: #fff;
   }
@@ -151,12 +154,14 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   .card .claim { font-size: 13px; margin-bottom: 6px; line-height: 1.5; }
   .card .meta { font-size: 11px; color: hsl(var(--muted-foreground)); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .badge { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; border: 1px solid transparent; }
-  .badge.VERIFIED { background: color-mix(in srgb, var(--verified) 15%, transparent); color: var(--verified); }
-  .badge.UNVERIFIED { background: color-mix(in srgb, var(--unverified) 15%, transparent); color: var(--unverified); }
-  .badge.STALE { background: color-mix(in srgb, var(--stale) 15%, transparent); color: var(--stale); }
-  .badge.REFUTED { background: color-mix(in srgb, var(--refuted) 15%, transparent); color: var(--refuted); }
-  .kind { color: hsl(var(--primary)); font-weight: 500; }
+  .badge.VERIFIED { background: color-mix(in srgb, var(--verified) 20%, transparent); color: var(--verified); }
+  .badge.UNVERIFIED { background: color-mix(in srgb, var(--unverified) 20%, transparent); color: var(--unverified); }
+  .badge.STALE { background: color-mix(in srgb, var(--stale) 20%, transparent); color: var(--stale); }
+  .badge.REFUTED { background: color-mix(in srgb, var(--refuted) 20%, transparent); color: var(--refuted); }
+  .kind { font-weight: 500; }
   .actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .actions button { display: inline-flex; align-items: center; gap: 4px; }
+  .actions button svg, .actions button img { width: 14px; height: 14px; flex-shrink: 0; }
   .evidence { font-size: 11px; color: hsl(var(--muted-foreground)); font-family: ui-monospace, monospace; margin-top: 4px; word-break: break-all; }
   .legend {
     display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 16px; font-size: 11px;
@@ -244,6 +249,34 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
     font-size: 12px; padding: 6px 8px;
   }
+  /* Custom kind dropdown */
+  .kind-dropdown { position: relative; display: inline-block; }
+  .kind-dropdown-trigger {
+    display: flex; align-items: center; gap: 6px;
+    background: hsl(var(--background)); color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+    font-size: 12px; padding: 6px 10px; cursor: pointer; min-width: 160px;
+    user-select: none;
+  }
+  .kind-dropdown-trigger svg, .kind-dropdown-trigger img { width: 16px; height: 16px; flex-shrink: 0; }
+  .kind-dropdown-trigger .kind-caret { margin-left: auto; font-size: 10px; color: hsl(var(--muted-foreground)); }
+  .kind-dropdown-menu {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 50;
+    background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) - 2px); box-shadow: var(--surface-glow);
+    max-height: 280px; overflow-y: auto; display: none; margin-top: 2px;
+  }
+  .kind-dropdown-menu.open { display: block; }
+  .kind-dropdown-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 10px; cursor: pointer; font-size: 12px;
+    border-bottom: 1px solid hsl(var(--border) / 0.4);
+  }
+  .kind-dropdown-item:last-child { border-bottom: none; }
+  .kind-dropdown-item:hover { background: hsl(var(--primary) / 0.08); }
+  .kind-dropdown-item.selected { background: hsl(var(--primary) / 0.12); }
+  .kind-dropdown-item svg, .kind-dropdown-item img { width: 16px; height: 16px; flex-shrink: 0; }
+  .kind-dropdown-item .kind-label { font-weight: 500; }
   .keyrow {
     font-size: 11px; font-family: ui-monospace, monospace;
     display: flex; justify-content: space-between; align-items: center;
@@ -294,7 +327,8 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   #view-health { flex: 1; overflow-y: auto; padding: 24px clamp(16px, 5vw, 56px) 56px; }
   .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
   .health-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 16px; }
-  .health-card .label { font-size: 12px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .health-card .label { font-size: 12px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .health-card .label svg, .health-card .label img { width: 16px; height: 16px; flex-shrink: 0; }
   .health-card .value { font-size: 28px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
   .health-card .detail { font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 4px; }
   .health-card.warning .value { color: var(--stale); }
@@ -593,12 +627,13 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     <h2>Memories</h2>
     <div class="searchbar">
       <input id="q" placeholder="Search memories… (semantic when embeddings configured)" oninput="debouncedSearch()">
-      <select id="q-kind" onchange="doSearch()">
-        <option value="">all kinds</option>
-        <option>DECISION</option><option>CONVENTION</option><option>GOTCHA</option>
-        <option>FAILED_APPROACH</option><option>ARCHITECTURE</option><option>INVARIANT</option>
-        <option>TODO_CONTEXT</option><option>GUARDRAIL</option><option>SKILL</option>
-      </select>
+      <div class="kind-dropdown" id="q-kind-dd">
+        <div class="kind-dropdown-trigger" onclick="kindDropdownToggle('q-kind-dd')">
+          <span class="kind-trigger-icon"></span><span class="kind-trigger-label">all kinds</span><span class="kind-caret">▼</span>
+        </div>
+        <div class="kind-dropdown-menu"></div>
+      </div>
+      <input type="hidden" id="q-kind" value="">
     </div>
     <div id="memories"></div>
   </aside>
@@ -643,11 +678,13 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   <label>Claim (write it falsifiable — something a check could verify)</label>
   <textarea id="nm-claim" placeholder="All DB access goes through src/db/store.ts; nothing else imports better-sqlite3"></textarea>
   <label>Kind</label>
-  <select id="nm-kind" onchange="toggleGuardrailLevel()">
-    <option>DECISION</option><option>CONVENTION</option><option>GOTCHA</option>
-    <option>FAILED_APPROACH</option><option>ARCHITECTURE</option><option>INVARIANT</option>
-    <option>TODO_CONTEXT</option><option>GUARDRAIL</option><option>SKILL</option>
-  </select>
+  <div class="kind-dropdown" id="nm-kind-dd">
+    <div class="kind-dropdown-trigger" onclick="kindDropdownToggle('nm-kind-dd')">
+      <span class="kind-trigger-icon"></span><span class="kind-trigger-label">DECISION</span><span class="kind-caret">▼</span>
+    </div>
+    <div class="kind-dropdown-menu"></div>
+  </div>
+  <input type="hidden" id="nm-kind" value="DECISION">
   <div id="guardrail-section" style="display:none;">
     <label>Guardrail Level</label>
     <select id="nm-guardrail-level">
@@ -873,7 +910,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
 </div>
 
 <script>
-const COLORS = { VERIFIED: "#22c55e", UNVERIFIED: "#94a3b8", STALE: "#eab308", REFUTED: "#ef4444" };
+const COLORS = { VERIFIED: "#15803d", UNVERIFIED: "#475569", STALE: "#a16207", REFUTED: "#dc2626" };
 let state = null;
 let csrfToken = null;
 
@@ -1201,10 +1238,10 @@ function renderProposals() {
   el.innerHTML = state.proposals.map(p => \`
     <div class="card">
       <div class="claim">\${esc(p.claim)}</div>
-      <div class="meta"><span class="kind">\${p.kind}</span><span>via \${esc(p.source)}</span>\${p.ticketRef ? \`<span>\${IC_TICKET} \${esc(p.ticketRef)}</span>\` : ""}</div>
+      <div class="meta"><span class="kind" style="color:\${KIND_COLORS[p.kind] || 'hsl(var(--primary))'}">\${p.kind}</span><span>via \${esc(p.source)}</span>\${p.ticketRef ? \`<span>\${IC_TICKET} \${esc(p.ticketRef)}</span>\` : ""}</div>
       <div class="actions">
-        <button class="primary" onclick="act('/api/proposals/\${p.id}/approve','approved')">Approve</button>
-        <button class="danger" onclick="act('/api/proposals/\${p.id}/reject','rejected')">Reject</button>
+        <button class="primary" onclick="act('/api/proposals/\${p.id}/approve','approved')">\${IC_THUMBUP} Approve</button>
+        <button class="danger" onclick="act('/api/proposals/\${p.id}/reject','rejected')">\${IC_THUMBDOWN} Reject</button>
       </div>
     </div>\`).join("");
 }
@@ -1219,17 +1256,17 @@ function renderMemories(list) {
       <div class="meta">
         <span class="badge \${m.status}">\${m.status}</span>
         \${m.pinned ? '<span class="badge" title="Pinned: never decays with age (evidence failure can still mark it stale)">PINNED</span>' : ""}
-        <span class="kind">\${m.kind}</span>
+        <span class="kind" style="color:\${KIND_COLORS[m.kind] || 'hsl(var(--primary))'}">\${m.kind}</span>
         <span>conf \${m.confidence.toFixed(2)}</span>
         \${m.scope.paths.length ? "<span>" + IC_FOLDER + " " + esc(m.scope.paths.join(", ")) + "</span>" : "<span>repo-wide</span>"}
       </div>
       \${m.grounding.map(e => \`<div class="evidence">\${e.type}(\${e.result}) \${esc(e.payload)}</div>\`).join("")}
       <div class="actions">
         \${m.pinned
-          ? \`<button onclick="act('/api/memories/\${m.id}/unpin','unpinned')">Unpin</button>\`
-          : \`<button onclick="act('/api/memories/\${m.id}/pin','pinned')">Pin</button>\`}
-        \${m.status !== "REFUTED" ? \`<button class="danger" onclick="act('/api/memories/\${m.id}/refute','refuted')">Refute</button>\` : ""}
-        <button class="danger" onclick="if(confirm('Delete permanently?'))act('/api/memories/\${m.id}/forget','forgotten')">Forget</button>
+          ? \`<button onclick="act('/api/memories/\${m.id}/unpin','unpinned')">\${IC_UNPIN} Unpin</button>\`
+          : \`<button onclick="act('/api/memories/\${m.id}/pin','pinned')">\${IC_PIN_BTN} Pin</button>\`}
+        \${m.status !== "REFUTED" ? \`<button class="danger" onclick="act('/api/memories/\${m.id}/refute','refuted')">\${IC_REFUTE} Refute</button>\` : ""}
+        <button class="danger" onclick="if(confirm('Delete permanently?'))act('/api/memories/\${m.id}/forget','forgotten')">\${IC_FORGET} Forget</button>
       </div>
     </div>\`).join("");
 }
@@ -1561,6 +1598,87 @@ async function keyList() {
 
 ${ICONS_JS}
 
+const KIND_ICONS = {
+  DECISION: IC_DECISION,
+  CONVENTION: IC_CONVENTION,
+  GOTCHA: IC_GOTCHA,
+  FAILED_APPROACH: IC_FAILED,
+  ARCHITECTURE: IC_ARCH,
+  INVARIANT: IC_INVARIANT,
+  TODO_CONTEXT: IC_TODO,
+  GUARDRAIL: IC_GUARDRAIL,
+  SKILL: IC_SKILL,
+};
+const KIND_LIST = ["DECISION", "CONVENTION", "GOTCHA", "FAILED_APPROACH", "ARCHITECTURE", "INVARIANT", "TODO_CONTEXT", "GUARDRAIL", "SKILL"];
+const KIND_COLORS = {
+  DECISION: "#2563eb",
+  CONVENTION: "#0284c7",
+  GOTCHA: "#a16207",
+  FAILED_APPROACH: "#dc2626",
+  ARCHITECTURE: "#7c3aed",
+  INVARIANT: "#d97706",
+  TODO_CONTEXT: "#0891b2",
+  GUARDRAIL: "#059669",
+  SKILL: "#db2777",
+};
+
+function initKindDropdown(ddId, hiddenId, includeAll, onChange) {
+  const dd = document.getElementById(ddId);
+  if (!dd) return;
+  const menu = dd.querySelector(".kind-dropdown-menu");
+  const triggerIcon = dd.querySelector(".kind-trigger-icon");
+  const triggerLabel = dd.querySelector(".kind-trigger-label");
+  const hidden = document.getElementById(hiddenId);
+  const items = [];
+  if (includeAll) {
+    items.push({ value: "", icon: "", label: "all kinds" });
+  }
+  for (const k of KIND_LIST) {
+    items.push({ value: k, icon: KIND_ICONS[k], label: k });
+  }
+  menu.innerHTML = items.map(it =>
+    '<div class="kind-dropdown-item" data-value="' + it.value + '">' +
+    (it.icon ? it.icon : "") +
+    '<span class="kind-label" style="color:' + (it.value ? (KIND_COLORS[it.value] || 'hsl(var(--foreground))') : "hsl(var(--muted-foreground))") + '">' + it.label + '</span></div>'
+  ).join("");
+  const selectItem = (value) => {
+    const item = items.find(it => it.value === value);
+    if (!item) return;
+    hidden.value = value;
+    triggerIcon.innerHTML = item.icon || "";
+    triggerLabel.textContent = item.label;
+    triggerLabel.style.color = value ? (KIND_COLORS[value] || 'hsl(var(--foreground))') : 'hsl(var(--muted-foreground))';
+    menu.querySelectorAll(".kind-dropdown-item").forEach(el => {
+      el.classList.toggle("selected", el.dataset.value === value);
+    });
+    if (onChange) onChange(value);
+  };
+  menu.querySelectorAll(".kind-dropdown-item").forEach(el => {
+    el.onclick = () => {
+      selectItem(el.dataset.value);
+      kindDropdownCloseAll();
+    };
+  });
+  selectItem(hidden.value || (includeAll ? "" : "DECISION"));
+}
+
+function kindDropdownToggle(ddId) {
+  const dd = document.getElementById(ddId);
+  if (!dd) return;
+  const menu = dd.querySelector(".kind-dropdown-menu");
+  const isOpen = menu.classList.contains("open");
+  kindDropdownCloseAll();
+  if (!isOpen) menu.classList.add("open");
+}
+
+function kindDropdownCloseAll() {
+  document.querySelectorAll(".kind-dropdown-menu.open").forEach(m => m.classList.remove("open"));
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".kind-dropdown")) kindDropdownCloseAll();
+});
+
 const _DIALOG_ICON_MAP = { '＋': IC_PLUS, '☁': IC_CLOUD, '🎫': IC_TICKET, '✏️': IC_PENCIL, '🧭': IC_COMPASS, '👁': IC_EYE, '🦙': IC_LLAMA, '🧮': IC_ABACUS, '👥': IC_PEOPLE, '🔑': IC_KEY };
 function replaceDialogIcons() {
   document.querySelectorAll('dialog h3').forEach(function(h) {
@@ -1864,10 +1982,11 @@ async function loadHealth() {
 }
 
 function riskColor(score) {
-  if (score >= 80) return COLORS.REFUTED;
-  if (score >= 60) return "#f97316";
-  if (score >= 30) return COLORS.STALE;
-  return COLORS.VERIFIED;
+  const dark = document.documentElement.classList.contains("dark");
+  if (score >= 80) return dark ? "#ef4444" : COLORS.REFUTED;
+  if (score >= 60) return dark ? "#f97316" : "#ea580c";
+  if (score >= 30) return dark ? "#eab308" : COLORS.STALE;
+  return dark ? "#22c55e" : COLORS.VERIFIED;
 }
 
 function riskLevel(score) {
@@ -1898,15 +2017,15 @@ function renderHealth() {
 
   // Summary metrics grid
   html += '<div class="health-section"><h3>Memory Summary</h3><div class="health-grid">';
-  html += healthCard("Total Memories", s.total, "good", IC_BRAIN);
+  html += healthCard("Total Memories", s.total, "good", state.cloud ? (state.cloud.server && state.cloud.server.includes("cloud.aidimag.com") ? SVG_AIDIMAG: IC_BRAIN) : IC_BRAIN);
   html += healthCard("Verified", s.byStatus.VERIFIED, "good", IC_CHECK_C);
-  html += healthCard("Unverified", s.unverified, s.unverified > 5 ? "warning" : "", IC_CIRCLE);
-  html += healthCard("Stale", s.stale, s.stale > 0 ? "warning" : "good", IC_HOURGLASS);
+  html += healthCard("Unverified", s.unverified, s.unverified > 5 ? "warning" : "", IC_CANCEL);
+  html += healthCard("Stale", s.stale, s.stale > 0 ? "warning" : "good", IC_SCROLL_OLD);
   html += healthCard("Refuted", s.refuted, s.refuted > 0 ? "danger" : "good", IC_WARN);
-  html += healthCard("Failed Approaches", s.failedApproaches, s.failedApproaches > 0 ? "warning" : "", IC_TRASH);
-  html += healthCard("Pending Proposals", s.pendingProposals, s.pendingProposals > 0 ? "warning" : "", IC_CLIP);
-  html += healthCard("Pinned", s.pinned, "good", IC_DIAMOND);
-  html += healthCard("Coverage Paths", s.coveragePaths, "", IC_FOLDER);
+  html += healthCard("Failed Approaches", s.failedApproaches, s.failedApproaches > 0 ? "warning" : "", IC_STOP);
+  html += healthCard("Pending Proposals", s.pendingProposals, s.pendingProposals > 0 ? "warning" : "", IC_HOURGLASS);
+  html += healthCard("Pinned", s.pinned, "good", IC_PIN);
+  html += healthCard("Coverage Paths", s.coveragePaths, "", IC_PATH);
   html += '</div></div>';
 
   // Coverage heatmap
@@ -1940,7 +2059,7 @@ function renderHealth() {
       for (const d of a.verifyTrend) {
         const passRate = d.passRate ?? (d.total > 0 ? Math.round((d.verified / d.total) * 100) : 0);
         const heightPct = Math.max(2, (d.total / maxVal) * 100);
-        const color = passRate >= 80 ? COLORS.VERIFIED : passRate >= 50 ? COLORS.STALE : COLORS.REFUTED;
+        const color = riskColor(passRate >= 80 ? 20 : passRate >= 50 ? 40 : 85);
         html += '<div class="trend-bar" style="height:' + heightPct + '%;background:' + color + '">';
         html += '<div class="tooltip">' + d.date + ': ' + d.verified + '/' + d.total + ' (' + passRate + '%)</div>';
         html += '</div>';
@@ -2052,7 +2171,7 @@ function renderHealth() {
     html += '<div class="health-section"><h3>Oldest Stale Memories</h3>';
     for (const m of h.oldestStale) {
       html += '<div class="card" style="margin-bottom:8px"><div class="claim">' + esc(m.claim) + '</div>';
-      html += '<div class="meta"><span class="kind">' + m.kind + '</span><span class="status-' + m.status.toLowerCase() + '">' + m.status + '</span></div></div>';
+      html += '<div class="meta"><span class="kind" style="color:' + (KIND_COLORS[m.kind] || 'hsl(var(--primary))') + '">' + m.kind + '</span><span class="status-' + m.status.toLowerCase() + '">' + m.status + '</span></div></div>';
     }
     html += '</div>';
   }
@@ -2635,7 +2754,7 @@ async function runAudit() {
     const r = await api("/api/audit");
     const body = r.findings.length
       ? r.findings.map((f) =>
-          '<div class="out-row"><div class="out-content"><b>risk ' + f.risk + '</b> · <span class="kind">' + f.memory.kind + '</span> ' + esc(f.memory.claim) +
+          '<div class="out-row"><div class="out-content"><b>risk ' + f.risk + '</b> · <span class="kind" style="color:' + (KIND_COLORS[f.memory.kind] || 'hsl(var(--primary))') + '">' + f.memory.kind + '</span> ' + esc(f.memory.claim) +
           '<div class="out-meta">' + f.reasons.map(esc).join(" · ") + '</div></div></div>').join("")
       : '<div class="empty">Nothing risky found — your memory rests on solid ground.</div>';
     showOutput(IC_SEARCH + " Provenance audit — weakest-ground memories first", body, r.findings.length ? [
@@ -2692,7 +2811,7 @@ async function runCheck() {
       '<div class="out-meta" style="margin-bottom:8px">' + r.changedFiles.length + ' changed file(s) · ' + r.checked + ' memories checked</div>' +
       (r.violations.length
         ? r.violations.map((v) =>
-            '<div class="out-row">' + (v.severity === "fail" ? IC_WARN : IC_WARN) + ' <div class="out-content"><b>' + v.severity.toUpperCase() + '</b> · <span class="kind">' + v.memory.kind + '</span> ' + esc(v.memory.claim) +
+            '<div class="out-row">' + (v.severity === "fail" ? IC_WARN : IC_WARN) + ' <div class="out-content"><b>' + v.severity.toUpperCase() + '</b> · <span class="kind" style="color:' + (KIND_COLORS[v.memory.kind] || 'hsl(var(--primary))') + '">' + v.memory.kind + '</span> ' + esc(v.memory.claim) +
             '<div class="out-meta">' + esc(v.detail) + '</div></div></div>').join("")
         : '<div class="empty">' + IC_CHECK_C + ' No contradictions — your staged diff agrees with active memory.</div>');
     showOutput(IC_FLASK + " Check staged changes", body);
@@ -3446,6 +3565,8 @@ function renderGraph() {
 window.addEventListener("resize", () => state && renderGraph());
 replaceDialogIcons();
 initTkDropdownIcons();
+initKindDropdown("q-kind-dd", "q-kind", true, () => doSearch());
+initKindDropdown("nm-kind-dd", "nm-kind", false, (v) => toggleGuardrailLevel());
 load();
 // Reset onboarding: hold Shift+R+O for 2 seconds on the dashboard
 let _resetTimer = null;
