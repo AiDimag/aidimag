@@ -6,7 +6,12 @@ dist/
 # IDE / tool state
 .idea/
 .vscode/
-.aidimag/
+
+# aidimag — ignore sensitive files, but allow critical-areas.* to be committed
+.aidimag/memory.db
+.aidimag/memory.db-wal
+.aidimag/memory.db-shm
+.aidimag/config.json
 
 # VitePress docs build output + cache
 docs/.vitepress/dist/

@@ -117,7 +117,23 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
         const current = existsSync(rootIgnore) ? readFileSync(rootIgnore, "utf8") : "";
         const folder = resolveKnowledgeConfig(root).folder;
         const additions: string[] = [];
-        if (!current.includes(".aidimag")) additions.push(".aidimag");
+        // Ignore sensitive .aidimag files, but allow critical-areas.* to be committed for team sharing
+        const aidimagIgnores = [
+          ".aidimag/memory.db",
+          ".aidimag/memory.db-wal",
+          ".aidimag/memory.db-shm",
+          ".aidimag/config.json",
+        ];
+        for (const entry of aidimagIgnores) {
+          if (!current.includes(entry)) additions.push(entry);
+        }
+        // Negation: if .aidimag/ is already ignored, un-ignore the critical-areas config so it can be committed
+        if (current.includes(".aidimag/") || current.includes(".aidimag")) {
+          if (!current.includes("!.aidimag/")) additions.push("!.aidimag/");
+          if (!current.includes("!.aidimag/critical-areas.yml")) additions.push("!.aidimag/critical-areas.yml");
+          if (!current.includes("!.aidimag/critical-areas.yaml")) additions.push("!.aidimag/critical-areas.yaml");
+          if (!current.includes("!.aidimag/critical-areas.json")) additions.push("!.aidimag/critical-areas.json");
+        }
         if (!current.includes(folder)) additions.push(folder);
         // generated context files (users can commit them if they want, but default is gitignored)
         if (!current.includes("CLAUDE.md")) additions.push("CLAUDE.md");
@@ -127,7 +143,7 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
         if (!current.includes(".github/copilot-instructions.md")) additions.push(".github/copilot-instructions.md");
         if (additions.length) {
           appendFileSync(rootIgnore, `${current.endsWith("\n") || current === "" ? "" : "\n"}${additions.join("\n")}\n`);
-          console.log(`\nUpdated ${rootIgnore} (ignored memory.db + ${folder}/ drops + generated context files)`);
+          console.log(`\nUpdated ${rootIgnore} (ignored .aidimag/memory.db + config.json + ${folder}/ drops + generated context files; critical-areas.* is committable)`);
         }
       }
       console.log(`\nNext: \`dim bootstrap\` gives this repo an instant starter brain (surveys docs/structure/history, queues reviewable memories).`);
