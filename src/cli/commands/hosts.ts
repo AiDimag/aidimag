@@ -69,16 +69,60 @@ export function registerHostCommands(program: Command): void {
     .command("generate-context")
     .description("Render trustworthy memory into a static context file (CLAUDE.md, .cursorrules, .windsurfrules, AGENTS.md, copilot-instructions) for non-MCP AI tools")
     .option("-f, --format <format>", "claude | cursorrules | copilot | windsurfrules | agents | all", "claude")
+    .option("--check", "Check for drift instead of writing: reports missing/stale rules per context file")
+    .option("--fix", "With --check: auto-regenerate files when drift is detected")
     .option("--auto", "Also persist generateContext.auto in .aidimag/config.json so verify/review/sync keep it fresh")
     .option("--no-auto", "Disable auto-regeneration (clears generateContext.auto)")
     .action(async (opts) => {
       const root = findRepoRoot() ?? fail("not inside a repo");
       const store = MemoryStore.open(root);
-      const { generateContext } = await import("../../context/generate.js");
       const format = String(opts.format).toLowerCase();
       if (!["claude", "cursorrules", "copilot", "windsurfrules", "agents", "all"].includes(format)) {
         fail(`invalid --format '${opts.format}'. Use: claude | cursorrules | copilot | windsurfrules | agents | all`);
       }
+
+      if (opts.check) {
+        const { detectDrift } = await import("../../context/drift.js");
+        const report = detectDrift(store, root, format);
+        if (report.summary.checked === 0) {
+          console.log("No context files checked.");
+        } else if (report.summary.totalMissing === 0 && report.summary.totalStale === 0) {
+          console.log(`✅ All ${report.summary.checked} context file(s) are in sync with the memory store.`);
+        } else {
+          console.log(`⚠️ Drift detected across ${report.summary.checked} context file(s):`);
+          for (const f of report.files) {
+            if (f.missing.length === 0 && f.stale.length === 0) {
+              console.log(`\n  ✅ ${f.file}: in sync`);
+              continue;
+            }
+            console.log(`\n  ⚠️ ${f.file}`);
+            if (f.missing.length) {
+              console.log(`    Missing (${f.missing.length} / ${f.totalInStore}):`);
+              for (const m of f.missing.slice(0, 10)) {
+                console.log(`      - [${m.kind}] ${m.claim}`);
+              }
+              if (f.missing.length > 10) console.log(`      ... and ${f.missing.length - 10} more`);
+            }
+            if (f.stale.length) {
+              console.log(`    Stale (${f.stale.length}):`);
+              for (const c of f.stale.slice(0, 10)) console.log(`      - ${c}`);
+              if (f.stale.length > 10) console.log(`      ... and ${f.stale.length - 10} more`);
+            }
+          }
+
+          if (opts.fix) {
+            const { generateContext } = await import("../../context/generate.js");
+            const r = generateContext(store, root, format as never);
+            console.log(`\n🔧 Auto-fixed: regenerated ${r.files.join(", ")} — ${r.total} memories (${r.pinned} pinned).`);
+          } else {
+            process.exitCode = 2;
+          }
+        }
+        store.close();
+        return;
+      }
+
+      const { generateContext } = await import("../../context/generate.js");
       const r = generateContext(store, root, format as never);
       console.log(`📝 Wrote ${r.files.join(", ")} — ${r.total} memories (${r.pinned} pinned).`);
       if (r.total === 0) {

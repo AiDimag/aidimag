@@ -35,7 +35,7 @@ recalls them at session start and when working on relevant files.
 ```sh
 dim remember "The API layer is stateless; all state lives in src/db/store.ts" \
   -k ARCHITECTURE -p src/api -p src/db \
-  -e "STATIC_CHECK:grep -rL 'useState\|useState' src/api --include=*.ts"
+  -e "STATIC_CHECK:! grep -rl 'useState' src/api --include=*.ts"
 ```
 
 When someone adds stateful logic to the API layer, the memory goes **STALE** — the agent is
@@ -53,7 +53,7 @@ with [guardrails](/guides/guardrails) and pre-commit `dim check`.
 # Convention with evidence
 dim remember "All API endpoints are registered in src/api/routes.ts" \
   -k CONVENTION -p src/api \
-  -e "STATIC_CHECK:grep -rL 'router\.' src/api --include=*.ts --exclude=routes.ts"
+  -e "STATIC_CHECK:! grep -rl 'router\.' src/api --include=*.ts --exclude=routes.ts"
 
 # Guardrail the agent must obey
 dim remember "Never call the production payments API from tests; use the sandbox client" \
@@ -170,6 +170,156 @@ dim review   # approve the summarized proposals
 
 See [Knowledgebase](/guides/knowledgebase).
 
+## Learning from incidents
+
+**Problem:** A production incident or CI failure reveals a failed approach, but the lesson
+stays in a postmortem doc that nobody re-reads. Next sprint, the agent suggests the same
+broken pattern.
+
+**With AIDimag:** `dim capture incident` reads a JSON or markdown incident report and
+proposes a `FAILED_APPROACH` memory with provenance evidence (commit ref, ticket ref,
+failed command, CI URL). `dim capture ci-log` parses raw CI failure logs from files or
+stdin, extracting error lines, failed commands, file paths, and commit SHAs. After review,
+the memory blocks future attempts.
+
+```sh
+dim capture incident postmortem-payments-retry-storm.md
+dim capture incident incident.json --llm   # LLM synthesizes a richer claim
+dim capture ci-log ci-failure.log          # parse raw CI log
+dim capture ci-log - < actions-output.txt  # pipe from stdin
+dim review                                  # approve the proposal
+```
+
+## Protecting critical code
+
+**Problem:** Certain paths — authentication, payments, PII handling, database migrations —
+are too sensitive for unsupervised agent changes. But nothing stops the agent from editing
+them.
+
+**With AIDimag:** Define critical areas in `.aidimag/critical-areas.yml` with required
+owners, approval tokens, and block/warn mode. `dim check` enforces: changes to critical
+paths without the approval token in the commit message are flagged or blocked.
+
+```yaml
+# .aidimag/critical-areas.yml
+areas:
+  - label: Authentication
+    paths: [src/auth]
+    owners: [alice@example.com]
+    block: true
+    approvalToken: "[AUTH-OK]"
+```
+
+```sh
+git commit -m "refactor auth middleware [AUTH-OK]"   # passes
+git commit -m "refactor auth middleware"              # blocked by dim check --block
+```
+
+## Change-risk scoring
+
+**Problem:** Some changes are riskier than others — they touch guardrails, critical areas,
+or memories with low confidence. But all changes look the same to the agent.
+
+**With AIDimag:** `dim check` computes a 0–100 risk score from violation severity, memory
+kind/status/confidence, evidence count, critical-area membership, and change breadth. The
+score and its factors are displayed alongside the check output, so reviewers know where to
+focus.
+
+```
+Risk Score: 72/100 [HIGH]
+  ██████████████░░░░░░
+  Factors:
+    +48 GUARDRAIL violation (fail) — never modify schema without approval
+    +25 Critical area: Migrations — 3 file(s) touched
+```
+
+## Compliance and audit trail
+
+**Problem:** For regulated teams, you need to prove who approved each memory, what evidence
+supports it, and that the history hasn't been tampered with.
+
+**With AIDimag:** Every memory-lifecycle event is recorded in an append-only event log.
+`dim audit export` produces a tamper-evident, SHA-256 chained export (JSON or CSV) suitable
+for compliance review. `dim audit verify` confirms integrity of a previous export.
+
+```sh
+dim audit export --format json --output audit-2026-08.json
+dim audit verify audit-2026-08.json    # ✓ no tampering detected
+```
+
+## Team knowledge health
+
+**Problem:** You've been using AIDimag for months. Which areas of the codebase have
+well-covered knowledge, and which are gaps? Are memories going stale? Are there
+unreviewed proposals piling up?
+
+**With AIDimag:** `dim health` prints a dashboard with memory counts by status/kind, pinned
+and pending proposal counts, per-path risk scores, oldest stale memories, and actionable
+suggestions. `dim ui` includes a Health tab with an interactive risk score banner, coverage
+heatmap of top risk paths, verify pass-rate trend chart, token usage trends, proposal
+throughput metrics, and agent activity breakdown.
+
+```sh
+dim health              # text dashboard
+dim health --format json # machine-readable
+dim ui                   # open web dashboard with Health tab
+```
+
+## Cross-agent instruction drift
+
+**Problem:** You generate context files for Claude Code, Cursor, and Copilot — but over
+time, the memory store evolves and the generated files go stale. Agents start following
+outdated rules.
+
+**With AIDimag:** `dim generate-context --check` compares generated context files against
+the memory store, reports missing or stale rules per agent, and exits non-zero on drift.
+Run it in CI to catch drift before agents do.
+
+```sh
+dim generate-context --check   # exits 2 if any agent's context is out of sync
+```
+
+## Memory retention and cleanup
+
+**Problem:** Over time, the memory store accumulates old agent-authored memories with no
+evidence — they were useful once but are now just noise that dilutes recall quality.
+
+**With AIDimag:** `dim retention` auto-forgets memories older than a configurable threshold
+that have no supporting evidence. STALE memories can be cleaned up on a separate schedule.
+Pinned, human-authored, and REFUTED memories are always preserved.
+
+```sh
+dim retention --dry-run --max-age-days 90   # preview
+dim retention --max-age-days 90              # execute
+```
+
+## Role-based access control
+
+**Problem:** On a shared sync server, not everyone should have the same access. Junior devs
+might only need read access, while team leads need write, and only admins should manage keys.
+
+**With AIDimag:** `dim users` manages RBAC roles on the sync server. Three roles — `admin`,
+`member`, `viewer` — can be assigned globally or overridden per brain.
+
+```sh
+dim users create --username alice --role member
+dim users set-role --user-id <uuid> --role viewer --brain restricted-repo
+```
+
+## Single sign-on (OIDC)
+
+**Problem:** Teams already have an identity provider (Google, Okta, Azure AD). They don't want
+to manage separate credentials for the sync server.
+
+**With AIDimag:** `dim oidc` configures an OIDC provider on the sync server. Users authenticate
+via their existing IdP, and the `sub` claim maps to an aidimag user account.
+
+```sh
+dim oidc set --issuer https://accounts.google.com \
+  --client-id ... --client-secret ... \
+  --redirect-uri https://your-server/v1/auth/oidc/callback
+```
+
 ---
 
-Next: **[Getting started](/getting-started)** · **[Why AIDimag?](/why-aidimag)** · **[How it works](/how-it-works)**
+Next: **[Introduction](/introduction)**.

@@ -194,3 +194,7 @@ Raw data for every run lives in
 [`benchmark/results/`](https://github.com/AiDimag/aidimag/tree/main/benchmark/results)
 as versioned JSON so regressions can be diffed release-over-release.
 
+---
+
+Next: **[Writing claims & evidence](/guides/claims-and-evidence)**.
+

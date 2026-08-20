@@ -135,7 +135,7 @@ Memory ids accept an 8-char prefix everywhere.
 ## 3. MCP tools (for reference — what agents see)
 
 `memory_search`, `memory_get_for_files`, `memory_write`, `memory_refute`, `memory_status`,
-`scratchpad_write`, `scratchpad_read`, `scratchpad_clear`, `memory_verify`, `memory_propose`,
+`memory_check_change`, `scratchpad_write`, `scratchpad_read`, `scratchpad_clear`, `memory_verify`, `memory_propose`,
 `context_note`, `memory_critique`, `ticket_get`, `commits_mine`, `proposals_pending`,
 `knowledge_pending`, `knowledge_ingest_submit`, `knowledge_ingest`, `session_end_extraction`,
 `session_start`.

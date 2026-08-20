@@ -248,6 +248,7 @@ export function finalizeDoc(
       paths: c.paths,
       symbols: c.symbols,
       guardrailLevel: c.guardrailLevel,
+      appliesWhen: c.appliesWhen,
       source,
       sourceRef,
       rationale: c.rationale ?? `Extracted from ${doc.file}`,

@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { MemoryStore, findRepoRoot } from "../../db/store.js";
 import { mineCommits, describeMineResult } from "../../capture/commit-miner.js";
-import { fail, autoSync, maybeRegenerateContext, printProposal, createPrompter } from "../shared.js";
+import { fail, autoSync, maybeRegenerateContext, printProposal, createPrompter, promptOllamaSetup } from "../shared.js";
 
 /**
  * Conversational review: walk the queue one proposal at a time —
@@ -122,7 +122,10 @@ export function registerCaptureCommands(program: Command): void {
         const r = await minePrs(store, root, { max: opts.max ? parseInt(opts.max, 10) : undefined, all: Boolean(opts.full) });
         if (!r.provider) {
           store.close();
-          fail("no LLM provider available — review threads need synthesis; run Ollama or set OPENAI_API_KEY (see AIDIMAG_LLM)");
+          const ok = await promptOllamaSetup("llm");
+          if (!ok) fail("no LLM provider available — run `dim setup-ollama` or set OPENAI_API_KEY (see AIDIMAG_LLM)");
+          store.close();
+          return;
         }
         console.log(
           `Scanned ${r.scanned} merged PR(s) with ${r.provider}: ${r.proposed.length} proposal(s) queued` +
@@ -146,7 +149,9 @@ export function registerCaptureCommands(program: Command): void {
         res = r;
         llmProvider = r.provider;
         if (!llmProvider && !opts.quiet) {
-          console.log("(no LLM provider available — fell back to keyword mining; run Ollama or set OPENAI_API_KEY)");
+          console.log("(no LLM provider available — fell back to keyword mining)");
+          const ok = await promptOllamaSetup("llm");
+          if (ok) console.log("(re-run with --llm to use the LLM provider)");
         }
       } else {
         res = mineCommits(store, root, {
@@ -189,7 +194,8 @@ export function registerCaptureCommands(program: Command): void {
       if (res.alreadyBootstrapped) {
         console.log("Already bootstrapped — use --force to re-run (dedupe absorbs repeats).");
       } else if (!res.provider) {
-        fail("no LLM provider available — run Ollama locally or set OPENAI_API_KEY (see AIDIMAG_LLM)");
+        const ok = await promptOllamaSetup("llm");
+        if (!ok) fail("no LLM provider available — run `dim setup-ollama` or set OPENAI_API_KEY (see AIDIMAG_LLM)");
       } else {
         console.log(
           `Surveyed ${res.surveyedFiles.length} file(s) with ${res.provider}: ` +
@@ -242,7 +248,8 @@ export function registerCaptureCommands(program: Command): void {
         console.log("No AI-chat transcripts found for this repo (checked Claude Code, Codex CLI, Copilot/VS Code, Cursor).");
         console.log("Transcripts appear after your first chat session in this repo. Devin is cloud-hosted and can't be harvested locally.");
       } else if (!res.provider) {
-        fail("no LLM provider available — run Ollama locally or set OPENAI_API_KEY (see AIDIMAG_LLM)");
+        const ok = await promptOllamaSetup("llm");
+        if (!ok) fail("no LLM provider available — run `dim setup-ollama` or set OPENAI_API_KEY (see AIDIMAG_LLM)");
       } else if (res.sessionsScanned === 0) {
         const names = res.sources.map((s) => s.label).join(", ");
         console.log(`No new sessions since the last harvest (sources: ${names}). Use --all to rescan everything.`);
@@ -350,6 +357,125 @@ export function registerCaptureCommands(program: Command): void {
         } else {
           console.log(`Removed ${removed} resolved proposal row(s). Run \`dim sync\` to propagate deletions.`);
           await autoSync(store);
+        }
+      } finally {
+        store.close();
+      }
+    });
+
+  program
+    .command("capture")
+    .description("Capture from external sources (incident reports, CI failures)")
+    .argument("<type>", "Source type: incident | ci-log")
+    .argument("[file]", "Path to the incident report (JSON, markdown) or CI log (.log, .txt). Use '-' for stdin. Omit when using --github or --batch.")
+    .option("--llm", "Use an LLM provider to synthesize a richer claim (needs Ollama/OPENAI_API_KEY)")
+    .option("--github [run-id]", "Fetch failed GitHub Actions run logs via `gh` CLI. Use 'latest' or a numeric run ID. Requires gh CLI authenticated.")
+    .option("--batch <dir>", "Bulk ingest all incident reports from a directory (JSON, markdown, .log, .txt files)")
+    .action(async (type, file, opts) => {
+      const root = findRepoRoot() ?? fail("not inside a repo");
+      const store = MemoryStore.open(root, { create: true });
+      try {
+        const { parseReport, parseCiLog, mineIncident } = await import("../../capture/incident-miner.js");
+
+        // --github: fetch failed run logs from GitHub Actions
+        if (opts.github) {
+          if (type !== "ci-log") fail("--github is only valid with 'ci-log' type");
+          const { execFileSync: exec } = await import("node:child_process");
+          const runId = typeof opts.github === "string" ? opts.github : "latest";
+
+          let rawLog: string;
+          try {
+            if (runId === "latest") {
+              // Find the most recent failed run
+              const runsJson = exec("gh", ["run", "list", "--status", "failure", "--limit", "1", "--json", "databaseId,databaseId"], { cwd: root, encoding: "utf8" });
+              const runs = JSON.parse(runsJson);
+              if (!runs.length) {
+                console.log("No failed GitHub Actions runs found.");
+                return;
+              }
+              const id = runs[0].databaseId;
+              rawLog = exec("gh", ["run", "view", String(id), "--log-failed"], { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+            } else {
+              rawLog = exec("gh", ["run", "view", runId, "--log-failed"], { cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+            }
+          } catch (e) {
+            fail(`Failed to fetch GitHub Actions logs via gh CLI: ${(e as Error).message}\nEnsure gh is installed and authenticated (gh auth login).`);
+          }
+
+          const report = parseCiLog(rawLog);
+          const result = await mineIncident(store, report, { llm: Boolean(opts.llm) });
+
+          if (result.proposed.length === 0) {
+            console.log("No new proposal — a duplicate of this CI failure was already queued.");
+          } else {
+            console.log("📋 Captured 1 FAILED_APPROACH proposal from GitHub Actions CI log.");
+            for (const p of result.proposed) printProposal(p);
+            console.log("\nReview with `dim review`.");
+          }
+          return;
+        }
+
+        // --batch: bulk ingest from a directory
+        if (opts.batch) {
+          if (type !== "incident") fail("--batch is only valid with 'incident' type");
+          const { readdirSync } = await import("node:fs");
+          const dir = opts.batch;
+          let files: string[];
+          try {
+            files = readdirSync(dir).filter((f) => /\.(json|md|log|txt)$/i.test(f)).map((f) => path.join(dir, f));
+          } catch {
+            fail(`Cannot read directory: ${dir}`);
+          }
+          if (files.length === 0) {
+            console.log(`No report files found in ${dir}`);
+            return;
+          }
+
+          let proposed = 0;
+          let skipped = 0;
+          for (const f of files) {
+            try {
+              const report = parseReport(f);
+              const result = await mineIncident(store, report, { llm: Boolean(opts.llm) });
+              proposed += result.proposed.length;
+              skipped += result.skippedDuplicates;
+            } catch (e) {
+              console.error(`  ⚠ Failed to parse ${path.basename(f)}: ${(e as Error).message}`);
+            }
+          }
+          console.log(`📋 Batch capture: ${proposed} proposal(s) queued, ${skipped} duplicate(s) skipped from ${files.length} file(s).`);
+          console.log("Review with `dim review`.");
+          return;
+        }
+
+        // Normal single-file mode
+        if (!file) fail("provide a file path, or use --github / --batch");
+        let report;
+        if (type === "ci-log") {
+          const { readFileSync: readFileSyncSync } = await import("node:fs");
+          const raw = file === "-"
+            ? await new Promise<string>((resolve) => {
+                let data = "";
+                process.stdin.setEncoding("utf8");
+                process.stdin.on("data", (chunk) => (data += chunk));
+                process.stdin.on("end", () => resolve(data));
+              })
+            : readFileSyncSync(file, "utf8");
+          report = parseCiLog(raw);
+        } else if (type === "incident") {
+          report = parseReport(file);
+        } else {
+          fail(`unknown capture type '${type}'. Use: incident | ci-log`);
+        }
+
+        const result = await mineIncident(store, report, { llm: Boolean(opts.llm) });
+
+        if (result.proposed.length === 0) {
+          console.log(`No new proposal — a duplicate of this incident was already queued.`);
+        } else {
+          console.log(`📋 Captured 1 FAILED_APPROACH proposal from ${type === "ci-log" ? "CI log" : "incident report"}.`);
+          for (const p of result.proposed) printProposal(p);
+          console.log(`\nReview with \`dim review\`.`);
         }
       } finally {
         store.close();

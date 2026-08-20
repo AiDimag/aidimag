@@ -50,6 +50,60 @@ const SECTIONS: Section[] = [
   { kind: "TODO_CONTEXT", heading: "Open Context (unfinished work)" },
 ];
 
+/** Per-agent format customization: heading style, guardrail prefix, rule ordering. */
+interface AgentFormat {
+  /** heading prefix style */
+  headingPrefix: string;
+  /** heading suffix style */
+  headingSuffix: string;
+  /** guardrail prefix format */
+  guardrailPrefix: (level: GuardrailLevel) => string;
+  /** section ordering: which kinds to include and in what order */
+  sectionOrder?: MemoryKind[];
+  /** whether to include scope annotations */
+  includeScope: boolean;
+  /** line prefix for each rule */
+  linePrefix: string;
+}
+
+const AGENT_FORMATS: Record<Exclude<ContextFormat, "all">, AgentFormat> = {
+  claude: {
+    headingPrefix: "## ",
+    headingSuffix: "",
+    guardrailPrefix: (level) => GUARDRAIL_ICON[level],
+    includeScope: true,
+    linePrefix: "- ",
+  },
+  cursorrules: {
+    headingPrefix: "## ",
+    headingSuffix: "",
+    guardrailPrefix: (level) => GUARDRAIL_ICON[level],
+    includeScope: true,
+    linePrefix: "- ",
+  },
+  copilot: {
+    headingPrefix: "## ",
+    headingSuffix: "",
+    guardrailPrefix: (level) => GUARDRAIL_ICON[level],
+    includeScope: true,
+    linePrefix: "- ",
+  },
+  windsurfrules: {
+    headingPrefix: "## ",
+    headingSuffix: "",
+    guardrailPrefix: (level) => GUARDRAIL_ICON[level],
+    includeScope: true,
+    linePrefix: "- ",
+  },
+  agents: {
+    headingPrefix: "## ",
+    headingSuffix: "",
+    guardrailPrefix: (level) => GUARDRAIL_ICON[level],
+    includeScope: true,
+    linePrefix: "- ",
+  },
+};
+
 function statusTag(m: MemoryEntry): string {
   const bits = [m.status === "VERIFIED" ? "VERIFIED" : m.status];
   if (m.pinned) bits.push("📌");
@@ -91,11 +145,12 @@ export interface RenderResult {
 }
 
 /** Build the markdown body shared by all output formats. */
-export function renderContext(store: MemoryStore): RenderResult {
+export function renderContext(store: MemoryStore, format: Exclude<ContextFormat, "all"> = "claude"): RenderResult {
   const memories = store
     .list(10_000)
     .filter((m) => m.status === "VERIFIED" || m.status === "UNVERIFIED");
   const pinned = memories.filter((m) => m.pinned).length;
+  const agentFmt = AGENT_FORMATS[format];
 
   const lines: string[] = [
     `<!-- ${GENERATED_HEADER} -->`,
@@ -107,10 +162,14 @@ export function renderContext(store: MemoryStore): RenderResult {
     "",
   ];
 
-  for (const section of SECTIONS) {
+  const sections = agentFmt.sectionOrder
+    ? SECTIONS.filter((s) => agentFmt.sectionOrder!.includes(s.kind))
+    : SECTIONS;
+
+  for (const section of sections) {
     const items = memories.filter((m) => m.kind === section.kind).sort(sortForContext);
     if (!items.length) continue;
-    lines.push(`## ${section.heading}`, ...items.map(renderMemory), "");
+    lines.push(`${agentFmt.headingPrefix}${section.heading}${agentFmt.headingSuffix}`, ...items.map(renderMemory), "");
   }
 
   if (memories.length === 0) {
@@ -130,15 +189,18 @@ export interface WriteResult extends RenderResult {
 
 /** Render + write the configured context file(s). Returns repo-relative paths written. */
 export function generateContext(store: MemoryStore, repoRoot: string, format: ContextFormat = "claude"): WriteResult {
-  const rendered = renderContext(store);
+  const targets = targetsFor(format);
   const files: string[] = [];
-  for (const target of targetsFor(format)) {
+  let rendered: RenderResult | undefined;
+  for (const target of targets) {
+    const targetRendered = renderContext(store, target);
+    if (!rendered) rendered = targetRendered;
     const rel = FORMAT_FILES[target];
     const abs = path.join(repoRoot, rel);
     mkdirSync(path.dirname(abs), { recursive: true });
-    writeFileSync(abs, rendered.markdown);
+    writeFileSync(abs, targetRendered.markdown);
     files.push(rel);
   }
-  return { ...rendered, files };
+  return { ...(rendered ?? renderContext(store)), files };
 }
 

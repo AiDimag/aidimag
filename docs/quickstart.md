@@ -19,7 +19,7 @@ head:
 # Quick start (5 minutes)
 
 A hands-on tour from zero to a verified, self-correcting memory. Run these in any git repo
-after `dim init`.
+after `dim setup`.
 
 ::: tip Don't want to start from an empty brain?
 Run `dim bootstrap` first — it reads your repo (README, configs, layout) and proposes
@@ -33,12 +33,12 @@ Write it as a **checkable statement**, not a vague note:
 ```sh
 dim remember "All database access goes through src/db/store.ts; nothing else imports better-sqlite3" \
   -k CONVENTION \
-  -p src/db \
-  -e "STATIC_CHECK:grep -rL better-sqlite3 src --include=*.ts"
+  -p src \
+  -e "STATIC_CHECK:! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts"
 ```
 
 - `-k CONVENTION` — the kind.
-- `-p src/db` — the scope (which files it applies to).
+- `-p src` — the scope (which files it applies to).
 - `-e STATIC_CHECK:...` — evidence: a command that **passes only if the claim is true**.
 
 aiDimag replies:
@@ -139,7 +139,5 @@ dim ui             # open the web dashboard in your browser
 - **Guardrails** encode hard rules; **generate-context** feeds every AI tool.
 - Inferred knowledge is **proposed**, then approved with `dim review`.
 
-Next, deepen any of these in the **Guides**, starting with
-**[Writing claims & evidence](/guides/claims-and-evidence)**, or browse the full
-**[CLI reference](/cli-reference)**.
+Next: **[Cloud sync TLDR](/cloud-quickstart)**.
 

@@ -26,6 +26,14 @@ export interface MinedCommit {
   files: string[];
 }
 
+export interface RevertInfo {
+  originalSubject: string;
+  /** SHA of the commit being reverted, when detectable. */
+  originalSha?: string;
+  /** Free-text reason extracted from the revert body. */
+  reason?: string;
+}
+
 export interface MineResult {
   scanned: number;
   proposed: Proposal[];
@@ -151,6 +159,45 @@ export function readCommits(repoRoot: string, sinceSha: string | null, maxCommit
   return commits;
 }
 
+const REVERT_SUBJECT_RE = /^Revert\s+["'](.+?)["']\s*(?:\([^)]*\))?\s*$/i;
+const REVERT_BODY_RE = /This\s+reverts\s+commit\s+([a-f0-9]{7,40})/i;
+
+/** Detect a git revert commit and, when possible, link it back to the original commit. */
+export function detectRevert(c: MinedCommit, repoRoot: string): RevertInfo | null {
+  const subjectMatch = c.subject.match(REVERT_SUBJECT_RE);
+  if (!subjectMatch) return null;
+  const originalSubject = subjectMatch[1].trim();
+
+  let originalSha: string | undefined;
+  const bodyMatch = c.body.match(REVERT_BODY_RE);
+  if (bodyMatch) {
+    originalSha = bodyMatch[1];
+  } else {
+    // Fallback: search history for a commit with the same subject.
+    try {
+      const found = git(repoRoot, ["log", "--all", "--format=%H", "--grep", originalSubject, "-1"]).trim();
+      if (found) originalSha = found;
+    } catch {
+      // ignore — original commit may be unreachable
+    }
+  }
+
+  const reason = c.body
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(
+      (l) =>
+        l &&
+        !l.startsWith("This reverts commit") &&
+        !l.startsWith("Co-authored-by") &&
+        !l.startsWith("Signed-off-by")
+    )
+    .join(" ")
+    .slice(0, 200);
+
+  return { originalSubject, originalSha, reason: reason || undefined };
+}
+
 export function classifyCommit(c: MinedCommit): { kind: MemoryKind; matched: string } | null {
   const text = `${c.subject}\n${c.body}`;
   for (const { kind, patterns } of SIGNALS) {
@@ -166,7 +213,17 @@ export function classifyCommit(c: MinedCommit): { kind: MemoryKind; matched: str
   return null;
 }
 
-function buildClaim(c: MinedCommit, kind: MemoryKind): string {
+function buildFailedApproachClaim(c: MinedCommit, revertInfo?: RevertInfo | null): string {
+  const subject = revertInfo
+    ? revertInfo.originalSubject.replace(/\.+$/, "")
+    : c.subject.trim().replace(/^Revert\s+["']?|["']?\s*$/g, "").replace(/\.+$/, "");
+  const why = revertInfo?.reason ? ` — ${revertInfo.reason}` : "";
+  return `The approach "${subject}" was tried and reverted${why}`;
+}
+
+function buildClaim(c: MinedCommit, kind: MemoryKind, revertInfo?: RevertInfo | null): string {
+  if (kind === "FAILED_APPROACH") return buildFailedApproachClaim(c, revertInfo);
+
   let subject = c.subject.trim().replace(/\.+$/, "");
   let bodyLines = c.body
     .split("\n")
@@ -180,15 +237,13 @@ function buildClaim(c: MinedCommit, kind: MemoryKind): string {
   }
   const why = bodyLines.join(" ").slice(0, 300);
   const prefix =
-    kind === "FAILED_APPROACH"
-      ? "An approach was abandoned"
-      : kind === "GOTCHA"
-        ? "There is a gotcha"
-        : kind === "DECISION"
-          ? "A decision was made"
-          : kind === "CONVENTION"
-            ? "A convention applies"
-            : "An invariant holds";
+    kind === "GOTCHA"
+      ? "There is a gotcha"
+      : kind === "DECISION"
+        ? "A decision was made"
+        : kind === "CONVENTION"
+          ? "A convention applies"
+          : "An invariant holds";
   return why ? `${prefix}: ${subject} — ${why}` : `${prefix}: ${subject}`;
 }
 
@@ -253,18 +308,39 @@ export function mineCommits(
     const hit = classifyCommit(c);
     if (!hit) continue;
     const ticketRef = extractTicketId(`${c.subject}\n${c.body}`, ticketPattern) ?? branchTicket ?? undefined;
+
+    let revertInfo: RevertInfo | null | undefined;
+    let appliesWhen: string[] | undefined;
+    const evidence: ProposalInput["evidence"] = [
+      { type: "COMMIT_REF", payload: c.sha },
+      ...(ticketRef ? [{ type: "TICKET_REF" as const, payload: ticketRef }] : []),
+    ];
+    let rationale = `Matched signal "${hit.matched}" in commit ${c.sha.slice(0, 8)}: ${c.subject}`;
+
+    if (hit.kind === "FAILED_APPROACH") {
+      revertInfo = detectRevert(c, repoRoot);
+      if (revertInfo) {
+        if (revertInfo.originalSha) {
+          evidence.push({ type: "COMMIT_REF", payload: revertInfo.originalSha });
+          // Semantics: the failed approach applies when the original (reverted) approach is present.
+          appliesWhen = [`original_commit:${revertInfo.originalSha}`];
+        }
+        if (revertInfo.reason) {
+          rationale += ` — reason: ${revertInfo.reason}`;
+        }
+      }
+    }
+
     const input: ProposalInput = {
       kind: hit.kind,
-      claim: buildClaim(c, hit.kind),
+      claim: buildClaim(c, hit.kind, revertInfo),
       paths: scopeFromFiles(c.files),
-      evidence: [
-        { type: "COMMIT_REF", payload: c.sha },
-        ...(ticketRef ? [{ type: "TICKET_REF" as const, payload: ticketRef }] : []),
-      ],
+      evidence,
       source: "commit-miner",
       sourceRef: c.sha,
-      rationale: `Matched signal "${hit.matched}" in commit ${c.sha.slice(0, 8)}: ${c.subject}`,
+      rationale,
       ticketRef,
+      appliesWhen,
     };
     const p = store.propose(input);
     if (p) proposed.push(p);
@@ -293,7 +369,7 @@ Rules:
 5. Scope with the touched paths; add "static_check" (cheap shell command, exit 0 iff true) when an honest one exists.
 6. 0–2 claims per commit. Zero is the common case.
 
-Respond with ONLY: {"claims":[{"kind":"DECISION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"rationale":"...","static_check":null}]}`;
+Respond with ONLY: {"claims":[{"kind":"DECISION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"applies_when":[],"rationale":"...","static_check":null}]}`;
 
 function commitDiff(repoRoot: string, sha: string): string {
   try {
@@ -367,6 +443,7 @@ export async function mineCommitsLlm(
         paths: cl.paths ?? scopeFromFiles(c.files),
         symbols: cl.symbols,
         guardrailLevel: cl.guardrailLevel,
+        appliesWhen: cl.appliesWhen,
         evidence,
         source: "commit-miner",
         sourceRef: c.sha,

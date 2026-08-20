@@ -49,7 +49,7 @@ export interface BranchRules {
 }
 
 export interface TicketsConfig {
-  provider?: "jira" | "github" | "linear" | "http" | "remote";
+  provider?: "jira" | "github" | "linear" | "http" | "remote" | "gitlab" | "azuredevops" | "clickup" | "shortcut" | "youtrack" | "asana" | "trello" | "notion" | "pivotal";
   /** ticket-id regex for branch/commit-message extraction */
   pattern?: string;
   /** Jira site / GitHub repo URL / HttpProvider endpoint (unused for remote) */
@@ -62,6 +62,15 @@ export const TOKEN_PAGES: Record<string, string> = {
   jira: "https://id.atlassian.com/manage-profile/security/api-tokens",
   github: "https://github.com/settings/tokens",
   linear: "https://linear.app/settings/account/security",
+  gitlab: "https://gitlab.com/-/user_settings/personal_access_tokens",
+  azuredevops: "https://dev.azure.com/_usersSettings/tokens",
+  clickup: "https://app.clickup.com/settings/apps",
+  shortcut: "https://app.shortcut.com/settings/account/api-tokens",
+  youtrack: "https://www.jetbrains.com/help/youtrack/standalone/Manage-Permanent-Token.html",
+  asana: "https://asana.com/guide/help/api/api",
+  trello: "https://trello.com/power-ups/admin",
+  notion: "https://www.notion.so/my-integrations",
+  pivotal: "https://www.pivotaltracker.com/profile",
 };
 
 export const DEFAULT_TICKET_PATTERN = "[A-Z][A-Z0-9]+-\\d+";
@@ -302,6 +311,267 @@ class LinearProvider implements TicketProvider {
   }
 }
 
+/** GitLab Issues: baseUrl is the project URL; ids are issue numbers. Credential: personal access token. */
+class GitLabProvider implements TicketProvider {
+  readonly name = "gitlab";
+  constructor(private baseUrl: string, private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const m = this.baseUrl.match(/gitlab\.com\/(.+)/);
+    const project = m ? encodeURIComponent(m[1].replace(/\.git$/, "").replace(/\/$/, "")) : encodeURIComponent(this.baseUrl.replace(/^https?:\/\//, "").replace(/\.git$/, "").replace(/\/$/, ""));
+    const num = id.replace(/^#/, "");
+    const raw = await fetchJson(`${this.baseUrl.replace(/\/$/, "")}/api/v4/projects/${project}/issues/${num}`, {
+      "PRIVATE-TOKEN": this.credential,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.labels) ? (raw.labels as string[]).map(String) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    return {
+      id: `#${raw.iid ?? num}`,
+      url: String(raw.web_url ?? ""),
+      title: String(raw.title ?? ""),
+      body: truncate(String(raw.description ?? "")),
+      type: lower.some((l) => l.includes("bug")) ? "bug" : lower.some((l) => l.includes("feature") || l.includes("enhancement")) ? "story" : "other",
+      status: raw.state === "closed" ? "done" : "open",
+      labels,
+    };
+  }
+}
+
+/** Azure DevOps Boards: baseUrl is https://dev.azure.com/{org}/{project}. Credential: PAT. */
+class AzureDevOpsProvider implements TicketProvider {
+  readonly name = "azuredevops";
+  constructor(private baseUrl: string, private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const auth = Buffer.from(`:${this.credential}`).toString("base64");
+    const m = this.baseUrl.match(/dev\.azure\.com\/([^/]+)\/([^/]+)/);
+    if (!m) throw new Error(`tickets.baseUrl must look like https://dev.azure.com/{org}/{project} (got ${this.baseUrl})`);
+    const org = m[1];
+    const project = m[2];
+    const raw = await fetchJson(`https://dev.azure.com/${org}/${project}/_apis/wit/workitems/${encodeURIComponent(id)}?api-version=7.1`, {
+      Authorization: `Basic ${auth}`,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const fields = (raw.fields ?? {}) as Record<string, unknown>;
+    const labels = String(fields["System.Tags"] ?? "").split("; ").filter(Boolean);
+    const lower = labels.map((l) => l.toLowerCase());
+    const state = String(fields["System.State"] ?? "").toLowerCase();
+    return {
+      id: String(raw.id ?? id),
+      url: String(raw.url ?? `${this.baseUrl}/_workitems/edit/${raw.id ?? id}`),
+      title: String(fields["System.Title"] ?? ""),
+      body: truncate(String(fields["System.Description"] ?? "")),
+      type: lower.some((l) => l.includes("bug")) ? "bug" : lower.some((l) => l.includes("feature") || l.includes("story")) ? "story" : "other",
+      status: state === "done" || state === "closed" ? "done" : state === "active" || state === "in progress" ? "in_progress" : "open",
+      labels,
+    };
+  }
+}
+
+/** ClickUp: baseUrl is the team/workspace URL. Credential: API token. */
+class ClickUpProvider implements TicketProvider {
+  readonly name = "clickup";
+  constructor(private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const raw = await fetchJson(`https://api.clickup.com/api/v2/task/${encodeURIComponent(id)}`, {
+      Authorization: this.credential,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.tags) ? (raw.tags as Array<Record<string, unknown>>).map((t) => String(t.name ?? t)) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    const status = String((raw.status as Record<string, unknown>)?.status ?? "").toLowerCase();
+    return {
+      id: String(raw.id ?? id),
+      url: String(raw.url ?? ""),
+      title: String(raw.name ?? ""),
+      body: truncate(String(raw.description ?? "")),
+      type: lower.some((l) => l.includes("bug")) ? "bug" : "other",
+      status: status === "complete" || status === "closed" ? "done" : status === "in progress" ? "in_progress" : "open",
+      labels,
+    };
+  }
+}
+
+/** Shortcut (formerly Clubhouse): REST API. Credential: API token. */
+class ShortcutProvider implements TicketProvider {
+  readonly name = "shortcut";
+  constructor(private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const raw = await fetchJson(`https://api.app.shortcut.com/api/v3/stories/${encodeURIComponent(id)}`, {
+      "Shortcut-Token": this.credential,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.labels) ? (raw.labels as Array<Record<string, unknown>>).map((l) => String(l.name ?? l)) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    const state = String((raw.workflow_state as Record<string, unknown>)?.name ?? "").toLowerCase();
+    return {
+      id: String(raw.id ?? id),
+      url: String(raw.app_url ?? ""),
+      title: String(raw.name ?? ""),
+      body: truncate(String(raw.description ?? "")),
+      type: lower.some((l) => l.includes("bug")) ? "bug" : lower.some((l) => l.includes("feature")) ? "story" : "other",
+      status: state.includes("done") || state.includes("complete") ? "done" : state.includes("progress") ? "in_progress" : "open",
+      labels,
+    };
+  }
+}
+
+/** YouTrack (JetBrains): baseUrl is the YouTrack instance URL. Credential: permanent token. */
+class YouTrackProvider implements TicketProvider {
+  readonly name = "youtrack";
+  constructor(private baseUrl: string, private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const raw = await fetchJson(`${this.baseUrl.replace(/\/$/, "")}/api/issues/${encodeURIComponent(id)}?fields=id,summary,description,type(name),state(name),tags(name),url`, {
+      Authorization: `Bearer ${this.credential}`,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.tags) ? (raw.tags as Array<Record<string, unknown>>).map((t) => String(t.name ?? t)) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    const typeName = String((raw.type as Record<string, unknown>)?.name ?? "").toLowerCase();
+    const stateName = String((raw.state as Record<string, unknown>)?.name ?? "").toLowerCase();
+    return {
+      id: String(raw.id ?? id),
+      url: String(raw.url ?? `${this.baseUrl}/issue/${raw.id ?? id}`),
+      title: String(raw.summary ?? ""),
+      body: truncate(String(raw.description ?? "")),
+      type: typeName.includes("bug") ? "bug" : typeName.includes("feature") || typeName.includes("story") ? "story" : "other",
+      status: stateName.includes("done") || stateName.includes("fixed") || stateName.includes("closed") ? "done" : stateName.includes("progress") ? "in_progress" : "open",
+      labels,
+    };
+  }
+}
+
+/** Asana: REST API. Credential: PAT. baseUrl is unused (uses global API). */
+class AsanaProvider implements TicketProvider {
+  readonly name = "asana";
+  constructor(private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const raw = await fetchJson(`https://app.asana.com/api/1.0/tasks/${encodeURIComponent(id)}`, {
+      Authorization: `Bearer ${this.credential}`,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.tags) ? (raw.tags as Array<Record<string, unknown>>).map((t) => String(t.name ?? t)) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    const completed = Boolean(raw.completed);
+    return {
+      id: String(raw.gid ?? id),
+      url: String(raw.permalink_url ?? ""),
+      title: String(raw.name ?? ""),
+      body: truncate(String(raw.notes ?? "")),
+      type: lower.some((l) => l.includes("bug")) ? "bug" : "other",
+      status: completed ? "done" : "open",
+      labels,
+    };
+  }
+}
+
+/** Trello: REST API. Credential: API key + token (format: "apiKey:token"). baseUrl is the board URL. */
+class TrelloProvider implements TicketProvider {
+  readonly name = "trello";
+  constructor(private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const [apiKey, token] = this.credential.includes(":") ? this.credential.split(":", 2) : [this.credential, this.credential];
+    const raw = await fetchJson(`https://api.trello.com/1/cards/${encodeURIComponent(id)}?key=${encodeURIComponent(apiKey)}&token=${encodeURIComponent(token)}`, {
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.labels) ? (raw.labels as Array<Record<string, unknown>>).map((l) => String(l.name ?? l)) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    const closed = Boolean(raw.closed);
+    return {
+      id: String(raw.id ?? id),
+      url: String(raw.url ?? ""),
+      title: String(raw.name ?? ""),
+      body: truncate(String(raw.desc ?? "")),
+      type: lower.some((l) => l.includes("bug")) ? "bug" : "other",
+      status: closed ? "done" : "open",
+      labels,
+    };
+  }
+}
+
+/** Notion: uses database query API. Credential: integration token. baseUrl is the database URL. */
+class NotionProvider implements TicketProvider {
+  readonly name = "notion";
+  constructor(private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(`https://api.notion.com/v1/pages/${encodeURIComponent(id)}`, {
+        headers: {
+          Authorization: `Bearer ${this.credential}`,
+          "Notion-Version": "2022-06-28",
+          Accept: "application/json",
+        },
+        signal: ctl.signal,
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status} from api.notion.com`);
+      const raw = (await res.json()) as Record<string, unknown>;
+      const props = (raw.properties ?? {}) as Record<string, Record<string, unknown>>;
+      const titleProp = Object.values(props).find((p) => p.type === "title");
+      const titleArr = (titleProp?.title ?? []) as Array<{ plain_text: string }>;
+      const title = titleArr.map((t) => t.plain_text).join("");
+      const status = String((props["Status"]?.status as Record<string, unknown>)?.name ?? (props["status"]?.status as Record<string, unknown>)?.name ?? "").toLowerCase();
+      return {
+        id: String(raw.id ?? id),
+        url: String(raw.url ?? ""),
+        title,
+        body: "",
+        type: "other",
+        status: status.includes("done") || status.includes("complete") || status.includes("closed") ? "done" : status.includes("progress") ? "in_progress" : "open",
+        labels: [],
+      };
+    } finally {
+      clearTimeout(t);
+    }
+  }
+}
+
+/** Pivotal Tracker: REST API v5. Credential: API token. baseUrl is the project URL. */
+class PivotalProvider implements TicketProvider {
+  readonly name = "pivotal";
+  constructor(private baseUrl: string, private credential: string) {}
+
+  async getTicket(id: string): Promise<Ticket | null> {
+    const m = this.baseUrl.match(/pivotaltracker\.com\/n\/projects\/(\d+)/);
+    const projectId = m ? m[1] : "";
+    if (!projectId) throw new Error(`tickets.baseUrl must look like https://www.pivotaltracker.com/n/projects/{id} (got ${this.baseUrl})`);
+    const raw = await fetchJson(`https://www.pivotaltracker.com/services/v5/projects/${projectId}/stories/${encodeURIComponent(id)}`, {
+      "X-TrackerToken": this.credential,
+      Accept: "application/json",
+    });
+    if (!raw) return null;
+    const labels = Array.isArray(raw.labels) ? (raw.labels as Array<Record<string, unknown>>).map((l) => String(l.name ?? l)) : [];
+    const lower = labels.map((l) => l.toLowerCase());
+    const state = String(raw.current_state ?? "").toLowerCase();
+    const storyType = String(raw.story_type ?? "").toLowerCase();
+    return {
+      id: String(raw.id ?? id),
+      url: String(raw.url ?? ""),
+      title: String(raw.name ?? ""),
+      body: truncate(String(raw.description ?? "")),
+      type: storyType === "bug" ? "bug" : storyType === "feature" ? "story" : storyType === "epic" ? "epic" : "other",
+      status: state === "accepted" || state === "delivered" ? "done" : state === "started" ? "in_progress" : "open",
+      labels,
+    };
+  }
+}
+
 /** T3: asks the team sync server — credentials live server-side, members reuse their sync token. */
 class RemoteProvider implements TicketProvider {
   readonly name = "remote";
@@ -335,6 +605,24 @@ export function buildDirectProvider(
     case "http":
       if (!isAllowedTicketBaseUrl(baseUrl)) return null;
       return new HttpProvider(baseUrl, credential); // credential optional for internal services
+    case "gitlab":
+      return credential ? new GitLabProvider(baseUrl, credential) : null;
+    case "azuredevops":
+      return credential ? new AzureDevOpsProvider(baseUrl, credential) : null;
+    case "clickup":
+      return credential ? new ClickUpProvider(credential) : null;
+    case "shortcut":
+      return credential ? new ShortcutProvider(credential) : null;
+    case "youtrack":
+      return credential ? new YouTrackProvider(baseUrl, credential) : null;
+    case "asana":
+      return credential ? new AsanaProvider(credential) : null;
+    case "trello":
+      return credential ? new TrelloProvider(credential) : null;
+    case "notion":
+      return credential ? new NotionProvider(credential) : null;
+    case "pivotal":
+      return credential ? new PivotalProvider(baseUrl, credential) : null;
     default:
       return null;
   }
@@ -357,8 +645,8 @@ export function ticketProviderFor(repoRoot: string): TicketProvider | null {
       return null;
     }
   }
-  if (!cfg.baseUrl && cfg.provider !== "linear") return null;
-  const credKey = cfg.baseUrl ?? "linear";
+  if (!cfg.baseUrl && !["linear", "clickup", "shortcut", "asana", "trello", "notion", "remote"].includes(cfg.provider)) return null;
+  const credKey = cfg.baseUrl ?? cfg.provider ?? "linear";
   return buildDirectProvider(cfg.provider, cfg.baseUrl ?? "", getTicketCredential(credKey));
 }
 

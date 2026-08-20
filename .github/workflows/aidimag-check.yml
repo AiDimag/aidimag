@@ -1,0 +1,177 @@
+name: AIDimag Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  aidimag-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Run dim check
+        id: dim
+        env:
+          AIDIMAG_NO_UPDATE_CHECK: '1'
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1 || true
+          set +e
+          OUT=$(node dist/cli/index.js check --block --json -r origin/${{ github.base_ref }} 2>&1)
+          EXIT=$?
+          set -e
+          echo "exit=$EXIT" >> "$GITHUB_OUTPUT"
+          {
+            echo "output<<AIDIMAG_EOF"
+            echo "$OUT"
+            echo "AIDIMAG_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "$OUT"
+
+      - name: Knowledge impact report
+        id: impact
+        env:
+          AIDIMAG_NO_UPDATE_CHECK: '1'
+        run: |
+          set +e
+          IMPACT=$(node dist/cli/index.js impact --base origin/${{ github.base_ref }} --head HEAD --verify --fail-on-impact 2>&1)
+          IMPACT_EXIT=$?
+          set -e
+          {
+            echo "report<<AIDIMAG_EOF"
+            echo "$IMPACT"
+            echo "AIDIMAG_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "exit=$IMPACT_EXIT" >> "$GITHUB_OUTPUT"
+          echo "$IMPACT"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        if: always()
+        env:
+          EXIT: ${{ steps.dim.outputs.exit }}
+          OUTPUT: ${{ steps.dim.outputs.output }}
+          IMPACT_REPORT: ${{ steps.impact.outputs.report }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- aidimag-check -->';
+            const output = process.env.OUTPUT || '';
+            const impact = process.env.IMPACT_REPORT || '';
+            const exitCode = process.env.EXIT || '1';
+
+            let parsed = null;
+            try { parsed = JSON.parse(output); } catch {}
+
+            let body = `${marker}\n`;
+
+            if (parsed) {
+              const risk = parsed.riskScore ?? 0;
+              const level = (parsed.riskLevel || 'low').toUpperCase();
+              const riskIcon = risk >= 80 ? '🔴' : risk >= 60 ? '🟠' : risk >= 30 ? '🟡' : '🟢';
+              const passed = parsed.passed;
+              const violations = parsed.violations || [];
+              const criticalAreas = parsed.criticalAreaViolations || [];
+              const failViolations = violations.filter(v => v.severity === 'fail');
+              const warnViolations = violations.filter(v => v.severity === 'warn');
+              const areaFails = criticalAreas.filter(v => v.severity === 'fail');
+              const areaWarns = criticalAreas.filter(v => v.severity === 'warn');
+
+              body += `## ${passed ? '✅' : '⚠️'} AIDimag Check ${passed ? 'Passed' : 'Found Issues'}\n\n`;
+              body += `| Metric | Value |\n|---|---|\n`;
+              body += `| Risk Score | ${riskIcon} **${risk}/100** (${level}) |\n`;
+              body += `| Files Changed | ${parsed.changedFiles?.length ?? 0} |\n`;
+              body += `| Memories Checked | ${parsed.checked ?? 0} |\n`;
+              body += `| Fail Violations | ${failViolations.length} |\n`;
+              body += `| Warnings | ${warnViolations.length} |\n`;
+              body += `| Critical Area Violations | ${areaFails.length} fail, ${areaWarns.length} warn |\n\n`;
+
+              if (parsed.riskFactors?.length > 0) {
+                body += `<details><summary>Risk factors</summary>\n\n`;
+                for (const f of parsed.riskFactors) {
+                  body += `- **+${f.contribution}** ${f.label}${f.detail ? ` — ${f.detail}` : ''}\n`;
+                }
+                body += `\n</details>\n\n`;
+              }
+
+              if (failViolations.length > 0 || warnViolations.length > 0) {
+                body += `<details><summary>Memory violations (${violations.length})</summary>\n\n`;
+                for (const v of failViolations) {
+                  body += `- ✗ **[${v.kind}]** ${v.detail}\n  > ${v.claim}\n`;
+                }
+                for (const v of warnViolations) {
+                  body += `- ~ **[${v.kind}]** ${v.detail}\n  > ${v.claim}\n`;
+                }
+                body += `\n</details>\n\n`;
+              }
+
+              if (criticalAreas.length > 0) {
+                body += `<details><summary>Critical area violations (${criticalAreas.length})</summary>\n\n`;
+                for (const v of criticalAreas) {
+                  const icon = v.severity === 'fail' ? '✗' : '~';
+                  body += `- ${icon} **${v.area}** — ${v.detail}\n  files: ${(v.changedFiles || []).join(', ')}\n`;
+                  if (v.owners?.length) body += `  required approvers: ${v.owners.join(', ')}\n`;
+                  if (v.requiredTests?.length) body += `  required tests: ${v.requiredTests.join(', ')}\n`;
+                }
+                body += `\n</details>\n\n`;
+              }
+            } else {
+              const count = (output.match(/^[~✗]/gm) || []).length;
+              body += exitCode === '0'
+                ? `✅ **AIDimag check passed** — no conflicts with verified memory.`
+                : `⚠️ **AIDimag check found ${count} violation(s).**\n\n<details><summary>Details</summary>\n\n\`\`\`\n${output}\n\`\`\`\n\n</details>`;
+            }
+
+            if (impact) {
+              body += `\n<details><summary>Knowledge impact</summary>\n\n${impact}\n\n</details>`;
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail on blocking violations
+        if: steps.dim.outputs.exit != '0'
+        run: |
+          echo "AIDimag check found blocking violations. See the PR comment for details."
+          exit 1
+
+      - name: Fail on knowledge impact
+        if: steps.impact.outputs.exit != '0'
+        run: |
+          echo "AIDimag impact check found memories that would go stale or violations. See the PR comment for details."
+          exit 1

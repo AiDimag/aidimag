@@ -146,5 +146,5 @@ No SaaS is required; the same protocol is what a future hosted version would use
  (live tools)   (.cursorrules, copilot)
 ```
 
-Next: **[Getting started](/getting-started)**.
+Next: **[How aiDimag compares](/comparison)**.
 

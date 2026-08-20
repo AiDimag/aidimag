@@ -1,0 +1,374 @@
+name: 'AIDimag Check'
+description: 'Run dim check against a pull request and post a summary comment with risk score and critical area enforcement.'
+author: 'aiDimag'
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  token:
+    description: 'GitHub token used to post PR comments'
+    required: false
+    default: ${{ github.token }}
+  base-ref:
+    description: 'Base ref to diff against (defaults to the pull request base ref)'
+    required: false
+    default: ${{ github.base_ref }}
+  working-directory:
+    description: 'Working directory for the repository'
+    required: false
+    default: '.'
+  version:
+    description: 'aiDimag version to install from npm (default: latest)'
+    required: false
+    default: 'latest'
+  risk-threshold:
+    description: 'Fail the check if the risk score exceeds this threshold (0-100). Default: not set.'
+    required: false
+    default: ''
+  require-owner-approval:
+    description: 'When "true", fail if critical area changes lack approval from a listed owner in PR reviews.'
+    required: false
+    default: 'false'
+  run-required-tests:
+    description: 'When "true", run required tests listed in critical-areas config and fail if any fail.'
+    required: false
+    default: 'false'
+  fail-on-impact:
+    description: 'When "true", fail the workflow if the knowledge impact report finds violations or stale predictions.'
+    required: false
+    default: 'false'
+
+outputs:
+  passed:
+    description: 'true if dim check found no blocking violations'
+    value: ${{ steps.dim.outputs.passed }}
+  risk-score:
+    description: 'Risk score (0-100) from dim check'
+    value: ${{ steps.dim.outputs.risk-score }}
+  violations:
+    description: 'Number of violations reported by dim check'
+    value: ${{ steps.count.outputs.violations }}
+  output:
+    description: 'Raw dim check JSON output'
+    value: ${{ steps.dim.outputs.output }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install aiDimag
+      shell: bash
+      run: npm install -g aidimag@${{ inputs.version }}
+
+    - name: Run dim check
+      id: dim
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -n "${{ inputs.base-ref }}" ]; then
+          git fetch origin ${{ inputs.base-ref }} --depth=1 || true
+        fi
+        ARGS="check --block --json -r origin/${{ inputs.base-ref }}"
+        if [ -n "${{ inputs.risk-threshold }}" ]; then
+          ARGS="$ARGS --risk-threshold ${{ inputs.risk-threshold }}"
+        fi
+        set +e
+        OUT=$(dim $ARGS 2>&1)
+        EXIT=$?
+        set -e
+        {
+          echo "output<<AIDIMAG_EOF"
+          echo "$OUT"
+          echo "AIDIMAG_EOF"
+          echo "exit=$EXIT"
+        } >> "$GITHUB_OUTPUT"
+        if [ "$EXIT" -eq 0 ]; then
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "passed=false" >> "$GITHUB_OUTPUT"
+        fi
+        # Extract risk score from JSON output
+        RISK=$(echo "$OUT" | grep -o '"riskScore":[[:space:]]*[0-9]*' | head -1 | grep -o '[0-9]*$' || echo "0")
+        echo "risk-score=$RISK" >> "$GITHUB_OUTPUT"
+        # surface the raw output in the job log
+        echo "$OUT"
+
+    - name: Count violations
+      id: count
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      if: github.event_name == 'pull_request'
+      env:
+        OUTPUT: ${{ steps.dim.outputs.output }}
+      run: |
+        COUNT=$(echo "$OUTPUT" | grep -cE '"severity":[[:space:]]*"fail"' || true)
+        echo "violations=$COUNT" >> "$GITHUB_OUTPUT"
+
+    - name: Check owner approval
+      id: owners
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request' && inputs.require-owner-approval == 'true'
+      env:
+        DIM_OUTPUT: ${{ steps.dim.outputs.output }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const output = process.env.DIM_OUTPUT || '';
+          let parsed = null;
+          try { parsed = JSON.parse(output); } catch {}
+          if (!parsed) { core.setOutput('approved', 'true'); return; }
+
+          const criticalAreas = (parsed.criticalAreaViolations || []).filter(v => v.severity === 'fail');
+          if (criticalAreas.length === 0) { core.setOutput('approved', 'true'); return; }
+
+          // Collect all required owners from critical area violations
+          const requiredOwners = new Set();
+          for (const v of criticalAreas) {
+            if (v.owners) v.owners.forEach(o => requiredOwners.add(o.toLowerCase()));
+          }
+          if (requiredOwners.size === 0) { core.setOutput('approved', 'true'); return; }
+
+          // Fetch PR reviews
+          const { data: reviews } = await github.rest.pulls.listReviews({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number,
+          });
+
+          // Check if any required owner has approved
+          const approvals = reviews.filter(r => r.state === 'APPROVED');
+          const approvedBy = new Set(approvals.map(r => (r.user?.login || '').toLowerCase()));
+
+          const missing = [];
+          for (const owner of requiredOwners) {
+            // Match GitHub login (strip @ prefix if present)
+            const handle = owner.replace(/^@/, '');
+            if (!approvedBy.has(handle)) missing.push(owner);
+          }
+
+          if (missing.length > 0) {
+            core.setOutput('approved', 'false');
+            core.setOutput('missing', missing.join(', '));
+            core.setOutput('areas', criticalAreas.map(v => v.area).join(', '));
+          } else {
+            core.setOutput('approved', 'true');
+          }
+
+    - name: Run required tests
+      id: tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      if: github.event_name == 'pull_request' && inputs.run-required-tests == 'true'
+      env:
+        OUTPUT: ${{ steps.dim.outputs.output }}
+      run: |
+        # Extract required tests from dim check JSON output
+        TESTS=$(echo "$OUTPUT" | grep -o '"requiredTests":\[[^]]*\]' | grep -o '"[^"]*"' | sed 's/"//g' | sort -u || true)
+        if [ -z "$TESTS" ]; then
+          echo "No required tests found in critical-areas config."
+          echo "tests-passed=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "Running required tests: $TESTS"
+        FAILED=0
+        for TEST in $TESTS; do
+          echo "::group::Running test: $TEST"
+          set +e
+          if command -v npm &>/dev/null; then
+            npm test -- "$TEST" 2>&1
+          elif command -v npx &>/dev/null; then
+            npx "$TEST" 2>&1
+          else
+            echo "No test runner found (npm/npx). Skipping: $TEST"
+            set -e
+            continue
+          fi
+          RC=$?
+          set -e
+          echo "::endgroup::"
+          if [ $RC -ne 0 ]; then
+            echo "❌ Required test failed: $TEST"
+            FAILED=1
+          else
+            echo "✅ Required test passed: $TEST"
+          fi
+        done
+        if [ $FAILED -ne 0 ]; then
+          echo "tests-passed=false" >> "$GITHUB_OUTPUT"
+          exit 1
+        fi
+        echo "tests-passed=true" >> "$GITHUB_OUTPUT"
+
+    - name: Knowledge impact report
+      id: impact
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      if: github.event_name == 'pull_request'
+      run: |
+        set +e
+        IMPACT_ARGS="impact --base origin/${{ inputs.base-ref }} --head HEAD --verify"
+        if [ "${{ inputs.fail-on-impact }}" == "true" ]; then
+          IMPACT_ARGS="$IMPACT_ARGS --fail-on-impact"
+        fi
+        IMPACT=$(dim $IMPACT_ARGS 2>&1)
+        IMPACT_EXIT=$?
+        set -e
+        {
+          echo "report<<AIDIMAG_EOF"
+          echo "$IMPACT"
+          echo "AIDIMAG_EOF"
+        } >> "$GITHUB_OUTPUT"
+        echo "exit=$IMPACT_EXIT" >> "$GITHUB_OUTPUT"
+
+    - name: Comment on PR
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      env:
+        PASSED: ${{ steps.dim.outputs.passed }}
+        VIOLATIONS: ${{ steps.count.outputs.violations }}
+        DIM_OUTPUT: ${{ steps.dim.outputs.output }}
+        IMPACT_REPORT: ${{ steps.impact.outputs.report }}
+        OWNER_APPROVED: ${{ steps.owners.outputs.approved }}
+        OWNER_MISSING: ${{ steps.owners.outputs.missing }}
+        OWNER_AREAS: ${{ steps.owners.outputs.areas }}
+        TESTS_PASSED: ${{ steps.tests.outputs.tests-passed }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const marker = '<!-- aidimag-check -->';
+          const output = process.env.DIM_OUTPUT || '';
+          const impact = process.env.IMPACT_REPORT || '';
+          const ownerApproved = process.env.OWNER_APPROVED;
+          const ownerMissing = process.env.OWNER_MISSING || '';
+          const ownerAreas = process.env.OWNER_AREAS || '';
+          const testsPassed = process.env.TESTS_PASSED;
+
+          let parsed = null;
+          try { parsed = JSON.parse(output); } catch {}
+
+          let body = `${marker}\n`;
+
+          if (parsed) {
+            const risk = parsed.riskScore ?? 0;
+            const level = (parsed.riskLevel || 'low').toUpperCase();
+            const riskIcon = risk >= 80 ? '🔴' : risk >= 60 ? '🟠' : risk >= 30 ? '🟡' : '🟢';
+            const passed = parsed.passed;
+            const violations = parsed.violations || [];
+            const criticalAreas = parsed.criticalAreaViolations || [];
+            const failViolations = violations.filter(v => v.severity === 'fail');
+            const warnViolations = violations.filter(v => v.severity === 'warn');
+            const areaFails = criticalAreas.filter(v => v.severity === 'fail');
+            const areaWarns = criticalAreas.filter(v => v.severity === 'warn');
+
+            body += `## ${passed ? '✅' : '⚠️'} AIDimag Check ${passed ? 'Passed' : 'Found Issues'}\n\n`;
+            body += `| Metric | Value |\n|---|---|\n`;
+            body += `| Risk Score | ${riskIcon} **${risk}/100** (${level}) |\n`;
+            body += `| Files Changed | ${parsed.changedFiles?.length ?? 0} |\n`;
+            body += `| Memories Checked | ${parsed.checked ?? 0} |\n`;
+            body += `| Fail Violations | ${failViolations.length} |\n`;
+            body += `| Warnings | ${warnViolations.length} |\n`;
+            body += `| Critical Area Violations | ${areaFails.length} fail, ${areaWarns.length} warn |\n\n`;
+
+            if (parsed.riskFactors?.length > 0) {
+              body += `<details><summary>Risk factors</summary>\n\n`;
+              for (const f of parsed.riskFactors) {
+                body += `- **+${f.contribution}** ${f.label}${f.detail ? ` — ${f.detail}` : ''}\n`;
+              }
+              body += `\n</details>\n\n`;
+            }
+
+            if (failViolations.length > 0 || warnViolations.length > 0) {
+              body += `<details><summary>Memory violations (${violations.length})</summary>\n\n`;
+              for (const v of failViolations) {
+                body += `- ✗ **[${v.kind}]** ${v.detail}\n  > ${v.claim}\n`;
+              }
+              for (const v of warnViolations) {
+                body += `- ~ **[${v.kind}]** ${v.detail}\n  > ${v.claim}\n`;
+              }
+              body += `\n</details>\n\n`;
+            }
+
+            if (criticalAreas.length > 0) {
+              body += `<details><summary>Critical area violations (${criticalAreas.length})</summary>\n\n`;
+              for (const v of criticalAreas) {
+                const icon = v.severity === 'fail' ? '✗' : '~';
+                body += `- ${icon} **${v.area}** — ${v.detail}\n  files: ${(v.changedFiles || []).join(', ')}\n`;
+                if (v.owners?.length) body += `  required approvers: ${v.owners.join(', ')}\n`;
+                if (v.requiredTests?.length) body += `  required tests: ${v.requiredTests.join(', ')}\n`;
+              }
+              body += `\n</details>\n\n`;
+            }
+
+            // Owner approval status
+            if (ownerApproved === 'false') {
+              body += `### 🛑 Missing Owner Approval\n\n`;
+              body += `Critical area(s) **${ownerAreas}** require approval from: **${ownerMissing}**\n\n`;
+              body += `Please request a review from one of the listed owners.\n\n`;
+            }
+
+            // Required test status
+            if (testsPassed === 'false') {
+              body += `### 🛑 Required Tests Failed\n\n`;
+              body += `One or more required tests for critical areas did not pass. See the job log for details.\n\n`;
+            }
+          } else {
+            const count = (output.match(/^[~✗]/gm) || []).length;
+            body += `⚠️ **AIDimag check found ${count} violation(s).**\n\n<details><summary>Details</summary>\n\n\`\`\`\n${output}\n\`\`\`\n\n</details>`;
+          }
+
+          if (impact) {
+            body += `\n<details><summary>Knowledge impact</summary>\n\n${impact}\n\n</details>`;
+          }
+
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find(c => c.body && c.body.includes(marker));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
+
+    - name: Fail on blocking violations
+      shell: bash
+      if: steps.dim.outputs.passed != 'true'
+      run: |
+        echo "AIDimag check found blocking violations. See the PR comment for details."
+        exit 1
+
+    - name: Fail on missing owner approval
+      if: steps.owners.outputs.approved == 'false'
+      run: |
+        echo "Critical area changes require approval from: ${{ steps.owners.outputs.missing }}"
+        exit 1
+
+    - name: Fail on required test failure
+      if: steps.tests.outputs.tests-passed == 'false'
+      run: |
+        echo "One or more required tests for critical areas failed. See the job log for details."
+        exit 1
+
+    - name: Fail on knowledge impact
+      if: steps.impact.outputs.exit != '0'
+      run: |
+        echo "AIDimag impact check found memories that would go stale or violations. See the PR comment for details."
+        exit 1

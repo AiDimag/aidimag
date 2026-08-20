@@ -73,6 +73,9 @@ export function printMemory(m: MemoryEntry, verbose = false): void {
       console.log(`    evidence: ${e.type}(${e.result}) ${e.payload}`);
     }
   }
+  if (verbose && m.appliesWhen?.length) {
+    console.log(`    applies when: ${m.appliesWhen.join(", ")}`);
+  }
 }
 
 export function printProposal(p: Proposal): void {
@@ -85,6 +88,7 @@ export function printProposal(p: Proposal): void {
     console.log(`    evidence: ${p.evidence.map((e) => `${e.type}:${e.payload}`).join("  ")}`);
   }
   if (p.ticketRef) console.log(`    ticket: ${p.ticketRef}`);
+  if (p.appliesWhen?.length) console.log(`    applies when: ${p.appliesWhen.join(", ")}`);
   if (p.rationale) console.log(`    rationale: ${p.rationale}`);
 }
 
@@ -129,9 +133,7 @@ export function printIngestReport(report: import("../knowledge/ingest.js").Inges
       `      dim knowledge sync\n` +
       `\n` +
       `   3. Use Ollama (free/local):\n` +
-      `      brew install ollama && ollama serve &\n` +
-      `      ollama pull llama3.2\n` +
-      `      export AIDIMAG_LLM=ollama\n` +
+      `      dim setup-ollama    # installs Ollama + pulls a model\n` +
       `      dim knowledge sync`
     );
   }
@@ -182,5 +184,52 @@ export async function openBrowser(url: string): Promise<void> {
   execFile(opener, args, (err) => {
     if (err) process.stderr.write(`Could not open browser: ${err.message}\n`);
   });
+}
+
+/**
+ * Check if an LLM provider is available; if not, prompt to set up Ollama.
+ * Returns true if a provider is available (or was just set up), false otherwise.
+ * `kind` controls the message: "llm" for text generation, "embedding" for semantic search.
+ */
+export async function promptOllamaSetup(kind: "llm" | "embedding" = "llm"): Promise<boolean> {
+  if (kind === "embedding") {
+    const { getEmbeddingProvider } = await import("../embeddings/provider.js");
+    const provider = await getEmbeddingProvider();
+    if (provider) return true;
+  } else {
+    const { getTextProvider } = await import("../knowledge/llm.js");
+    const provider = await getTextProvider();
+    if (provider) return true;
+  }
+
+  if (process.env.OPENAI_API_KEY) return true;
+
+  const label = kind === "embedding" ? "semantic search" : "this command";
+  console.log(`\n🧮 No LLM provider available for ${label}.`);
+  console.log("   Ollama (free, local) can provide one — I'll install it and pull a lightweight model.\n");
+  const prompter = await createPrompter("n");
+  const choice = (await prompter.ask("Set up Ollama now? [y/N] ")).trim().toLowerCase();
+  prompter.close();
+
+  if (choice === "y" || choice === "yes") {
+    const { setupOllamaInteractive } = await import("./commands/setup.js");
+    const ok = await setupOllamaInteractive();
+    if (ok) {
+      if (kind === "embedding") {
+        const { getEmbeddingProvider, resetEmbeddingProviderCache } = await import("../embeddings/provider.js");
+        resetEmbeddingProviderCache();
+        const provider = await getEmbeddingProvider();
+        return Boolean(provider);
+      } else {
+        const { getTextProvider, resetTextProviderCache } = await import("../knowledge/llm.js");
+        resetTextProviderCache();
+        const provider = await getTextProvider();
+        return Boolean(provider);
+      }
+    }
+  } else {
+    console.log("   Skipped. Run `dim setup-ollama` anytime to enable.");
+  }
+  return false;
 }
 

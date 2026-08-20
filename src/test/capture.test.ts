@@ -12,7 +12,9 @@ import { scoreProposal, claimSimilarity, triagePending } from "../capture/triage
 import { userMessagesFromTranscript, redactSecrets } from "../capture/harvest.js";
 import { codexTranscript, copilotUserMessages } from "../capture/transcript-sources.js";
 import { parseClaims, dedupeClaims } from "../knowledge/extract.js";
-import { classifyCommit, scopeFromFiles } from "../capture/commit-miner.js";
+import { classifyCommit, scopeFromFiles, detectRevert, mineCommits } from "../capture/commit-miner.js";
+import { execFileSync } from "node:child_process";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { buildPrPrompt } from "../capture/pr-miner.js";
 import type { Proposal } from "../types.js";
 
@@ -189,6 +191,55 @@ test("scopeFromFiles: filters noise, collapses to top directories", () => {
   const many = ["src/db/a.ts", "src/db/b.ts", "src/db/c.ts", "src/ui/d.ts", "docs/e.md", "src/db/f.ts", "src/ui/g.ts"];
   const scoped = scopeFromFiles(many, 2);
   assert.deepEqual(scoped, ["src/db", "src/ui"]);
+});
+
+test("detectRevert: parses git-style revert commit and links to original", () => {
+  const info = detectRevert(
+    {
+      sha: "badcafe1234567890",
+      subject: "Revert 'Add automatic retry on declined payments'",
+      body: "This approach caused duplicate ledger entries when idempotency keys are missing.\n\nThis reverts commit abc1234def5678901234567890abcdef12345678.",
+      files: ["src/payments/retry.ts"],
+    },
+    "/tmp/nonexistent"
+  );
+  assert.ok(info);
+  assert.equal(info!.originalSubject, "Add automatic retry on declined payments");
+  assert.equal(info!.originalSha, "abc1234def5678901234567890abcdef12345678");
+  assert.match(info!.reason!, /duplicate ledger entries/);
+});
+
+test("mineCommits: creates FAILED_APPROACH proposal from a real revert", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "aidimag-revert-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "Test User"], { cwd: dir });
+
+    mkdirSync(path.join(dir, "src", "payments"), { recursive: true });
+    writeFileSync(path.join(dir, "src", "payments", "retry.ts"), "export function retry() {}");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "Add automatic retry on declined payments", "-m", "This adds naive immediate retries in src/payments/retry.ts."], { cwd: dir });
+    const original = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir }).toString().trim();
+    assert.ok(original);
+
+    execFileSync("git", ["revert", "--no-edit", original!], { cwd: dir });
+
+    const store = new MemoryStore(path.join(dir, ".aidimag", "memory.db"));
+    try {
+      const result = mineCommits(store, dir, { full: true });
+      assert.equal(result.proposed.length, 1);
+      assert.equal(result.proposed[0].kind, "FAILED_APPROACH");
+      assert.match(result.proposed[0].claim, /automatic retry/i);
+      assert.match(result.proposed[0].claim, /reverted/i);
+      assert.ok(result.proposed[0].evidence.some((e) => e.type === "COMMIT_REF" && e.payload === original));
+      assert.ok(result.proposed[0].appliesWhen?.some((c) => c.startsWith("original_commit:")));
+    } finally {
+      store.close();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------- PR miner

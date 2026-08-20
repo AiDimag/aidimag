@@ -185,6 +185,7 @@ export async function bootstrapRepo(
       paths: c.paths,
       symbols: c.symbols,
       guardrailLevel: c.guardrailLevel,
+      appliesWhen: c.appliesWhen,
       evidence: evidence.length ? evidence : undefined,
       rationale: c.rationale ?? "Extracted by repo bootstrap survey.",
       source: "bootstrap",

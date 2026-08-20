@@ -9,4 +9,6 @@ export { getEmbeddingProvider } from "./embeddings/provider.js";
 export { hybridSearch, indexMemory, reindexAll } from "./embeddings/search.js";
 export { startSyncServer } from "./sync/server.js";
 export { sync, readCloudConfig, writeCloudConfig } from "./sync/client.js";
+export { computeAnalytics, recordTokenUsage } from "./analytics.js";
+export type { AnalyticsReport } from "./analytics.js";
 

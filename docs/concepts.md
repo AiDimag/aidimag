@@ -135,6 +135,5 @@ your-repo/
 └── .git/hooks/            # additive hooks aidimag installs
 ```
 
-Next: **[How it works](/how-it-works)** for the mechanics, or
-**[Getting started](/getting-started)** to set it up.
+Next: **[How it works](/how-it-works)**.
 

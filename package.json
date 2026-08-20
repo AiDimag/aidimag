@@ -1,6 +1,6 @@
 {
   "name": "aidimag",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "description": "Persistent, verified memory for AI coding agents. CLI: dim.",
   "type": "module",
   "license": "MIT",
@@ -41,6 +41,8 @@
     "node": ">=22"
   },
   "scripts": {
+    "icons:fetch": "node scripts/fetch-icons.mjs",
+    "prebuild": "node scripts/fetch-icons.mjs",
     "build": "tsc",
     "dev": "tsc --watch",
     "mcp": "node dist/mcp/server.js",

@@ -207,9 +207,4 @@ More: [FAQ](/faq) · [Configuration](/configuration) · [Team sync (self-hosted)
 
 ---
 
-## What to read next
-
-- [Quick start (5 minutes)](/quickstart) — remember, verify, guardrails without cloud depth  
-- [The review queue](/guides/review-queue) — how proposals become memories  
-- [Verifying memories](/guides/verifying) — evidence and the trust gate for synced-in claims  
-- [CLI reference](/cli-reference) — every command
+Next: **[CLI reference](/cli-reference)**.

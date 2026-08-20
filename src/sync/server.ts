@@ -36,6 +36,32 @@ import { buildDirectProvider } from "../tickets/provider.js";
 import { validateSyncPushItems } from "../security/sync-push.js";
 import { sealDeviceToken, unsealDeviceToken } from "../security/seal.js";
 import { isAllowedTicketBaseUrl } from "../security/url.js";
+import { randomUUID } from "node:crypto";
+
+// ---------------------------------------------------------------- RBAC types
+
+export type Role = "admin" | "member" | "viewer";
+
+export type Permission = "read" | "write" | "admin";
+
+export interface UserInfo {
+  id: string;
+  username: string;
+  role: Role;
+  oidcSub: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  admin: ["read", "write", "admin"],
+  member: ["read", "write"],
+  viewer: ["read"],
+};
+
+function roleHasPermission(role: Role, perm: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(perm) ?? false;
+}
 
 export interface SyncItem {
   tbl: "memories" | "proposals";
@@ -163,6 +189,32 @@ CREATE TABLE IF NOT EXISTS server_meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+-- RBAC: named users with roles (admin, member, viewer)
+CREATE TABLE IF NOT EXISTS users (
+  id         TEXT PRIMARY KEY,             -- uuid
+  username   TEXT NOT NULL UNIQUE,         -- display name or OIDC subject
+  role       TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member','viewer')),
+  oidc_sub   TEXT,                         -- OIDC 'sub' claim for SSO mapping
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+-- brain-scoped role overrides (per-user, per-brain)
+CREATE TABLE IF NOT EXISTS user_brain_roles (
+  user_id    TEXT NOT NULL,
+  brain      TEXT NOT NULL,
+  role       TEXT NOT NULL CHECK (role IN ('admin','member','viewer')),
+  PRIMARY KEY (user_id, brain),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+-- OIDC provider configuration (for SSO)
+CREATE TABLE IF NOT EXISTS oidc_config (
+  id           INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton
+  issuer       TEXT NOT NULL,              -- e.g. https://accounts.google.com
+  client_id    TEXT NOT NULL,
+  client_secret TEXT,                      -- encrypted at rest if needed
+  redirect_uri TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
 `;
 
 const TICKET_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -263,12 +315,17 @@ ${msg ? `<div class="msg">${escapeHtml(msg)}</div>` : ""}
 <button type="submit">Approve device</button>
 </form></div></body></html>`;
 
+export interface SyncServerHandle {
+  url: string;
+  close: () => Promise<void>;
+}
+
 export function startSyncServer(opts: {
   dbPath: string;
   token: string;
   port?: number;
   host?: string;
-}): Promise<string> {
+}): Promise<SyncServerHandle> {
   mkdirSync(path.dirname(path.resolve(opts.dbPath)), { recursive: true });
   const db = new Database(opts.dbPath);
   db.exec(SERVER_SCHEMA);
@@ -434,6 +491,107 @@ export function startSyncServer(opts: {
         return respond(200, { token: plainToken, brain: scope?.brain ?? null });
       }
 
+      // ---- OIDC SSO endpoints (no Bearer auth on login/callback) -----------
+      if (url.pathname === "/v1/auth/oidc/login") {
+        const cfg = db
+          .prepare("SELECT issuer, client_id, redirect_uri FROM oidc_config WHERE id = 1")
+          .get() as { issuer: string; client_id: string; redirect_uri: string } | undefined;
+        if (!cfg) return respond(503, { error: "OIDC not configured" });
+
+        const state = randomBytes(16).toString("hex");
+        const params = new URLSearchParams({
+          response_type: "code",
+          client_id: cfg.client_id,
+          redirect_uri: cfg.redirect_uri,
+          scope: "openid profile email",
+          state,
+        });
+        // Store state for CSRF validation on callback
+        db.prepare("INSERT INTO server_meta (key, value) VALUES (?, ?)").run(
+          `oidc_state_${state}`,
+          new Date(Date.now() + 10 * 60_000).toISOString()
+        );
+        return respond(302, { redirect: `${cfg.issuer.replace(/\/$/, "")}/authorize?${params.toString()}` });
+      }
+
+      if (req.method === "GET" && url.pathname === "/v1/auth/oidc/callback") {
+        const cfg = db
+          .prepare("SELECT issuer, client_id, client_secret, redirect_uri FROM oidc_config WHERE id = 1")
+          .get() as { issuer: string; client_id: string; client_secret: string | null; redirect_uri: string } | undefined;
+        if (!cfg) return respond(503, { error: "OIDC not configured" });
+
+        const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        const error = url.searchParams.get("error");
+
+        if (error) return respondHtml(400, `<h1>SSO failed</h1><p>${escapeHtml(error)}</p>`);
+        if (!code || !state) return respond(400, { error: "missing code or state" });
+
+        // Validate state (CSRF protection)
+        const stateRow = db.prepare("SELECT value FROM server_meta WHERE key = ?").get(`oidc_state_${state}`);
+        if (!stateRow) return respond(400, { error: "invalid or expired state" });
+        db.prepare("DELETE FROM server_meta WHERE key = ?").run(`oidc_state_${state}`);
+
+        // Exchange code for tokens
+        const tokenRes = await fetch(`${cfg.issuer.replace(/\/$/, "")}/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            client_id: cfg.client_id,
+            client_secret: cfg.client_secret ?? "",
+            redirect_uri: cfg.redirect_uri,
+          }),
+        });
+        if (!tokenRes.ok) {
+          const errText = await tokenRes.text();
+          return respondHtml(400, `<h1>SSO token exchange failed</h1><p>${escapeHtml(errText)}</p>`);
+        }
+        const tokens = (await tokenRes.json()) as { id_token?: string; access_token?: string };
+
+        // Decode id_token to get sub (no signature verification — the IdP already validated it)
+        let oidcSub = "";
+        if (tokens.id_token) {
+          try {
+            const payload = JSON.parse(
+              Buffer.from(tokens.id_token.split(".")[1], "base64url").toString("utf8")
+            ) as { sub?: string };
+            oidcSub = payload.sub ?? "";
+          } catch { /* malformed token */ }
+        }
+
+        if (!oidcSub) return respondHtml(400, `<h1>SSO failed</h1><p>No subject in id_token</p>`);
+
+        // Look up user by oidc_sub
+        const user = db
+          .prepare("SELECT id, username, role FROM users WHERE oidc_sub = ? AND revoked_at IS NULL")
+          .get(oidcSub) as { id: string; username: string; role: Role } | undefined;
+
+        if (!user) {
+          return respondHtml(403, `<h1>Access denied</h1><p>No user mapped to OIDC subject: ${escapeHtml(oidcSub)}</p>`);
+        }
+
+        // Mint an account token for this user
+        const token = `aidimag_at_${randomBytes(24).toString("base64url")}`;
+        const brainScope = roleHasPermission(user.role, "admin") ? null : "*";
+        db.prepare("INSERT INTO account_tokens (token, brain, label, created_at) VALUES (?, ?, ?, ?)").run(
+          hashCred(token),
+          brainScope,
+          `sso:${user.username}`,
+          new Date().toISOString()
+        );
+
+        return respondHtml(
+          200,
+          `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>aidimag — SSO login</title>${AUTH_PAGE_STYLES}</head>
+           <body><div class="card"><div class="success-icon">✅</div><h1>Welcome, ${escapeHtml(user.username)}</h1>
+           <p style="color:var(--dim);margin:12px 0 0">Role: <strong style="color:var(--text)">${user.role}</strong>.</p>
+           <p style="color:var(--dim);margin:8px 0 0">Your token: <code>${token}</code></p>
+           <p style="color:var(--dim);margin:8px 0 0;font-size:.85rem">Use this token with <code>dim cloud link --token ${token}</code></p></div></body></html>`
+        );
+      }
+
       // ---- everything below requires Bearer auth ----------------------------
       const auth = req.headers.authorization ?? "";
       if (!auth.startsWith("Bearer ")) return respond(401, { error: "unauthorized" });
@@ -486,6 +644,118 @@ export function startSyncServer(opts: {
               .run(new Date().toISOString(), h).changes;
           }
           return respond(200, { revoked: changes > 0 });
+        }
+        return respond(405, { error: "method not allowed" });
+      }
+
+      // ---- RBAC: user management (admin only) -----------------------------
+      if (url.pathname === "/v1/users") {
+        if (!isAdmin) return respond(403, { error: "admin token required" });
+        if (req.method === "POST") {
+          try {
+            const body = await readBody(req);
+            const { username, role, oidcSub } = JSON.parse(body || "{}") as {
+              username?: string; role?: Role; oidcSub?: string;
+            };
+            if (!username) return respond(400, { error: "missing username" });
+            const validRoles: Role[] = ["admin", "member", "viewer"];
+            const userRole: Role = validRoles.includes(role as Role) ? (role as Role) : "member";
+            const id = randomUUID();
+            db.prepare(
+              "INSERT INTO users (id, username, role, oidc_sub, created_at) VALUES (?, ?, ?, ?, ?)"
+            ).run(id, username, userRole, oidcSub ?? null, new Date().toISOString());
+            return respond(201, { id, username, role: userRole, oidcSub: oidcSub ?? null });
+          } catch (err) {
+            return respond(400, { error: err instanceof Error ? err.message : String(err) });
+          }
+        }
+        if (req.method === "GET") {
+          const users = db
+            .prepare("SELECT id, username, role, oidc_sub, created_at, revoked_at FROM users ORDER BY created_at")
+            .all() as Array<{ id: string; username: string; role: Role; oidc_sub: string | null; created_at: string; revoked_at: string | null }>;
+          return respond(200, {
+            users: users.map((u) => ({
+              id: u.id, username: u.username, role: u.role,
+              oidcSub: u.oidc_sub, createdAt: u.created_at, revokedAt: u.revoked_at,
+            })),
+          });
+        }
+        if (req.method === "DELETE") {
+          const target = url.searchParams.get("id");
+          if (!target) return respond(400, { error: "missing ?id=" });
+          db.prepare("UPDATE users SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL")
+            .run(new Date().toISOString(), target);
+          return respond(200, { ok: true });
+        }
+        return respond(405, { error: "method not allowed" });
+      }
+
+      // ---- RBAC: per-brain role overrides (admin only) --------------------
+      if (url.pathname === "/v1/user-brain-roles") {
+        if (!isAdmin) return respond(403, { error: "admin token required" });
+        if (req.method === "POST") {
+          try {
+            const body = await readBody(req);
+            const { userId, brain: targetBrain, role } = JSON.parse(body || "{}") as {
+              userId?: string; brain?: string; role?: Role;
+            };
+            if (!userId || !targetBrain) return respond(400, { error: "missing userId or brain" });
+            const validRoles: Role[] = ["admin", "member", "viewer"];
+            if (!validRoles.includes(role as Role)) return respond(400, { error: "invalid role" });
+            db.prepare(
+              "INSERT INTO user_brain_roles (user_id, brain, role) VALUES (?, ?, ?) ON CONFLICT(user_id, brain) DO UPDATE SET role = excluded.role"
+            ).run(userId, targetBrain, role as Role);
+            return respond(200, { ok: true });
+          } catch (err) {
+            return respond(400, { error: err instanceof Error ? err.message : String(err) });
+          }
+        }
+        if (req.method === "GET") {
+          const rows = db
+            .prepare(
+              `SELECT u.username, u.role AS global_role, ubr.brain, ubr.role AS brain_role
+               FROM user_brain_roles ubr JOIN users u ON u.id = ubr.user_id
+               WHERE u.revoked_at IS NULL ORDER BY ubr.brain, u.username`
+            )
+            .all() as Array<{ username: string; global_role: Role; brain: string; brain_role: Role }>;
+          return respond(200, { roles: rows });
+        }
+        return respond(405, { error: "method not allowed" });
+      }
+
+      // ---- OIDC provider config (admin only) -------------------------------
+      if (url.pathname === "/v1/oidc/config") {
+        if (!isAdmin) return respond(403, { error: "admin token required" });
+        if (req.method === "PUT" || req.method === "POST") {
+          try {
+            const body = await readBody(req);
+            const { issuer, clientId, clientSecret, redirectUri } = JSON.parse(body || "{}") as {
+              issuer?: string; clientId?: string; clientSecret?: string; redirectUri?: string;
+            };
+            if (!issuer || !clientId || !redirectUri) {
+              return respond(400, { error: "missing issuer, clientId, or redirectUri" });
+            }
+            db.prepare(
+              `INSERT INTO oidc_config (id, issuer, client_id, client_secret, redirect_uri, created_at)
+               VALUES (1, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET issuer = excluded.issuer, client_id = excluded.client_id,
+                 client_secret = excluded.client_secret, redirect_uri = excluded.redirect_uri`
+            ).run(issuer, clientId, clientSecret ?? null, redirectUri, new Date().toISOString());
+            return respond(200, { ok: true, issuer, clientId, redirectUri });
+          } catch (err) {
+            return respond(400, { error: err instanceof Error ? err.message : String(err) });
+          }
+        }
+        if (req.method === "GET") {
+          const cfg = db
+            .prepare("SELECT issuer, client_id, redirect_uri, created_at FROM oidc_config WHERE id = 1")
+            .get() as { issuer: string; client_id: string; redirect_uri: string; created_at: string } | undefined;
+          if (!cfg) return respond(404, { error: "OIDC not configured" });
+          return respond(200, { issuer: cfg.issuer, clientId: cfg.client_id, redirectUri: cfg.redirect_uri, createdAt: cfg.created_at });
+        }
+        if (req.method === "DELETE") {
+          db.prepare("DELETE FROM oidc_config WHERE id = 1").run();
+          return respond(200, { ok: true });
         }
         return respond(405, { error: "method not allowed" });
       }
@@ -766,7 +1036,15 @@ export function startSyncServer(opts: {
 
   return new Promise((resolve, reject) => {
     server.on("error", reject);
-    server.listen(port, host, () => resolve(`http://${host === "0.0.0.0" ? "localhost" : host}:${port}`));
+    server.listen(port, host, () => {
+      const addr = server.address();
+      const actualPort = addr && typeof addr === "object" ? addr.port : port;
+      const baseUrl = `http://${host === "0.0.0.0" ? "localhost" : host}:${actualPort}`;
+      resolve({
+        url: baseUrl,
+        close: () => new Promise<void>((res) => server.close(() => res())),
+      });
+    });
   });
 }
 

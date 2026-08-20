@@ -18,6 +18,8 @@ export interface ExtractedClaim {
   symbols?: string[];
   /** only for kind === "GUARDRAIL" */
   guardrailLevel?: GuardrailLevel;
+  /** only for kind === "FAILED_APPROACH": conditions under which the failure applies */
+  appliesWhen?: string[];
   /** short note on why this is durable / where in the doc it came from */
   rationale?: string;
   /** optional STATIC_CHECK shell command that passes iff the claim holds */
@@ -50,7 +52,7 @@ Turn it into a small set of FALSIFIABLE claims. Rules:
 5. Extract 0–12 claims. Zero is fine. Do NOT pad, and do NOT invent rules the document doesn't support.
 
 Respond with ONLY a JSON object of this exact shape:
-{"claims":[{"kind":"CONVENTION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"rationale":"..."}]}`;
+{"claims":[{"kind":"CONVENTION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"applies_when":[],"rationale":"..."}]}`;
 
 /** Build the user message for the LLM: instructions + the document. */
 export function buildExtractionUser(filename: string, content: string): string {
@@ -64,6 +66,8 @@ interface RawClaim {
   symbols?: unknown;
   guardrail_level?: unknown;
   guardrailLevel?: unknown;
+  applies_when?: unknown;
+  appliesWhen?: unknown;
   rationale?: unknown;
   static_check?: unknown;
   staticCheck?: unknown;
@@ -108,8 +112,10 @@ export function parseClaims(raw: string): ExtractedClaim[] {
     const out: ExtractedClaim = { kind, claim };
     const paths = asStringArray(item.paths);
     const symbols = asStringArray(item.symbols);
+    const appliesWhen = asStringArray(item.applies_when ?? item.appliesWhen);
     if (paths) out.paths = paths;
     if (symbols) out.symbols = symbols;
+    if (appliesWhen && kind === "FAILED_APPROACH") out.appliesWhen = appliesWhen;
     if (typeof item.rationale === "string" && item.rationale.trim()) out.rationale = item.rationale.trim();
     const sc = item.static_check ?? item.staticCheck;
     if (typeof sc === "string" && sc.trim()) out.staticCheck = sc.trim();

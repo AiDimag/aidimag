@@ -194,6 +194,7 @@ export async function minePrs(
         paths: cl.paths ?? scopeFromFiles(pr.files),
         symbols: cl.symbols,
         guardrailLevel: cl.guardrailLevel,
+        appliesWhen: cl.appliesWhen,
         evidence: evidence.length ? evidence : undefined,
         source: "pr-miner",
         sourceRef: `pr:${pr.number}`,

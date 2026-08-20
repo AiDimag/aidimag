@@ -143,5 +143,5 @@ general semantic recall over a large document corpus, use a vector store directl
 Use aiDimag when the problem is: **AI coding agents keep re-discovering, re-asking, or —
 worse — confidently misremembering how your codebase works.**
 
-Next: **[How it works](/how-it-works)** · **[Getting started](/getting-started)**
+Next: **[Install & setup](/getting-started)**.
 

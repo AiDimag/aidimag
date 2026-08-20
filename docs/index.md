@@ -91,8 +91,8 @@ your AI.
 ```sh
 # Remember a checkable claim about your codebase
 dim remember "All DB access goes through src/db/store.ts" \
-  -k CONVENTION -p src/db \
-  -e "STATIC_CHECK:grep -rL better-sqlite3 src --include=*.ts"
+  -k CONVENTION -p src \
+  -e "STATIC_CHECK:! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts"
 
 # Verify it against the current code
 dim verify
@@ -103,7 +103,7 @@ Output:
 ```
 ✓ [CONVENTION] All DB access goes through src/db/store.ts
     id=4f3a9c21 status=VERIFIED conf=0.80 scope=src/db
-    evidence: STATIC_CHECK(PASS) grep -rL better-sqlite3 src --include=*.ts
+    evidence: STATIC_CHECK(PASS) ! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts
 ```
 
 Now imagine someone imports `better-sqlite3` somewhere it shouldn't be. Run verify again:
@@ -115,6 +115,11 @@ Now imagine someone imports `better-sqlite3` somewhere it shouldn't be. Run veri
 
 **The memory noticed the code drifted.** That's the core value — memory that proves itself,
 instead of memory you hope is right.
+
+### Try the interactive demo
+
+Want to see the full workflow without installing anything? Try our [interactive demo →](/demo) —
+a simulated walkthrough showing remember → verify → check → staleness detection in action.
 
 ## Built for coding agents
 
@@ -193,7 +198,7 @@ Inspect the implementation. Run it locally. Build on top of it.
 
 ```sh
 npm install -g aidimag
-dim init
+dim setup
 ```
 
 [**Get started**](/getting-started) · [**View on GitHub**](https://github.com/AiDimag/aidimag) · [**Read the docs**](/introduction)

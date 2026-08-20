@@ -64,14 +64,14 @@ AIDimag's model:
 ```sh
 # Remember a claim with evidence
 dim remember "All DB access goes through src/db/store.ts" \
-  -k CONVENTION -p src/db \
-  -e "STATIC_CHECK:grep -rL better-sqlite3 src --include=*.ts"
+  -k CONVENTION -p src \
+  -e "STATIC_CHECK:! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts"
 ```
 
 ```
 ✓ [CONVENTION] All DB access goes through src/db/store.ts
     id=4f3a9c21 status=VERIFIED conf=0.80 scope=src/db
-    evidence: STATIC_CHECK(PASS) grep -rL better-sqlite3 src --include=*.ts
+    evidence: STATIC_CHECK(PASS) ! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts
 ```
 
 Someone adds a direct `better-sqlite3` import elsewhere. Next pull triggers verification
@@ -140,4 +140,4 @@ worse — confidently misremembering how your codebase works.**
 
 ---
 
-Next: **[Use cases](/use-cases)** · **[Getting started](/getting-started)** · **[How it works](/how-it-works)**
+Next: **[Use cases](/use-cases)**.

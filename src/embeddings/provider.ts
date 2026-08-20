@@ -13,6 +13,9 @@
  *   AIDIMAG_BEDROCK_REGION      (default: AWS SDK resolution)
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 export interface EmbeddingProvider {
   readonly name: string;
   readonly model: string;
@@ -21,8 +24,20 @@ export interface EmbeddingProvider {
 }
 
 const OLLAMA_URL = process.env.AIDIMAG_OLLAMA_URL ?? "http://localhost:11434";
-const OLLAMA_MODEL = process.env.AIDIMAG_OLLAMA_MODEL ?? "nomic-embed-text";
 const OPENAI_MODEL = process.env.AIDIMAG_OPENAI_MODEL ?? "text-embedding-3-small";
+
+/** Resolve the Ollama embedding model: env var → config.json → default */
+function getOllamaEmbeddingModel(): string {
+  if (process.env.AIDIMAG_OLLAMA_MODEL) return process.env.AIDIMAG_OLLAMA_MODEL;
+  const root = process.env.AIDIMAG_REPO_ROOT;
+  if (root) {
+    try {
+      const cfg = JSON.parse(readFileSync(path.join(root, ".aidimag", "config.json"), "utf8"));
+      if (cfg.ollama?.embeddingModel) return cfg.ollama.embeddingModel;
+    } catch { /* ignore */ }
+  }
+  return "nomic-embed-text";
+}
 
 class OpenAiProvider implements EmbeddingProvider {
   readonly name = "openai";
@@ -46,10 +61,11 @@ class OpenAiProvider implements EmbeddingProvider {
 
 class OllamaProvider implements EmbeddingProvider {
   readonly name = "ollama";
-  readonly model = OLLAMA_MODEL;
+  readonly model: string;
   readonly dim: number;
 
-  constructor(dim: number) {
+  constructor(model: string, dim: number) {
+    this.model = model;
     this.dim = dim;
   }
 
@@ -69,20 +85,21 @@ class OllamaProvider implements EmbeddingProvider {
   }
 
   static async detect(): Promise<OllamaProvider | null> {
+    const model = getOllamaEmbeddingModel();
     try {
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), 1500);
       const res = await fetch(`${OLLAMA_URL}/api/embeddings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: OLLAMA_MODEL, prompt: "probe" }),
+        body: JSON.stringify({ model, prompt: "probe" }),
         signal: ctl.signal,
       });
       clearTimeout(t);
       if (!res.ok) return null;
       const body = (await res.json()) as { embedding?: number[] };
       if (!body.embedding?.length) return null;
-      return new OllamaProvider(body.embedding.length);
+      return new OllamaProvider(model, body.embedding.length);
     } catch {
       return null;
     }
@@ -144,11 +161,16 @@ export async function getEmbeddingProvider(): Promise<EmbeddingProvider | null> 
   }
   if (mode === "ollama") {
     const p = await OllamaProvider.detect();
-    if (!p) throw new Error(`AIDIMAG_EMBEDDINGS=ollama but Ollama is not reachable at ${OLLAMA_URL} (model: ${OLLAMA_MODEL})`);
+    if (!p) throw new Error(`AIDIMAG_EMBEDDINGS=ollama but Ollama is not reachable at ${OLLAMA_URL} (model: ${getOllamaEmbeddingModel()})`);
     return (cached = p);
   }
   // auto
   if (process.env.OPENAI_API_KEY) return (cached = new OpenAiProvider());
   return (cached = await OllamaProvider.detect());
+}
+
+/** Reset the cached provider so the next call re-detects (e.g. after Ollama setup). */
+export function resetEmbeddingProviderCache(): void {
+  cached = undefined;
 }
 

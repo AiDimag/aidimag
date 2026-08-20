@@ -17,6 +17,9 @@
  * chain (env vars, ~/.aws profiles, SSO, instance roles).
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 export interface TextProvider {
   readonly name: string;
   readonly model: string;
@@ -25,8 +28,20 @@ export interface TextProvider {
 }
 
 const OLLAMA_URL = process.env.AIDIMAG_OLLAMA_URL ?? "http://localhost:11434";
-const OLLAMA_CHAT_MODEL = process.env.AIDIMAG_OLLAMA_CHAT_MODEL ?? "llama3.1";
 const OPENAI_CHAT_MODEL = process.env.AIDIMAG_OPENAI_CHAT_MODEL ?? "gpt-4o-mini";
+
+/** Resolve the Ollama chat/LLM model: env var → config.json → default */
+function getOllamaChatModel(): string {
+  if (process.env.AIDIMAG_OLLAMA_CHAT_MODEL) return process.env.AIDIMAG_OLLAMA_CHAT_MODEL;
+  const root = process.env.AIDIMAG_REPO_ROOT;
+  if (root) {
+    try {
+      const cfg = JSON.parse(readFileSync(path.join(root, ".aidimag", "config.json"), "utf8"));
+      if (cfg.ollama?.llmModel) return cfg.ollama.llmModel;
+    } catch { /* ignore */ }
+  }
+  return "llama3.1";
+}
 
 class OpenAiTextProvider implements TextProvider {
   readonly name = "openai";
@@ -57,7 +72,11 @@ class OpenAiTextProvider implements TextProvider {
 
 class OllamaTextProvider implements TextProvider {
   readonly name = "ollama";
-  readonly model = OLLAMA_CHAT_MODEL;
+  readonly model: string;
+
+  constructor() {
+    this.model = getOllamaChatModel();
+  }
 
   async generate(system: string, user: string): Promise<string> {
     const res = await fetch(`${OLLAMA_URL}/api/generate`, {
@@ -161,5 +180,10 @@ export async function getTextProvider(): Promise<TextProvider | null> {
   // auto: try OpenAI first, then Ollama
   if (process.env.OPENAI_API_KEY) return (cached = new OpenAiTextProvider());
   return (cached = await OllamaTextProvider.detect());
+}
+
+/** Reset the cached provider so the next call re-detects (e.g. after Ollama setup). */
+export function resetTextProviderCache(): void {
+  cached = undefined;
 }
 

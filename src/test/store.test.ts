@@ -250,3 +250,33 @@ test("search ranks human-authored above agent-authored at equal status", () => {
   }
 });
 
+test("FAILED_APPROACH appliesWhen round-trips through write, propose, and approval", () => {
+  const { store, dir } = tempStore();
+  try {
+    const m = store.write({
+      kind: "FAILED_APPROACH",
+      claim: "Retrying declined payments caused duplicate ledger entries",
+      paths: ["src/payments"],
+      appliesWhen: ["idempotency_not_enabled", "pre_feature_flag_v2"],
+      trustExecutableEvidence: true,
+    });
+    assert.deepEqual(m.appliesWhen, ["idempotency_not_enabled", "pre_feature_flag_v2"]);
+    assert.deepEqual(store.get(m.id)?.appliesWhen, m.appliesWhen);
+
+    const p = store.propose({
+      kind: "FAILED_APPROACH",
+      claim: "Direct DB writes in payment worker caused rollback",
+      source: "commit-miner",
+      appliesWhen: ["legacy_worker_path"],
+    });
+    assert.ok(p);
+    assert.deepEqual(p!.appliesWhen, ["legacy_worker_path"]);
+
+    const approved = store.approveProposal(p!.id);
+    assert.deepEqual(approved.appliesWhen, ["legacy_worker_path"]);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+

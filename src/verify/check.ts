@@ -67,7 +67,7 @@ export function gitDiff(repoRoot: string, ref?: string): string {
   }
 }
 
-const STOP = new Set(["the", "a", "an", "and", "or", "to", "of", "in", "on", "for", "with", "never", "always", "must", "only", "not", "use", "via"]);
+const STOP = new Set(["the", "a", "an", "and", "or", "to", "of", "in", "on", "for", "with", "never", "always", "must", "only", "not", "use", "via", "was", "were", "this", "that", "approach"]);
 
 function significantTokens(claim: string): string[] {
   return claim
@@ -85,8 +85,94 @@ function guardrailTripped(claim: string, addedText: string): boolean {
   return hits / tokens.length >= 0.6;
 }
 
-export function checkDiff(store: MemoryStore, repoRoot: string, opts: { ref?: string } = {}): CheckReport {
-  const diff = gitDiff(repoRoot, opts.ref);
+/** A failed approach is "tripped" when added code resembles the reverted approach. */
+function failedApproachTripped(claim: string, addedText: string): boolean {
+  const tokens = significantTokens(claim);
+  if (tokens.length === 0) return false;
+  const hay = addedText.toLowerCase();
+  const hits = tokens.filter((t) => hay.includes(t)).length;
+  // Lower threshold than guardrails: warn on a strong resemblance, not an exact match.
+  return hits / tokens.length >= 0.45;
+}
+
+/**
+ * Evaluate whether a FAILED_APPROACH memory's `appliesWhen` conditions are
+ * satisfied by the current change context. Conditions can be:
+ *  - `path:<pattern>` — matches if any changed file starts with the pattern
+ *  - `symbol:<name>` — matches if the symbol appears in added lines
+ *  - `keyword:<term>` — matches if the term appears in added text
+ *  - `original_commit:<sha>` — always matches (historical reference, not a precondition)
+ *  - bare text — treated as a keyword match
+ * Returns true if all conditions are satisfied (or if no conditions are given).
+ */
+export function evaluateAppliesWhen(
+  appliesWhen: string[] | undefined,
+  changedFiles: string[],
+  addedText: string
+): boolean {
+  if (!appliesWhen || appliesWhen.length === 0) return true;
+
+  const hay = addedText.toLowerCase();
+  const addedSymbols = extractSymbolsFromAdded(addedText);
+
+  for (const cond of appliesWhen) {
+    const c = cond.trim().toLowerCase();
+    if (!c) continue;
+
+    if (c.startsWith("path:")) {
+      const pattern = c.slice(5).replace(/^\//, "");
+      const matched = changedFiles.some((f) => f.startsWith(pattern) || f === pattern);
+      if (!matched) return false;
+    } else if (c.startsWith("symbol:")) {
+      const sym = c.slice(7);
+      if (!addedSymbols.has(sym) && !hay.includes(sym)) return false;
+    } else if (c.startsWith("keyword:")) {
+      const kw = c.slice(8);
+      if (!hay.includes(kw)) return false;
+    } else if (c.startsWith("original_commit:")) {
+      // Historical reference — always passes; not a runtime precondition
+      continue;
+    } else {
+      // Bare text — treat as keyword match
+      if (!hay.includes(c)) return false;
+    }
+  }
+  return true;
+}
+
+/** Extract function/class/method names from added lines for symbol-level matching. */
+function extractSymbolsFromAdded(addedText: string): Set<string> {
+  const symbols = new Set<string>();
+  const patterns = [
+    /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/g,
+    /(?:export\s+)?class\s+([A-Za-z_$][\w$]*)/g,
+    /(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g,
+    /(?:public|private|protected|static)?\s*([A-Za-z_$][\w$]*)\s*\(/g,
+    /def\s+([A-Za-z_]\w*)/g,
+  ];
+  for (const p of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = p.exec(addedText)) !== null) {
+      symbols.add(m[1].toLowerCase());
+    }
+  }
+  return symbols;
+}
+
+/** Collect added lines for the files a memory scopes to (or all changed files if unscoped). */
+function addedTextForMemory(m: MemoryEntry, changedFiles: string[], addedByFile: Map<string, string>): string {
+  return m.scope.paths.length
+    ? m.scope.paths
+        .flatMap((sp) =>
+          changedFiles
+            .filter((f) => f.startsWith(sp) || sp.startsWith(f))
+            .map((f) => addedByFile.get(f) ?? "")
+        )
+        .join("\n")
+    : changedFiles.map((f) => addedByFile.get(f) ?? "").join("\n");
+}
+
+export function checkDiffText(store: MemoryStore, diff: string, repoRoot: string): CheckReport {
   const diffFiles = parseDiff(diff);
   const changedFiles = diffFiles.map((f) => f.path);
   const addedByFile = new Map(diffFiles.map((f) => [f.path, f.addedLines.join("\n")]));
@@ -122,9 +208,7 @@ export function checkDiff(store: MemoryStore, repoRoot: string, opts: { ref?: st
 
     // 2) GUARDRAIL (never): pattern-match the added lines against the claim
     if (m.kind === "GUARDRAIL" && m.guardrailLevel === "never") {
-      const added = m.scope.paths.length
-        ? m.scope.paths.flatMap((sp) => changedFiles.filter((f) => f.startsWith(sp) || sp.startsWith(f)).map((f) => addedByFile.get(f) ?? "")).join("\n")
-        : changedFiles.map((f) => addedByFile.get(f) ?? "").join("\n");
+      const added = addedTextForMemory(m, changedFiles, addedByFile);
       if (guardrailTripped(m.claim, added)) {
         violations.push({
           memory: m,
@@ -134,7 +218,21 @@ export function checkDiff(store: MemoryStore, repoRoot: string, opts: { ref?: st
       }
     }
 
-    // 3) INVARIANT / CONVENTION scoped to a changed file → advisory reminder
+    // 3) FAILED_APPROACH: warn when added code resembles a previously reverted approach
+    //    and the appliesWhen preconditions are still satisfied.
+    if (m.kind === "FAILED_APPROACH") {
+      const added = addedTextForMemory(m, changedFiles, addedByFile);
+      if (failedApproachTripped(m.claim, added) && evaluateAppliesWhen(m.appliesWhen, changedFiles, added)) {
+        const conditions = m.appliesWhen?.length ? ` (applies when: ${m.appliesWhen.join(", ")})` : "";
+        violations.push({
+          memory: m,
+          severity: "warn",
+          detail: `⚠️ FAILED_APPROACH: this change resembles a previously reverted approach${conditions}`,
+        });
+      }
+    }
+
+    // 4) INVARIANT / CONVENTION scoped to a changed file → advisory reminder
     if ((m.kind === "INVARIANT" || m.kind === "CONVENTION") && m.scope.paths.length) {
       const touches = m.scope.paths.some((sp) => changedFiles.some((f) => f.startsWith(sp) || sp.startsWith(f)));
       const hasStaticCheck = m.grounding.some((e) => e.type === "STATIC_CHECK");
@@ -151,3 +249,6 @@ export function checkDiff(store: MemoryStore, repoRoot: string, opts: { ref?: st
   return { changedFiles, checked: seenIds.size, violations };
 }
 
+export function checkDiff(store: MemoryStore, repoRoot: string, opts: { ref?: string } = {}): CheckReport {
+  return checkDiffText(store, gitDiff(repoRoot, opts.ref), repoRoot);
+}

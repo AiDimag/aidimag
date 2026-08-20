@@ -168,3 +168,7 @@ Alternatively, disable the billing feature entirely in your server configuration
 - Check `dim status` to see the store's health at a glance.
 - Open `dim ui` for a visual view of memories, proposals, and the graph.
 
+---
+
+Next: **[Glossary](/glossary)**.
+

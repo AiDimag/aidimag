@@ -109,6 +109,7 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
 
     nav: [
       { text: "Home", link: "/" },
+      { text: "Interactive Demo", link: "/demo" },
       { text: "Why AIDimag", link: "/why-aidimag" },
       { text: "Use Cases", link: "/use-cases" },
       { text: "Getting Started", link: "/getting-started" },
@@ -132,8 +133,10 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
       {
         text: "Getting started",
         items: [
+          { text: "Interactive demo", link: "/demo" },
           { text: "Install & setup", link: "/getting-started" },
           { text: "Quick start (5 minutes)", link: "/quickstart" },
+          { text: "Sample repo", link: "/sample-repo" },
           { text: "Cloud sync TLDR", link: "/cloud-quickstart" },
         ],
       },

@@ -43,8 +43,8 @@ The most useful type. The command should exit `0` **only if the claim holds**.
 
 ```sh
 # "Nothing outside src/db imports better-sqlite3"
-dim remember "All DB access goes through src/db/store.ts" -k CONVENTION -p src/db \
-  -e "STATIC_CHECK:grep -rL better-sqlite3 src --include=*.ts"
+dim remember "All DB access goes through src/db/store.ts" -k CONVENTION -p src \
+  -e "STATIC_CHECK:! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts"
 
 # "The routes directory exists"
 -e "STATIC_CHECK:test -d src/routes"
@@ -94,6 +94,27 @@ dim remember "Public API responses are schema-validated" -k INVARIANT -p src/api
   -e "STATIC_CHECK:grep -rq schema.parse src/api" \
   -e "TEST_RESULT:npm test -- api/contract.test.ts"
 ```
+
+## Failed approaches
+
+`FAILED_APPROACH` memories capture something that was tried and reverted, so agents don't
+repeat it. Write the claim as the abandoned approach and its consequence, and use
+`-a, --applies-when` (or `applies_when` via MCP) to list the conditions under which the failure
+is still relevant. This prevents the memory from blocking the approach forever after the
+underlying cause has been fixed.
+
+```sh
+# The reverted retry logic only applies while idempotency keys are absent
+dim remember "Retrying declined payments caused duplicate ledger entries" \
+  -k FAILED_APPROACH -p src/payments \
+  -a idempotency_not_enabled pre_feature_flag_v2 \
+  -e COMMIT_REF:abc1234
+```
+
+`dim mine` detects git revert commits and automatically proposes `FAILED_APPROACH` memories
+with the original commit as evidence and an `applies_when` condition pointing back to the
+reverted approach. Refine the conditions during review — they are opaque condition strings
+that future checks can evaluate against the repo state.
 
 ## Verify your work
 

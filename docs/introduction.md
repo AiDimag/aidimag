@@ -47,7 +47,7 @@ free-text note. For example:
 > **Claim:** "All database access goes through `src/db/store.ts`; nothing else imports
 > `better-sqlite3`."
 >
-> **Evidence:** the shell command `grep -rL better-sqlite3 src --include=*.ts` (passes only
+> **Evidence:** the shell command `! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts` (passes only
 > if the claim holds).
 
 Because the claim is checkable, aiDimag can **re-run the evidence as your code changes**:
@@ -98,6 +98,5 @@ aiDimag organizes knowledge into **kinds**:
   `memory_critique` second-critic actively catch work that contradicts verified memory.
 - **Team-optional.** Add a self-hosted sync server when you want a shared brain. No SaaS lock-in.
 
-Next: **[Core concepts](/concepts)** explains the moving parts, or jump to
-**[Getting started](/getting-started)**.
+Next: **[Core concepts](/concepts)**.
 

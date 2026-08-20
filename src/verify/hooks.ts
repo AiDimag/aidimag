@@ -12,7 +12,7 @@
  * existing logic is never clobbered.
  */
 
-import { chmodSync, existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 
 export const HOOK_MARKER = "# >>> aidimag verify hook >>>";
@@ -25,6 +25,14 @@ const CAPTURE_HOOK_NAME = "post-commit";
 const BRANCH_PUSH_HOOK_NAME = "pre-push";
 const PRECOMMIT_HOOK_NAME = "pre-commit";
 const KNOWLEDGE_HOOK_NAME = "post-merge";
+
+export const ALL_HOOK_NAMES = [
+  ...VERIFY_HOOK_NAMES,
+  CAPTURE_HOOK_NAME,
+  BRANCH_PUSH_HOOK_NAME,
+  PRECOMMIT_HOOK_NAME,
+  KNOWLEDGE_HOOK_NAME,
+] as const;
 
 function hookBlock(): string {
   return [
@@ -135,6 +143,72 @@ export function installGitHooks(repoRoot: string): HookInstallResult {
   install(KNOWLEDGE_HOOK_NAME, KNOWLEDGE_HOOK_MARKER, knowledgeHookBlock());
   result.installed = [...new Set(result.installed)];
   result.alreadyPresent = [...new Set(result.alreadyPresent)].filter((n) => !result.installed.includes(n));
+  return result;
+}
+
+export interface HookUninstallResult {
+  removed: string[];
+  notPresent: string[];
+}
+
+const ALL_MARKERS = [
+  HOOK_MARKER,
+  CAPTURE_HOOK_MARKER,
+  BRANCH_HOOK_MARKER,
+  PRECOMMIT_HOOK_MARKER,
+  KNOWLEDGE_HOOK_MARKER,
+];
+
+/** Strip aidimag-managed blocks from git hooks. Empty hooks are left in place so the
+ *  user keeps any custom logic they added; only files that become pure boilerplate
+ *  (only shebang + whitespace after removal) are deleted. */
+export function uninstallGitHooks(repoRoot: string): HookUninstallResult {
+  const gitDir = path.join(repoRoot, ".git");
+  const result: HookUninstallResult = { removed: [], notPresent: [] };
+  if (!existsSync(gitDir)) return result;
+  const hooksDir = path.join(gitDir, "hooks");
+  if (!existsSync(hooksDir)) return result;
+
+  const stripBlock = (text: string, marker: string): string => {
+    const lines = text.split("\n");
+    const out: string[] = [];
+    let inside = false;
+    for (const line of lines) {
+      if (line.trim() === marker || line.trim().startsWith(marker)) {
+        inside = true;
+        continue;
+      }
+      if (inside) {
+        const end = line.trim().startsWith("# <<< aidimag") && line.trim().endsWith("hook <<<");
+        if (end) inside = false;
+        continue;
+      }
+      out.push(line);
+    }
+    return out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+  };
+
+  for (const name of ALL_HOOK_NAMES) {
+    const file = path.join(hooksDir, name);
+    if (!existsSync(file)) {
+      result.notPresent.push(name);
+      continue;
+    }
+    const original = readFileSync(file, "utf8");
+    let cleaned = original;
+    for (const marker of ALL_MARKERS) {
+      cleaned = stripBlock(cleaned, marker);
+    }
+    if (cleaned === original) {
+      result.notPresent.push(name);
+    } else if (!cleaned || cleaned.replace(/^#!.*\n?/, "").trim() === "") {
+      rmSync(file, { force: true });
+      result.removed.push(name);
+    } else {
+      writeFileSync(file, cleaned.endsWith("\n") ? cleaned : cleaned + "\n", { mode: 0o755 });
+      result.removed.push(name);
+    }
+  }
   return result;
 }
 

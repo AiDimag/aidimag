@@ -3,7 +3,7 @@
  * FTS5 powers Phase 1 search; sqlite-vec embeddings arrive in Phase 2.
  */
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 13;
 
 /** Idempotent migrations for pre-existing DBs (failures = already applied). */
 export const MIGRATIONS: string[] = [
@@ -23,6 +23,12 @@ export const MIGRATIONS: string[] = [
   "ALTER TABLE memories ADD COLUMN cloud_seq INTEGER",
   "ALTER TABLE proposals ADD COLUMN cloud_synced INTEGER NOT NULL DEFAULT 0",
   "ALTER TABLE proposals ADD COLUMN cloud_seq INTEGER",
+  // v12: FAILED_APPROACH applicability conditions
+  "ALTER TABLE memories ADD COLUMN applies_when TEXT",
+  "ALTER TABLE proposals ADD COLUMN applies_when TEXT",
+  // v13: signed evidence — cryptographic signature + signer identity
+  "ALTER TABLE evidence ADD COLUMN signature TEXT",
+  "ALTER TABLE evidence ADD COLUMN signed_by TEXT",
 ];
 
 /**
@@ -134,6 +140,33 @@ DROP TABLE events_v8;
 CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced, seq);
 `;
 
+/**
+ * v13 guarded rebuild: Add evidence_signed event type to the events table
+ * CHECK constraint. SQLite can't ALTER a CHECK constraint.
+ */
+export const EVENTS_REBUILD_V13 = `
+ALTER TABLE events RENAME TO events_v12;
+CREATE TABLE events (
+  seq            INTEGER PRIMARY KEY AUTOINCREMENT,
+  id             TEXT NOT NULL UNIQUE,
+  type           TEXT NOT NULL CHECK (type IN (
+                   'memory_created','status_changed','evidence_result',
+                   'refuted','superseded','forgotten',
+                   'proposal_created','proposal_approved','proposal_rejected',
+                   'verification_report','updated','evidence_added','evidence_removed',
+                   'evidence_signed')),
+  memory_id      TEXT,
+  payload        TEXT NOT NULL DEFAULT '{}',
+  machine        TEXT NOT NULL,
+  schema_version INTEGER NOT NULL,
+  created_at     TEXT NOT NULL,
+  synced         INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO events SELECT * FROM events_v12;
+DROP TABLE events_v12;
+CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced, seq);
+`;
+
 export const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
@@ -160,7 +193,8 @@ CREATE TABLE IF NOT EXISTS memories (
   pinned        INTEGER NOT NULL DEFAULT 0,
   guardrail_level TEXT CHECK (guardrail_level IN ('always','ask-first','never')),
   cloud_synced  INTEGER NOT NULL DEFAULT 0,
-  cloud_seq     INTEGER
+  cloud_seq     INTEGER,
+  applies_when  TEXT                       -- JSON string[] of applicability conditions (FAILED_APPROACH)
 );
 
 -- scope: one row per path / symbol a memory applies to
@@ -178,7 +212,9 @@ CREATE TABLE IF NOT EXISTS evidence (
               'COMMIT_REF','TEST_RESULT','EXEC_TRACE','STATIC_CHECK','HUMAN_ATTESTED','TICKET_REF')),
   payload   TEXT NOT NULL,
   last_run  TEXT,
-  result    TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (result IN ('PASS','FAIL','UNKNOWN'))
+  result    TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (result IN ('PASS','FAIL','UNKNOWN')),
+  signature TEXT,
+  signed_by TEXT
 );
 
 CREATE TABLE IF NOT EXISTS memory_links (
@@ -228,7 +264,8 @@ CREATE TABLE IF NOT EXISTS proposals (
   ticket_ref TEXT,                          -- ticket id (e.g. XXX-2100) when known
   guardrail_level TEXT,                     -- always | ask-first | never (GUARDRAIL proposals)
   cloud_synced INTEGER NOT NULL DEFAULT 0,
-  cloud_seq  INTEGER
+  cloud_seq  INTEGER,
+  applies_when TEXT                         -- JSON string[] of applicability conditions (FAILED_APPROACH proposals)
 );
 
 CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status);
@@ -274,7 +311,8 @@ CREATE TABLE IF NOT EXISTS events (
                    'memory_created','status_changed','evidence_result',
                    'refuted','superseded','forgotten',
                    'proposal_created','proposal_approved','proposal_rejected',
-                   'verification_report')),
+                   'verification_report','updated','evidence_added','evidence_removed',
+                   'evidence_signed')),
   memory_id      TEXT,                          -- subject memory/proposal id
   payload        TEXT NOT NULL DEFAULT '{}',    -- JSON event body
   machine        TEXT NOT NULL,                 -- stable per-machine id
@@ -299,5 +337,27 @@ CREATE TABLE IF NOT EXISTS scratchpad (
 );
 CREATE INDEX IF NOT EXISTS idx_scratchpad_session ON scratchpad(session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_scratchpad_expiry ON scratchpad(expires_at);
+
+-- v13: Immutable history — prevent modification of event data columns.
+-- The events log is the tamper-evident audit trail; once written, event data
+-- must never be modified or removed. The synced column is exempt so that
+-- dim sync can mark events as pushed without triggering the guard.
+CREATE TRIGGER IF NOT EXISTS trg_events_no_update
+BEFORE UPDATE ON events
+WHEN NEW.type <> OLD.type
+   OR NEW.id <> OLD.id
+   OR NEW.memory_id IS NOT OLD.memory_id
+   OR NEW.payload <> OLD.payload
+   OR NEW.machine <> OLD.machine
+   OR NEW.schema_version <> OLD.schema_version
+   OR NEW.created_at <> OLD.created_at
+BEGIN
+  SELECT RAISE(ABORT, 'events table is immutable: event data cannot be modified');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_events_no_delete
+BEFORE DELETE ON events
+BEGIN
+  SELECT RAISE(ABORT, 'events table is immutable: DELETE not allowed');
+END;
 `;
 

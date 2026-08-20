@@ -30,6 +30,10 @@ aiDimag keeps repo settings in **`.aidimag/config.json`**. This file contains se
     "summarizer": "auto",
     "requireReview": true,
     "backup": true
+  },
+  "ollama": {
+    "embeddingModel": "nomic-embed-text",
+    "llmModel": "llama3.2"
   }
 }
 ```
@@ -81,6 +85,30 @@ work out of the box.
 | `maxBytes` | `1048576` | Hard size cap; larger files are skipped |
 | `chunkBytes` | `16384` | Soft threshold; larger text docs are chunked before summarizing |
 
+### `retention`
+
+Controls automatic forgetting of old, evidence-free memories. See `dim retention` in the
+[CLI reference](/cli-reference#dim-retention).
+
+| Key | Default | Description |
+|---|---|---|
+| `maxAgeDays` | `0` (disabled) | Memories older than this with no evidence are auto-forgotten |
+| `staleAgeDays` | `0` (disabled) | STALE memories older than this are auto-forgotten regardless of evidence |
+| `preservePinned` | `true` | Never forget pinned memories |
+| `preserveSources` | `["human", "knowledge:"]` | Never forget memories from these sources |
+| `dryRun` | `false` | Report what would be forgotten without deleting |
+
+### `ollama`
+
+Stores the selected Ollama models for embedding and LLM tasks. Set automatically by
+`dim setup-ollama` or the dashboard's Model Settings dialog. Environment variables
+(`AIDIMAG_OLLAMA_MODEL`, `AIDIMAG_OLLAMA_CHAT_MODEL`) take precedence over config values.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `embeddingModel` | `"nomic-embed-text"` | Ollama model for semantic search embeddings |
+| `llmModel` | `"llama3.1"` | Ollama model for mining, harvest, bootstrap, knowledge sync |
+
 ## Environment variables
 
 Some behavior is controlled by environment variables rather than the config file — see the
@@ -89,4 +117,8 @@ table in the [CLI reference](/cli-reference#environment-variables). The most use
 - `AIDIMAG_REPO` — point the CLI/MCP server at a specific repo.
 - `AIDIMAG_EMBEDDINGS` — `auto` / `openai` / `ollama` / `off`.
 - `AIDIMAG_AUTO_SYNC=off` — disable automatic sync after writes.
+
+---
+
+Next: **[MCP integration](/mcp)**.
 

@@ -19,9 +19,9 @@ export function registerSyncCommands(program: Command): void {
       const token = opts.token ?? process.env.AIDIMAG_SYNC_TOKEN;
       if (!token) fail("provide --token or set AIDIMAG_SYNC_TOKEN");
       const { startSyncServer } = await import("../../sync/server.js");
-      const url = await startSyncServer({ dbPath: opts.db, token, port: parseInt(opts.port, 10) });
-      console.log(`aidimag sync server: ${url}  (db: ${opts.db}, Ctrl+C to stop)`);
-      console.log(`Link a repo with: dim cloud link --server ${url} --brain <name> --token <token>`);
+      const handle = await startSyncServer({ dbPath: opts.db, token, port: parseInt(opts.port, 10) });
+      console.log(`aidimag sync server: ${handle.url}  (db: ${opts.db}, Ctrl+C to stop)`);
+      console.log(`Link a repo with: dim cloud link --server ${handle.url} --brain <name> --token <token>`);
     });
 
   program
@@ -355,6 +355,140 @@ export function registerSyncCommands(program: Command): void {
         }
         default:
           fail(`unknown action '${action}'. Use: create | list | revoke`);
+      }
+    });
+
+  program
+    .command("users")
+    .description("Manage RBAC users on the sync server (admin token required)")
+    .argument("<action>", "create | list | revoke | set-role")
+    .option("-s, --server <url>", "Server URL (defaults to the repo's linked server)")
+    .option("-u, --username <name>", "Username (create)")
+    .option("-r, --role <role>", "Role: admin | member | viewer (create, set-role)")
+    .option("--oidc-sub <sub>", "OIDC subject for SSO mapping (create)")
+    .option("--user-id <id>", "User id (revoke, set-role)")
+    .option("--brain <name>", "Brain name (set-role for per-brain override)")
+    .option("-t, --admin-token <token>", "Admin token (or AIDIMAG_ADMIN_TOKEN env)")
+    .action(async (action: string, opts) => {
+      const { readCloudConfig } = await import("../../sync/client.js");
+      const root = findRepoRoot();
+      const server: string | undefined = opts.server ?? (root ? readCloudConfig(root)?.server : undefined);
+      if (!server) fail("no server: pass --server or link the repo with `dim cloud link`");
+      const admin = opts.adminToken ?? process.env.AIDIMAG_ADMIN_TOKEN;
+      if (!admin) fail("provide --admin-token or set AIDIMAG_ADMIN_TOKEN");
+      const call = async (method: string, pathq: string, body?: unknown) => {
+        const res = await fetch(`${server}${pathq}`, {
+          method,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin}` },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        const json = await res.json();
+        if (!res.ok) fail(`server: ${JSON.stringify(json)}`);
+        return json;
+      };
+      switch (action) {
+        case "create": {
+          if (!opts.username) fail("usage: dim users create --username <name> [--role <role>] [--oidc-sub <sub>]");
+          const r = (await call("POST", "/v1/users", {
+            username: opts.username,
+            role: opts.role,
+            oidcSub: opts.oidcSub,
+          })) as { id: string; username: string; role: string };
+          console.log(`Created user: ${r.username} (id: ${r.id}, role: ${r.role})`);
+          break;
+        }
+        case "list": {
+          const r = (await call("GET", "/v1/users")) as {
+            users: Array<{ id: string; username: string; role: string; oidcSub: string | null; createdAt: string; revokedAt: string | null }>;
+          };
+          if (!r.users.length) console.log("No users.");
+          for (const u of r.users) {
+            console.log(`${u.revokedAt ? "✗" : "✓"} ${u.username}  role=${u.role}  id=${u.id}${u.oidcSub ? `  oidc=${u.oidcSub}` : ""}${u.revokedAt ? "  (revoked)" : ""}`);
+          }
+          break;
+        }
+        case "revoke": {
+          if (!opts.userId) fail("usage: dim users revoke --user-id <id>");
+          await call("DELETE", `/v1/users?id=${encodeURIComponent(opts.userId)}`);
+          console.log("User revoked.");
+          break;
+        }
+        case "set-role": {
+          if (!opts.userId || !opts.role) fail("usage: dim users set-role --user-id <id> --role <role> [--brain <name>]");
+          if (opts.brain) {
+            await call("POST", "/v1/user-brain-roles", { userId: opts.userId, brain: opts.brain, role: opts.role });
+            console.log(`Set per-brain role: ${opts.role} on brain '${opts.brain}'.`);
+          } else {
+            // Update global role by creating a new user entry with the same username
+            fail("Global role update not yet supported via API. Use per-brain overrides with --brain.");
+          }
+          break;
+        }
+        default:
+          fail(`unknown action '${action}'. Use: create | list | revoke | set-role`);
+      }
+    });
+
+  program
+    .command("oidc")
+    .description("Configure OIDC SSO provider on the sync server (admin token required)")
+    .argument("<action>", "set | show | remove")
+    .option("-s, --server <url>", "Server URL (defaults to the repo's linked server)")
+    .option("--issuer <url>", "OIDC issuer URL (e.g. https://accounts.google.com)")
+    .option("--client-id <id>", "OAuth client ID")
+    .option("--client-secret <secret>", "OAuth client secret")
+    .option("--redirect-uri <url>", "Callback URL (e.g. https://your-server/v1/auth/oidc/callback)")
+    .option("-t, --admin-token <token>", "Admin token (or AIDIMAG_ADMIN_TOKEN env)")
+    .action(async (action: string, opts) => {
+      const { readCloudConfig } = await import("../../sync/client.js");
+      const root = findRepoRoot();
+      const server: string | undefined = opts.server ?? (root ? readCloudConfig(root)?.server : undefined);
+      if (!server) fail("no server: pass --server or link the repo with `dim cloud link`");
+      const admin = opts.adminToken ?? process.env.AIDIMAG_ADMIN_TOKEN;
+      if (!admin) fail("provide --admin-token or set AIDIMAG_ADMIN_TOKEN");
+      const call = async (method: string, pathq: string, body?: unknown) => {
+        const res = await fetch(`${server}${pathq}`, {
+          method,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin}` },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        const json = await res.json();
+        if (!res.ok) fail(`server: ${JSON.stringify(json)}`);
+        return json;
+      };
+      switch (action) {
+        case "set": {
+          if (!opts.issuer || !opts.clientId || !opts.redirectUri) {
+            fail("usage: dim oidc set --issuer <url> --client-id <id> --redirect-uri <url> [--client-secret <secret>]");
+          }
+          const r = (await call("PUT", "/v1/oidc/config", {
+            issuer: opts.issuer,
+            clientId: opts.clientId,
+            clientSecret: opts.clientSecret,
+            redirectUri: opts.redirectUri,
+          })) as { ok: boolean; issuer: string; clientId: string };
+          console.log(`✓ OIDC configured: ${r.issuer} (client: ${r.clientId})`);
+          console.log(`  Users can now log in at: ${server}/v1/auth/oidc/login`);
+          break;
+        }
+        case "show": {
+          const r = (await call("GET", "/v1/oidc/config")) as {
+            issuer: string; clientId: string; redirectUri: string; createdAt: string;
+          };
+          console.log(`Issuer:       ${r.issuer}`);
+          console.log(`Client ID:    ${r.clientId}`);
+          console.log(`Redirect URI: ${r.redirectUri}`);
+          console.log(`Created:      ${r.createdAt}`);
+          console.log(`\nLogin URL:    ${server}/v1/auth/oidc/login`);
+          break;
+        }
+        case "remove": {
+          await call("DELETE", "/v1/oidc/config");
+          console.log("✓ OIDC configuration removed.");
+          break;
+        }
+        default:
+          fail(`unknown action '${action}'. Use: set | show | remove`);
       }
     });
 }

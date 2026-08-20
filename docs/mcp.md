@@ -112,6 +112,7 @@ field must match the registry name **exactly, including case** (`AiDimag`, not `
 | `memory_refute` | Mark a memory false when it no longer holds |
 | `memory_status` | Counts by status and kind |
 | `commits_mine` | Mine git history for memory proposals (like `dim mine`; optional `full`, `llm`, `max`) |
+| `memory_check_change` | **Pre-edit safety check** — pass a diff or (paths + task) and get any matching `FAILED_APPROACH`, guardrails, invariants, or conventions before you edit |
 | `memory_critique` | Review work against verified memory + guardrails (a "second critic") |
 | `scratchpad_write` | Jot a **short-term working note** for the current session (task state, plans, hypotheses). TTL-expiring (default 24h), never synced, never durable memory |
 | `scratchpad_read` | Read back working notes — use when resuming a task to recover in-flight state (expired notes are purged automatically) |
@@ -156,7 +157,7 @@ You never have to memorize the list — discovery is built in at four levels:
 
 1. **Start** → run `session_start` (or read `aidimag://session-briefing`) to learn the rules
    and stale spots.
-2. **Before editing files** → `memory_get_for_files` to pull conventions/gotchas/guardrails.
+2. **Before editing files** → `memory_check_change` with the planned diff or paths/task to catch `FAILED_APPROACH` warnings and guardrails up front, then `memory_get_for_files` to pull conventions/gotchas.
 3. **While working** → `memory_search` whenever a question comes up, `context_note`
    the moment the human states a durable fact in chat, and `scratchpad_write` for
    in-flight task state (plans, hypotheses, "resume here" markers).
@@ -171,4 +172,8 @@ You never have to memorize the list — discovery is built in at four levels:
 No — it's the richest integration, but optional. `dim generate-context` produces
 `CLAUDE.md`, `.cursorrules`, and `copilot-instructions.md` that any assistant reads at
 startup. Many teams use both: MCP for live read/write, generated files as a static fallback.
+
+---
+
+Next: **[IDE extensions](/ide-extensions)**.
 

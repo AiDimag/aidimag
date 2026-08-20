@@ -4,6 +4,8 @@
  * (Claude Code, Cursor, Copilot, ...) over stdio.
  *
  * Tools: memory_search, memory_get_for_files, memory_write, memory_refute, memory_status,
+ *        memory_check_change (pre-edit safety check with risk score + proceed/ask_first/stop),
+ *        memory_pre_edit (file-specific pre-edit guardrail check with STOP/PROCEED),
  *        commits_mine, context_note (passive in-chat fact capture), chat_harvest (bulk
  *        on-the-fly harvest of the current session from any tool), … — searches are logged
  *        so zero-hit queries surface as coverage gaps (`dim gaps`).
@@ -23,6 +25,7 @@ import { buildSessionBriefing, renderBriefing, sessionStartPrompt } from "../cap
 import { critique } from "../critique/critique.js";
 import { ticketProviderFor, detectBranchTicket } from "../tickets/provider.js";
 import { verifyAll } from "../verify/engine.js";
+import { checkDiffText } from "../verify/check.js";
 import { hybridSearch, indexMemory } from "../embeddings/search.js";
 import { stripExecutableEvidence } from "../security/evidence.js";
 import { resolveKnowledgeConfig } from "../config.js";
@@ -207,7 +210,7 @@ async function main() {
       evidence: z
         .array(z.object({ type: z.enum(EVIDENCE_TYPES), payload: z.string() }))
         .optional()
-        .describe("Grounding evidence, e.g. {type:'COMMIT_REF', payload:'abc123'} or {type:'STATIC_CHECK', payload:'grep -rL better-sqlite3 src --include=*.ts'}"),
+        .describe("Grounding evidence, e.g. {type:'COMMIT_REF', payload:'abc123'} or {type:'STATIC_CHECK', payload:'! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts'}"),
       created_by: z.string().optional().describe("Agent identifier, e.g. 'claude-code'"),
     },
     async (args) => {
@@ -357,6 +360,10 @@ async function main() {
         .array(z.object({ type: z.enum(EVIDENCE_TYPES), payload: z.string() }))
         .optional()
         .describe("Grounding evidence, e.g. {type:'COMMIT_REF', payload:'abc123'}"),
+      applies_when: z
+        .array(z.string())
+        .optional()
+        .describe("For kind=FAILED_APPROACH: conditions under which the failure applies (prevents blocking the approach after the underlying cause is fixed)"),
       rationale: z.string().optional().describe("Why this is worth remembering (helps the reviewer)"),
       ticket_ref: z
         .string()
@@ -381,6 +388,7 @@ async function main() {
         rationale: args.rationale,
         ticketRef,
         guardrailLevel: args.guardrail_level,
+        appliesWhen: args.kind === "FAILED_APPROACH" ? args.applies_when : undefined,
         source: `session:${args.agent_id ?? "agent"}`,
       });
       if (!p) {
@@ -400,6 +408,184 @@ async function main() {
   );
 
   server.tool(
+    "memory_check_change",
+    "Pre-edit safety check: given a diff or a short description of a change you're about to make, return any FAILED_APPROACH, GUARDRAIL, INVARIANT, or CONVENTION memories that match. Call this BEFORE editing code when the task touches an area with known historical failures or explicit rules. Returns a decision: proceed, ask_first, or stop.",
+    {
+      diff: z.string().optional().describe("Unified diff of the proposed change (e.g. git diff --no-index or a hand-written patch). If omitted, the check is based on paths + task only."),
+      paths: z.array(z.string()).optional().describe("Repo-relative paths the change touches"),
+      task: z.string().optional().describe("Short plain-text description of what you're about to do (used for keyword matching when no diff is given)"),
+      agent_id: z.string().optional().describe("Your agent identifier, e.g. 'claude-code'"),
+    },
+    async (args) => {
+      const root = process.env.AIDIMAG_REPO ?? findRepoRoot() ?? process.cwd();
+      let report;
+      if (args.diff && args.diff.trim()) {
+        report = checkDiffText(store, args.diff, root);
+      } else {
+        // Fallback: search for relevant memories in the touched paths.
+        const searchPaths = args.paths ?? [];
+        const query = args.task?.trim() || "";
+        const candidates = store.search({ query, paths: searchPaths, limit: 20 });
+        const forFiles = searchPaths.length ? store.getForFiles(searchPaths, 50) : [];
+        const seen = new Set<string>();
+        const relevant: MemoryEntry[] = [];
+        for (const m of [...candidates, ...forFiles]) {
+          if (seen.has(m.id)) continue;
+          seen.add(m.id);
+          if (["FAILED_APPROACH", "GUARDRAIL", "INVARIANT", "CONVENTION"].includes(m.kind)) {
+            relevant.push(m);
+          }
+        }
+        report = {
+          changedFiles: searchPaths,
+          checked: relevant.length,
+          violations: relevant.map((m) => ({
+            memory: m,
+            severity: "warn" as const,
+            detail: `Relevant ${m.kind}: ${m.claim}${m.appliesWhen?.length ? ` (applies when: ${m.appliesWhen.join(", ")})` : ""}`,
+          })),
+        };
+      }
+
+      // Compute risk score for structured guidance
+      const { computeRiskScore } = await import("../verify/risk-score.js");
+      const { readCriticalAreas, checkCriticalAreas } = await import("../verify/critical-areas.js");
+      const areasConfig = readCriticalAreas(root);
+      const areaViolations = checkCriticalAreas(areasConfig, report.changedFiles);
+      const risk = computeRiskScore(report, areaViolations);
+
+      const fails = report.violations.filter((v) => v.severity === "fail");
+      const hasNeverGuardrail = fails.some((v) => v.memory.kind === "GUARDRAIL" && v.memory.guardrailLevel === "never");
+      const hasAskFirst = report.violations.some((v) => v.memory.kind === "GUARDRAIL" && v.memory.guardrailLevel === "ask-first");
+      const hasCriticalAreaFail = areaViolations.some((v: { severity: string }) => v.severity === "fail");
+
+      let decision: "proceed" | "ask_first" | "stop";
+      if (hasNeverGuardrail || hasCriticalAreaFail) {
+        decision = "stop";
+      } else if (hasAskFirst || risk.level === "high" || risk.level === "critical") {
+        decision = "ask_first";
+      } else {
+        decision = "proceed";
+      }
+
+      if (report.violations.length === 0 && areaViolations.length === 0) {
+        return { content: [{ type: "text", text: `✅ PROCEED — no matching guardrails or failed approaches found. Risk: ${risk.score}/100 (${risk.level}).` }] };
+      }
+
+      const { resolveMcpEnforceConfig } = await import("../config.js");
+      const enforceMode = resolveMcpEnforceConfig(root);
+
+      const lines: string[] = [];
+      const decisionIcon = decision === "stop" ? "🛑 STOP" : decision === "ask_first" ? "⚠️ ASK FIRST" : "✅ PROCEED";
+      lines.push(`${decisionIcon} — Risk: ${risk.score}/100 (${risk.level})`);
+      lines.push("");
+      for (const v of report.violations) {
+        const icon = v.severity === "fail" ? "🚫" : "⚠️";
+        lines.push(`${icon} ${v.memory.kind} [${v.memory.id.slice(0, 8)}]: ${v.detail}`);
+        lines.push(`   claim: ${v.memory.claim}`);
+      }
+      for (const v of areaViolations) {
+        const icon = v.severity === "fail" ? "🚫" : "⚠️";
+        lines.push(`${icon} CRITICAL AREA [${v.area.label}]: ${v.detail}`);
+        if (v.area.owners?.length) lines.push(`   owners: ${v.area.owners.join(", ")}`);
+      }
+      if (decision === "stop") {
+        lines.push("");
+        lines.push("This change violates a NEVER guardrail or critical area. Do not proceed without explicit human approval.");
+        if (enforceMode === "enforce") {
+          lines.push("");
+          lines.push("⚠️ ENFORCEMENT MODE: This STOP decision is a hard block. The edit must not be applied.");
+        }
+      } else if (decision === "ask_first") {
+        lines.push("");
+        lines.push("An ASK-FIRST guardrail or high-risk change was detected. Confirm with the user before proceeding.");
+      }
+      const result: { content: { type: "text"; text: string }[]; isError?: boolean } = { content: [{ type: "text", text: lines.join("\n") }] };
+      if (enforceMode === "enforce" && decision === "stop") {
+        result.isError = true;
+      }
+      return result;
+    }
+  );
+
+  server.tool(
+    "memory_pre_edit",
+    "Pre-edit guardrail check for a specific file and code snippet. Given a file path and the code you're about to write, check whether it violates any NEVER guardrails or triggers FAILED_APPROACH warnings. Returns a clear STOP/PROCEED decision. Call this before writing to files in protected areas.",
+    {
+      file_path: z.string().describe("Repo-relative file path being edited"),
+      code: z.string().describe("The code snippet you're about to write (added lines only)"),
+      agent_id: z.string().optional().describe("Your agent identifier, e.g. 'claude-code'"),
+    },
+    async (args) => {
+      const root = process.env.AIDIMAG_REPO ?? findRepoRoot() ?? process.cwd();
+      const filePath = args.file_path;
+      const code = args.code;
+
+      // Build a synthetic diff for the check
+      const syntheticDiff = `diff --git a/${filePath} b/${filePath}\n--- a/${filePath}\n+++ b/${filePath}\n${code.split("\n").map((l) => `+${l}`).join("\n")}`;
+      const report = checkDiffText(store, syntheticDiff, root);
+
+      // Check critical areas
+      const { readCriticalAreas, checkCriticalAreas } = await import("../verify/critical-areas.js");
+      const areasConfig = readCriticalAreas(root);
+      const areaViolations = checkCriticalAreas(areasConfig, [filePath]);
+
+      // Compute risk
+      const { computeRiskScore } = await import("../verify/risk-score.js");
+      const risk = computeRiskScore(report, areaViolations);
+
+      const fails = report.violations.filter((v) => v.severity === "fail");
+      const hasNeverGuardrail = fails.some((v) => v.memory.kind === "GUARDRAIL" && v.memory.guardrailLevel === "never");
+      const hasCriticalAreaFail = areaViolations.some((v: { severity: string }) => v.severity === "fail");
+
+      let decision: "proceed" | "stop";
+      if (hasNeverGuardrail || hasCriticalAreaFail) {
+        decision = "stop";
+      } else {
+        decision = "proceed";
+      }
+
+      const lines: string[] = [];
+      const decisionIcon = decision === "stop" ? "🛑 STOP" : "✅ PROCEED";
+      lines.push(`${decisionIcon} — file: ${filePath} | risk: ${risk.score}/100 (${risk.level})`);
+
+      if (report.violations.length === 0 && areaViolations.length === 0) {
+        lines.push("No guardrail violations detected for this edit.");
+      } else {
+        lines.push("");
+        for (const v of report.violations) {
+          const icon = v.severity === "fail" ? "🚫" : "⚠️";
+          lines.push(`${icon} ${v.memory.kind} [${v.memory.id.slice(0, 8)}]: ${v.detail}`);
+          lines.push(`   claim: ${v.memory.claim}`);
+        }
+        for (const v of areaViolations) {
+          const icon = v.severity === "fail" ? "🚫" : "⚠️";
+          lines.push(`${icon} CRITICAL AREA [${v.area.label}]: ${v.detail}`);
+          if (v.area.owners?.length) lines.push(`   owners: ${v.area.owners.join(", ")}`);
+        }
+        if (decision === "stop") {
+          lines.push("");
+          lines.push("This edit violates a NEVER guardrail or critical area. Do not write this code without explicit human approval.");
+          const { resolveMcpEnforceConfig } = await import("../config.js");
+          const enforceMode = resolveMcpEnforceConfig(root);
+          if (enforceMode === "enforce") {
+            lines.push("");
+            lines.push("⚠️ ENFORCEMENT MODE: This STOP decision is a hard block. The edit must not be applied.");
+          }
+        }
+      }
+      const result: { content: { type: "text"; text: string }[]; isError?: boolean } = { content: [{ type: "text", text: lines.join("\n") }] };
+      if (decision === "stop") {
+        const { resolveMcpEnforceConfig } = await import("../config.js");
+        if (resolveMcpEnforceConfig(root) === "enforce") {
+          result.isError = true;
+        }
+      }
+      return result;
+    }
+  );
+
+  server.tool(
     "context_note",
     "Capture a durable fact the USER just stated in chat. Call this IMMEDIATELY when the user shares codebase knowledge — don't wait for session end. ALWAYS trigger on: 'we use X because Y' (DECISION), 'never do X' (GUARDRAIL), 'we always X' (CONVENTION), 'we tried X, it failed' (FAILED_APPROACH), 'the architecture is...' (ARCHITECTURE). Skip task-specific requests like 'fix this bug'. User-stated facts are queued for review with high trust (HUMAN_ATTESTED evidence).",
     {
@@ -415,6 +601,10 @@ async function main() {
         .enum(GUARDRAIL_LEVELS)
         .optional()
         .describe("For kind=GUARDRAIL: never | always | ask-first"),
+      applies_when: z
+        .array(z.string())
+        .optional()
+        .describe("For kind=FAILED_APPROACH: conditions under which the failure applies (prevents blocking the approach after the underlying cause is fixed)"),
       agent_id: z.string().optional().describe("Your agent identifier, e.g. 'claude-code'"),
     },
     async (args) => {
@@ -438,6 +628,7 @@ async function main() {
           : "Stated directly by the user in an AI chat session.",
         ticketRef,
         guardrailLevel: args.guardrail_level,
+        appliesWhen: args.kind === "FAILED_APPROACH" ? args.applies_when : undefined,
         source: `context:${args.agent_id ?? "agent"}`,
       });
       if (!p) {

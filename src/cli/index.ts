@@ -9,7 +9,8 @@
  *                 refute, pin, unpin, forget
  *   capture.ts    mine (commits/PRs), bootstrap, harvest, review, proposals gc
  *   verify.ts     verify, check, brief
- *   sync.ts       serve, cloud, login, logout, sync, keys
+ *   sync.ts       serve, cloud, login, logout, sync, keys, users, oidc
+ *   analytics.ts  analytics
  *   tickets.ts    ticket, branch, branch-check
  *   knowledge.ts  knowledge sync | status | list | watch
  *   hosts.ts      ui, generate-context, mcp
@@ -28,7 +29,12 @@ import { registerVerifyCommands } from "./commands/verify.js";
 import { registerSyncCommands } from "./commands/sync.js";
 import { registerTicketCommands } from "./commands/tickets.js";
 import { registerKnowledgeCommands } from "./commands/knowledge.js";
-import { registerHostCommands } from "./commands/hosts.js";import { registerHermesCommands } from "./commands/hermes.js";
+import { registerHostCommands } from "./commands/hosts.js";
+import { registerSetupCommands } from "./commands/setup.js";
+import { registerHermesCommands } from "./commands/hermes.js";
+import { registerHealthCommands } from "./commands/health.js";
+import { registerAuditCommands } from "./commands/audit.js";
+import { registerAnalyticsCommands } from "./commands/analytics.js";
 
 /** Version comes from package.json — single source of truth. */
 const PKG_VERSION: string = JSON.parse(
@@ -48,8 +54,12 @@ registerVerifyCommands(program);
 registerSyncCommands(program);
 registerTicketCommands(program);
 registerKnowledgeCommands(program);
+registerSetupCommands(program);
 registerHostCommands(program);
 registerHermesCommands(program);
+registerHealthCommands(program);
+registerAuditCommands(program);
+registerAnalyticsCommands(program);
 
 program.parseAsync().catch((err) => fail(err instanceof Error ? err.message : String(err)));
 

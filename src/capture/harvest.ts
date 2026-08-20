@@ -182,6 +182,7 @@ export async function harvestSessions(
           paths: c.paths,
           symbols: c.symbols,
           guardrailLevel: c.guardrailLevel,
+          appliesWhen: c.appliesWhen,
           rationale: c.rationale ?? `Stated by the user in a ${source.label} session.`,
           evidence: [
             { type: "HUMAN_ATTESTED", payload: `stated by user in ${source.label} session ${s.id.slice(0, 8)}` },

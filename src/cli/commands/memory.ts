@@ -13,6 +13,30 @@ import { resolveKnowledgeConfig } from "../../config.js";
 import { KINDS, GUARDRAIL_LEVELS, fail, autoSync, printMemory } from "../shared.js";
 import { debugLog } from "../../debug.js";
 import type { EvidenceType, GuardrailLevel, MemoryKind } from "../../types.js";
+import { applyBudget, applyCharBudget, getTokenizer } from "../../llm/tokens.js";
+import type { MemoryEntry } from "../../types.js";
+
+const PRESETS: Record<string, number> = {
+  minimal: 400,
+  standard: 1200,
+  deep: 4000,
+};
+
+function resolveBudget(budget: string, preset?: string): number {
+  if (preset && PRESETS[preset.toLowerCase()]) return PRESETS[preset.toLowerCase()];
+  const n = parseInt(budget, 10);
+  return Number.isNaN(n) ? PRESETS.standard : n;
+}
+
+function rankForContext(m: MemoryEntry): number {
+  let score = m.status === "VERIFIED" ? 100 : m.status === "UNVERIFIED" ? 50 : 10;
+  if (m.kind === "GUARDRAIL") score += 1000;
+  if (m.kind === "INVARIANT") score += 800;
+  if (m.kind === "CONVENTION") score += 500;
+  if (m.kind === "FAILED_APPROACH") score += 700;
+  if (m.pinned) score += 200;
+  return score;
+}
 
 export function registerMemoryCommands(program: Command): void {
   program
@@ -133,6 +157,27 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
       } else {
         console.log(`\n   Skipped. Run \`dim generate-context --auto --format all\` later if needed.`);
       }
+
+      // Offer to set up Ollama for semantic search + LLM (only if no provider detected)
+      if (fresh) {
+        const { getEmbeddingProvider } = await import("../../embeddings/provider.js");
+        const { getTextProvider } = await import("../../knowledge/llm.js");
+        const embProvider = await getEmbeddingProvider();
+        const llmProvider = await getTextProvider();
+        if (!embProvider && !llmProvider && !process.env.OPENAI_API_KEY) {
+          console.log(`\n🧮 Semantic search and LLM features need Ollama models.`);
+          console.log(`   Ollama (free, local) provides both — I'll install it and pull an embedding + LLM model.\n`);
+          const prompter2 = await createPrompter("n");
+          const ollamaChoice = (await prompter2.ask("Set up Ollama now? [y/N] ")).trim().toLowerCase();
+          prompter2.close();
+          if (ollamaChoice === "y" || ollamaChoice === "yes") {
+            const { setupOllamaInteractive } = await import("./setup.js");
+            await setupOllamaInteractive();
+          } else {
+            console.log(`   Skipped. Run \`dim setup-ollama\` anytime to enable semantic search + LLM features.`);
+          }
+        }
+      }
     });
 
   program
@@ -147,6 +192,7 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
       "Evidence as TYPE:payload, e.g. COMMIT_REF:abc123 or STATIC_CHECK:'grep ...'"
     )
     .option("-g, --guardrail-level <level>", `For kind=GUARDRAIL: ${GUARDRAIL_LEVELS.join("|")}`)
+    .option("-a, --applies-when <conditions...>", "For kind=FAILED_APPROACH: conditions under which the failure applies (e.g. idempotency_not_enabled)")
     .option("--pin", "Pin the memory: it never decays with age (evidence failure can still mark it stale)")
     .action(async (claim: string, opts) => {
       const kind = String(opts.kind).toUpperCase() as MemoryKind;
@@ -166,10 +212,17 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
         const type = spec.slice(0, idx).toUpperCase() as EvidenceType;
         return { type, payload: spec.slice(idx + 1) };
       });
+      const appliesWhen =
+        kind === "FAILED_APPROACH" && Array.isArray(opts.appliesWhen) && opts.appliesWhen.length > 0
+          ? (opts.appliesWhen as string[])
+          : undefined;
+      if (opts.appliesWhen && kind !== "FAILED_APPROACH") {
+        fail("--applies-when is only meaningful for kind=FAILED_APPROACH");
+      }
       const store = MemoryStore.open(process.cwd(), { create: true });
       const entry = store.write({
         kind, claim, paths: opts.path, symbols: opts.symbol, evidence,
-        createdBy: "human", pinned: Boolean(opts.pin), guardrailLevel,
+        createdBy: "human", pinned: Boolean(opts.pin), guardrailLevel, appliesWhen,
         trustExecutableEvidence: true,
       });
       console.log("🧠 Got it — I'll remember:");
@@ -193,6 +246,8 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
     .option("-k, --kind <kind>", "Filter by kind")
     .option("-n, --limit <n>", "Max results", "10")
     .option("--all", "Include refuted memories")
+    .option("--max-tokens <n>", "Maximum tokens worth of results to display")
+    .option("--budget <n>", "Alias for --max-tokens")
     .action(async (query: string[], opts) => {
       const store = MemoryStore.open();
       const { results, semantic } = await hybridSearch(store, {
@@ -202,20 +257,158 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
         limit: parseInt(opts.limit, 10),
         includeRefuted: Boolean(opts.all),
       });
+
+      let displayed = results;
+      let tokensUsed = 0;
+      let dropped = 0;
+      const budget = opts.maxTokens || opts.budget;
+      if (budget) {
+        const budgeted = await applyBudget(
+          results.map((m) => ({ memory: m, relevance: 1 })),
+          parseInt(budget, 10)
+        );
+        displayed = budgeted.included.map((x) => x.memory);
+        tokensUsed = budgeted.totalTokens;
+        dropped = budgeted.dropped;
+      }
+
       if (query.length) {
         try {
-          store.logSearch(query.join(" "), opts.path ?? [], results.length, "cli");
+          store.logSearch(query.join(" "), opts.path ?? [], displayed.length, "cli");
         } catch (err) {
           // gap logging is best-effort; never break recall
           debugLog("cli search-gap logging", err);
         }
       }
-      if (results.length === 0) console.log("No matching memories.");
-      for (const m of results) printMemory(m, true);
+      if (displayed.length === 0) console.log("No matching memories.");
+      for (const m of displayed) printMemory(m, true);
+      if (budget) {
+        const tokenizer = await getTokenizer();
+        const fmt = new Intl.NumberFormat("en").format;
+        console.log(`\n[token budget: ${fmt(tokensUsed)} / ${fmt(parseInt(budget, 10))} tokens${dropped > 0 ? `, ${fmt(dropped)} dropped` : ""}]`);
+      }
       if (query.length && !semantic) {
-        console.log("\n(keyword search only — set up Ollama or OPENAI_API_KEY for semantic recall, then `dim reindex`)");
+        console.log("\n(keyword search only — run `dim setup-ollama` for semantic recall, then `dim reindex`)");
+      }
+      if (budget) {
+        try {
+          const { recordTokenUsage } = await import("../../analytics.js");
+          recordTokenUsage(store, {
+            tokensRequested: parseInt(budget, 10),
+            tokensDelivered: tokensUsed,
+            memoriesUsed: displayed.length,
+          });
+        } catch { /* best-effort analytics */ }
       }
       store.close();
+    });
+
+  program
+    .command("context")
+    .description("Build a task-scoped context block from the most relevant memories")
+    .option("-t, --task <task>", "Description of the coding task")
+    .option("--diff", "Scope context to files changed in the working tree")
+    .option("--staged", "When used with --diff, only consider staged changes")
+    .option("-p, --path <paths...>", "Restrict to memories scoped to these paths")
+    .option("-b, --budget <n>", "Token budget for the context block (default: 1200)", "1200")
+    .option("--max-chars <n>", "Character budget for the context block (alternative to token budget)", parseInt)
+    .option("--preset <name>", "Use a preset budget: minimal (400), standard (1200), deep (4000)")
+    .option("-f, --format <fmt>", "Output format: markdown or json", "markdown")
+    .action(async (opts) => {
+      if (!opts.task && !opts.diff) fail("provide --task or --diff");
+      const root = findRepoRoot();
+      if (opts.diff && !root) fail("--diff requires a git repo");
+
+      let diffPaths: string[] = [];
+      let diffSymbols: string[] = [];
+      if (opts.diff) {
+        const { gitWorkingTreeFiles } = await import("../../verify/impact.js");
+        diffPaths = gitWorkingTreeFiles(root!, Boolean(opts.staged));
+        const { gitDiffSymbols } = await import("../../verify/diff-symbols.js");
+        diffSymbols = gitDiffSymbols(root!, undefined, Boolean(opts.staged));
+      }
+      const paths = Array.from(new Set([...(opts.path ?? []), ...diffPaths]));
+      const symbols = diffSymbols.length ? diffSymbols : undefined;
+      const query = opts.task ?? "";
+
+      const budget = resolveBudget(opts.budget, opts.preset);
+      const store = MemoryStore.open();
+      const { results } = await hybridSearch(store, { query, paths: paths.length ? paths : undefined, symbols, limit: 50 });
+
+      // Prefer guardrails and invariants first when building context for a coding task.
+      const ranked = results
+        .map((m) => ({ memory: m, relevance: rankForContext(m) }))
+        .sort((a, b) => b.relevance - a.relevance);
+
+      let budgeted: any;
+      if (opts.maxChars) {
+        budgeted = await applyCharBudget(ranked, opts.maxChars);
+      } else {
+        budgeted = await applyBudget(ranked, budget);
+      }
+      const included = budgeted.included.map((x: any) => x.memory);
+      try {
+        const { recordTokenUsage } = await import("../../analytics.js");
+        recordTokenUsage(store, {
+          tokensRequested: budget,
+          tokensDelivered: budgeted.totalTokens,
+          memoriesUsed: included.length,
+        });
+      } catch { /* best-effort analytics */ }
+      store.close();
+
+      if (opts.format === "json") {
+        console.log(
+          JSON.stringify(
+            {
+              task: opts.task,
+              budget,
+              usedTokens: budgeted.totalTokens,
+              remainingTokens: budgeted.remainingTokens,
+              dropped: budgeted.dropped,
+              diffSymbols: diffSymbols.length ? diffSymbols : undefined,
+              memories: included.map((m: MemoryEntry) => ({
+                id: m.id.slice(0, 8),
+                kind: m.kind,
+                status: m.status,
+                claim: m.claim,
+                paths: m.scope.paths,
+                symbols: m.scope.symbols,
+              })),
+            },
+            null,
+            2
+          )
+        );
+      } else {
+        const header = opts.task ? `Context for: ${opts.task}` : `Context for changes in ${paths.join(", ") || "working tree"}`;
+        const ruleBlock = included
+          .filter((m: MemoryEntry) => m.kind === "GUARDRAIL" || m.kind === "INVARIANT" || m.kind === "CONVENTION")
+          .map((m: MemoryEntry) => `- **[${m.kind}]** ${m.claim}`)
+          .join("\n");
+        const otherBlock = included
+          .filter((m: MemoryEntry) => m.kind !== "GUARDRAIL" && m.kind !== "INVARIANT" && m.kind !== "CONVENTION")
+          .map((m: MemoryEntry) => `- **[${m.kind}]** ${m.claim}`)
+          .join("\n");
+
+        const lines: string[] = [header, ""];
+        if (diffSymbols.length) {
+          lines.push(`_Symbols detected in diff: ${diffSymbols.slice(0, 10).join(", ")}${diffSymbols.length > 10 ? "…" : ""}_`);
+          lines.push("");
+        }
+        lines.push("### Rules and guardrails", ruleBlock || "_none_", "");
+        if (otherBlock) {
+          lines.push("### Other relevant memories");
+          lines.push(otherBlock);
+          lines.push("");
+        }
+        lines.push(`---`);
+        const budgetLabel = opts.maxChars
+          ? `Char budget: ${budgeted.totalChars} / ${opts.maxChars} used, ${budgeted.remainingChars} remaining, ${budgeted.dropped} dropped.`
+          : `Token budget: ${budgeted.totalTokens} / ${budget} used, ${budgeted.remainingTokens} remaining, ${budgeted.dropped} dropped.`;
+        lines.push(budgetLabel);
+        console.log(lines.join("\n"));
+      }
     });
 
   program
@@ -226,9 +419,16 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
       if (!store.vecAvailable) fail("sqlite-vec extension failed to load on this platform");
       const { indexed, provider } = await reindexAll(store);
       if (!provider) {
-        fail("no embedding provider available — run Ollama locally or set OPENAI_API_KEY (see AIDIMAG_EMBEDDINGS)");
+        const { promptOllamaSetup } = await import("../shared.js");
+        const ok = await promptOllamaSetup("embedding");
+        if (!ok) fail("no embedding provider available — run `dim setup-ollama` or set OPENAI_API_KEY (see AIDIMAG_EMBEDDINGS)");
+        // Retry after setup
+        const { indexed: idx2, provider: p2 } = await reindexAll(store);
+        if (!p2) fail("embedding provider still not available — run `dim setup-ollama` manually");
+        console.log(`Indexed ${idx2} memorie(s) with ${p2.name}/${p2.model} (${p2.dim}d).`);
+      } else {
+        console.log(`Indexed ${indexed} memorie(s) with ${provider.name}/${provider.model} (${provider.dim}d).`);
       }
-      console.log(`Indexed ${indexed} memorie(s) with ${provider.name}/${provider.model} (${provider.dim}d).`);
       store.close();
     });
 
@@ -332,7 +532,7 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
     });
 
   program
-    .command("audit")
+    .command("audit-findings")
     .description("Provenance audit: memories resting on the least ground — agent-authored, evidence-free, stale, or long-unverified")
     .option("-n, --limit <n>", "Max entries", "20")
     .action((opts) => {
@@ -466,6 +666,53 @@ This project uses aiDimag for persistent memory. Always consult memory before pr
       store.forget(match.id);
       console.log(`Forgot memory ${match.id}: "${match.claim}"`);
       await autoSync(store);
+      store.close();
+    });
+
+  program
+    .command("retention")
+    .description("Apply retention policy: auto-forget old, evidence-free memories (configured in .aidimag/config.json)")
+    .option("--dry-run", "Report what would be forgotten without deleting")
+    .option("--max-age-days <n>", "Override maxAgeDays from config", parseInt)
+    .option("--stale-age-days <n>", "Override staleAgeDays from config", parseInt)
+    .action(async (opts) => {
+      const root = findRepoRoot();
+      if (!root) fail("not inside a git repo");
+      const { resolveRetentionConfig } = await import("../../config.js");
+      const cfg = resolveRetentionConfig(root);
+      const maxAgeDays = opts.maxAgeDays ?? cfg.maxAgeDays;
+      const staleAgeDays = opts.staleAgeDays ?? cfg.staleAgeDays;
+      const dryRun = opts.dryRun ?? cfg.dryRun;
+
+      if (maxAgeDays === 0 && staleAgeDays === 0) {
+        console.log("Retention policy is not configured. Set retention.maxAgeDays in .aidimag/config.json, or pass --max-age-days.");
+        return;
+      }
+
+      const store = MemoryStore.open();
+      const eligible = store.applyRetention({
+        maxAgeDays,
+        staleAgeDays,
+        preservePinned: cfg.preservePinned,
+        preserveSources: cfg.preserveSources,
+        dryRun,
+      });
+
+      if (eligible.length === 0) {
+        console.log("✓ No memories eligible for retention cleanup.");
+      } else {
+        const action = dryRun ? "Would forget" : "Forgot";
+        console.log(`${action} ${eligible.length} memorie(s):\n`);
+        for (const m of eligible) {
+          const ageDays = Math.floor((Date.now() - Date.parse(m.createdAt)) / 86_400_000);
+          const reasons: string[] = [];
+          if (m.grounding.length === 0) reasons.push("no evidence");
+          if (m.status === "STALE") reasons.push("STALE");
+          reasons.push(`${ageDays}d old`);
+          console.log(`  ${m.id.slice(0, 8)} [${m.kind}] "${m.claim.slice(0, 80)}" — ${reasons.join(", ")}`);
+        }
+        if (!dryRun) await autoSync(store);
+      }
       store.close();
     });
 }

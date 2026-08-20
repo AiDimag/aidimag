@@ -7,17 +7,17 @@ import type { Command } from "commander";
 import { findRepoRoot } from "../../db/store.js";
 import { fail, createPrompter, openBrowser } from "../shared.js";
 
-const TICKET_PROVIDERS = ["jira", "github", "linear", "http", "remote"] as const;
+const TICKET_PROVIDERS = ["jira", "github", "linear", "http", "remote", "gitlab", "azuredevops", "clickup", "shortcut", "youtrack", "asana", "trello", "notion", "pivotal"] as const;
 type TicketProviderName = (typeof TICKET_PROVIDERS)[number];
 type BranchEnforce = "push" | "warn" | "off";
 
 export function registerTicketCommands(program: Command): void {
   program
     .command("ticket")
-    .description("Connect a ticketing app so proposals carry real context (Jira, GitHub Issues, Linear, the team sync server, or your own HTTP middleware)")
+    .description("Connect a ticketing app so proposals carry real context (Jira, GitHub Issues, Linear, GitLab, Azure DevOps, ClickUp, Shortcut, YouTrack, Asana, Trello, Notion, Pivotal Tracker, the team sync server, or your own HTTP middleware)")
     .argument("<action>", "connect | status | disconnect | show | share | branch-rule")
-    .argument("[id]", "Ticket id for 'show' (e.g. XXX-2100 or #123) · provider name for 'connect' (jira|github|linear|http|remote)")
-    .option("--provider <name>", "jira | github | linear | http | remote (connect/share)")
+    .argument("[id]", "Ticket id for 'show' (e.g. XXX-2100 or #123) · provider name for 'connect' (jira|github|linear|gitlab|azuredevops|clickup|shortcut|youtrack|asana|trello|notion|pivotal|http|remote)")
+    .option("--provider <name>", "jira | github | linear | gitlab | azuredevops | clickup | shortcut | youtrack | asana | trello | notion | pivotal | http | remote (connect/share)")
     .option("--url <baseUrl>", "Jira site / GitHub repo URL / middleware endpoint (connect/share)")
     .option("--token <credential>", "Jira: email:apiToken or PAT · GitHub/Linear: token · http: optional bearer (connect/share)")
     .option("--pattern <regex>", "Ticket-id pattern for branch/commit extraction (connect) · branch pattern (branch-rule)")
@@ -40,7 +40,7 @@ export function registerTicketCommands(program: Command): void {
           // Prompt for anything missing — the prompter queues piped lines, so
           // scripted/agent-driven input works too; on closed stdin answers come
           // back empty and we fail fast instead of hanging (CI-safe).
-          const needsUrl = !opts.url && provider !== "linear" && provider !== "remote";
+          const needsUrl = !opts.url && provider !== "linear" && provider !== "clickup" && provider !== "shortcut" && provider !== "asana" && provider !== "trello" && provider !== "notion" && provider !== "remote";
           const interactive = !provider || (provider !== "remote" && (needsUrl || !opts.token));
           const isTTY = Boolean(process.stdin.isTTY && process.stdout.isTTY);
           const existing = tickets.readTicketsConfig(root);
@@ -85,12 +85,16 @@ export function registerTicketCommands(program: Command): void {
               break;
             }
 
-            // ---- direct providers: jira | github | linear | http
+            // ---- direct providers: jira | github | linear | gitlab | azuredevops | clickup | shortcut | youtrack | asana | trello | notion | pivotal | http
             let baseUrl = (opts.url as string | undefined)?.replace(/\/$/, "");
-            if (!baseUrl && provider !== "linear") {
+            if (!baseUrl && provider !== "linear" && provider !== "clickup" && provider !== "shortcut" && provider !== "asana" && provider !== "trello" && provider !== "notion") {
               const what =
                 provider === "jira" ? "your Jira site URL (e.g. https://acme.atlassian.net)"
                 : provider === "github" ? "the repo URL (e.g. https://github.com/acme/api)"
+                : provider === "gitlab" ? "the GitLab project URL (e.g. https://gitlab.com/acme/api)"
+                : provider === "azuredevops" ? "your Azure DevOps project URL (e.g. https://dev.azure.com/acme/Project)"
+                : provider === "youtrack" ? "your YouTrack instance URL (e.g. https://acme.youtrack.cloud)"
+                : provider === "pivotal" ? "your Pivotal Tracker project URL (e.g. https://www.pivotaltracker.com/n/projects/123)"
                 : "your middleware endpoint (implements GET /ticket/:id)";
               baseUrl = (await ask(`   What's ${what}?\n   › `)).trim().replace(/\/$/, "");
               if (!baseUrl) fail("a base URL is required");
@@ -105,6 +109,7 @@ export function registerTicketCommands(program: Command): void {
               }
               const hint =
                 provider === "jira" ? "email:apiToken (or a PAT)"
+                : provider === "trello" ? "apiKey:token (from Trello power-ups admin)"
                 : provider === "http" ? "bearer token (enter to skip — optional for internal services)"
                 : "token";
               token = (await ask(`\n   Paste your ${hint}: `)).trim() || undefined;
@@ -113,7 +118,7 @@ export function registerTicketCommands(program: Command): void {
               console.log(`   ⚠ No credential provided — you can add one later (re-run connect, or set AIDIMAG_TICKET_TOKEN).`);
             }
 
-            const credKey = baseUrl ?? "linear";
+            const credKey = baseUrl ?? provider ?? "linear";
             tickets.writeTicketsConfig(root, {
               ...existing,
               provider,
@@ -154,7 +159,7 @@ export function registerTicketCommands(program: Command): void {
             const cloud = readCloudConfig(root);
             console.log(`provider: remote (via the team sync server)\nserver:   ${cloud?.server ?? "NOT LINKED — dim cloud link"}\nbrain:    ${cloud?.brain ?? "—"}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${cloud && getToken(cloud.server, root) ? "sync token stored" : "MISSING — dim login"}`);
           } else {
-            const credKey = cfg.baseUrl ?? "linear";
+            const credKey = cfg.baseUrl ?? cfg.provider ?? "linear";
             console.log(`provider: ${cfg.provider}${cfg.baseUrl ? `\nbaseUrl:  ${cfg.baseUrl}` : ""}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${tickets.getTicketCredential(credKey) ? "stored" : "MISSING"}`);
           }
           const branch = cfg.branch;
@@ -193,9 +198,9 @@ export function registerTicketCommands(program: Command): void {
           }
           const local = tickets.readTicketsConfig(root);
           const provider = (opts.provider ?? (local.provider !== "remote" ? local.provider : undefined)) as string | undefined;
-          if (!provider) fail("usage: dim ticket share --provider jira|github|linear|http --url <baseUrl> --token <credential> (defaults come from this repo's `dim ticket connect`)");
+          if (!provider) fail("usage: dim ticket share --provider <name> --url <baseUrl> --token <credential> (defaults come from this repo's `dim ticket connect`)");
           const baseUrl = (opts.url as string | undefined)?.replace(/\/$/, "") ?? local.baseUrl ?? "";
-          const credential = (opts.token as string | undefined) ?? tickets.getTicketCredential(baseUrl || "linear") ?? undefined;
+          const credential = (opts.token as string | undefined) ?? tickets.getTicketCredential(baseUrl || provider || "linear") ?? undefined;
           if (!credential && provider !== "http") fail("no credential to share — pass --token (or connect locally first so it can be reused)");
           const res = await fetch(endpoint, {
             method: "PUT",

@@ -23,6 +23,7 @@ import { buildSessionBriefing, renderBriefing } from "../capture/session-briefin
 import { bootstrapRepo } from "../capture/bootstrap.js";
 import { harvestClaudeSessions } from "../capture/harvest.js";
 import { generateContext } from "../context/generate.js";
+import { getEmbeddingProvider, resetEmbeddingProviderCache } from "../embeddings/provider.js";
 import {
   readTicketsConfig,
   writeTicketsConfig,
@@ -66,7 +67,9 @@ function readBody(req: import("node:http").IncomingMessage): Promise<Record<stri
   });
 }
 
+
 export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517): Promise<string> {
+  process.env.AIDIMAG_REPO_ROOT = repoRoot;
   const csrfToken = randomBytes(32).toString("base64url");
 
   const isMutation = (method: string | undefined) =>
@@ -149,6 +152,33 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         try { gapCount = store.searchGaps({ sinceDays: 30, limit: 100 }).length; } catch { /* pre-migration DB */ }
         let scratchCount = 0;
         try { scratchCount = store.scratchpadRead(undefined, 100).length; } catch { /* pre-migration DB */ }
+        // Detect LLM + embedding providers for status display
+        let llmProvider: { name: string; model: string } | null = null;
+        let embeddingProvider: { name: string; model: string } | null = null;
+        try {
+          const { getTextProvider } = await import("../knowledge/llm.js");
+          const lp = await getTextProvider();
+          if (lp) llmProvider = { name: lp.name, model: lp.model };
+        } catch { /* ignore */ }
+        try {
+          const ep = await getEmbeddingProvider();
+          if (ep) embeddingProvider = { name: ep.name, model: ep.model };
+        } catch { /* ignore */ }
+        let teamTickets: { provider?: string; baseUrl?: string; hasCredential?: boolean; pattern?: string | null } | null = null;
+        if ((!tcfg.provider || tcfg.provider === "remote") && cloud) {
+          const token = getToken(cloud.server, repoRoot);
+          if (token) {
+            try {
+              const r = await fetch(`${cloud.server}/v1/ticket-config?brain=${encodeURIComponent(cloud.brain)}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (r.ok) {
+                const body = (await r.json()) as { config?: { provider?: string; baseUrl?: string; hasCredential?: boolean; pattern?: string | null } | null };
+                teamTickets = body.config ?? null;
+              }
+            } catch { /* ignore */ }
+          }
+        }
         json(res, 200, {
           repoRoot,
           csrfToken,
@@ -172,8 +202,11 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
                 branch: tcfg.branch ?? null,
               }
             : null,
+          teamTickets,
           vecAvailable: store.vecAvailable,
           onboarded: !!readConfig(repoRoot).onboarded,
+          llmProvider,
+          embeddingProvider,
         });
         return;
       }
@@ -244,6 +277,198 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         return;
       }
 
+      // ---- Ollama setup: status check ----
+      if (req.method === "GET" && pathname === "/api/ollama/status") {
+        const { execSync } = await import("node:child_process");
+        const os = await import("node:os");
+        const bin = os.platform() === "win32" ? "ollama.exe" : "ollama";
+        let installed = false;
+        try {
+          execSync(`${bin} --version`, { stdio: "pipe", timeout: 5000 });
+          installed = true;
+        } catch {
+          const paths = ["/usr/local/bin/ollama", "/opt/homebrew/bin/ollama", "/usr/bin/ollama"];
+          installed = paths.some((p) => existsSync(p));
+        }
+        let running = false;
+        try {
+          const ctl = new AbortController();
+          const t = setTimeout(() => ctl.abort(), 2000);
+          const r2 = await fetch("http://localhost:11434/api/tags", { signal: ctl.signal });
+          clearTimeout(t);
+          running = r2.ok;
+        } catch { /* not running */ }
+        let pulledModels: string[] = [];
+        if (installed) {
+          try {
+            const out = execSync(`${bin} list`, { encoding: "utf8", timeout: 5000 });
+            pulledModels = out.split("\n").slice(1).map((l) => l.split(/\s+/)[0]).filter(Boolean).map((m) => m.split(":")[0]);
+          } catch { /* ignore */ }
+        }
+        const embeddingModels = [
+          { name: "all-minilm", size: "~45MB", dim: 384, desc: "Lightest option. Fast, good for small repos." },
+          { name: "nomic-embed-text", size: "~274MB", dim: 768, desc: "Best balance of size and quality. Recommended." },
+          { name: "mxbai-embed-large", size: "~670MB", dim: 1024, desc: "Higher quality, larger. Good for large repos." },
+          { name: "snowflake-arctic-embed", size: "~1.2GB", dim: 1024, desc: "Top-tier quality, largest. For demanding search." },
+        ];
+        const llmModels = [
+          { name: "llama3.2", size: "~2.0GB", desc: "Latest, fast, good balance. Recommended." },
+          { name: "llama3.1", size: "~4.9GB", desc: "Capable, larger. Good for complex repos." },
+          { name: "qwen2.5", size: "~4.7GB", desc: "Strong code understanding." },
+          { name: "phi3", size: "~2.2GB", desc: "Compact, efficient for simple tasks." },
+        ];
+        const pulledEmbedding = pulledModels.filter((m) => embeddingModels.some((em) => em.name === m) || /embed/i.test(m));
+        const pulledLlm = pulledModels.filter((m) => llmModels.some((lm) => lm.name === m) || (!/embed/i.test(m) && !embeddingModels.some((em) => em.name === m)));
+        const cfg = readConfig(repoRoot);
+        json(res, 200, {
+          installed, running, pulledModels, pulledEmbedding, pulledLlm,
+          embeddingModels, llmModels,
+          currentLlmModel: cfg.ollama?.llmModel ?? "llama3.1",
+        });
+        return;
+      }
+
+      // ---- Ollama setup: install ----
+      if (req.method === "POST" && pathname === "/api/ollama/install") {
+        const { execSync } = await import("node:child_process");
+        const os = await import("node:os");
+        const plat = os.platform();
+        try {
+          if (plat === "darwin") {
+            try {
+              execSync("command -v brew", { stdio: "pipe" });
+              execSync("brew install ollama", { stdio: "pipe", timeout: 120000 });
+              json(res, 200, { ok: true, method: "homebrew" });
+              return;
+            } catch { /* fall through to install script */ }
+          }
+          if (plat === "darwin" || plat === "linux") {
+            execSync("curl -fsSL https://ollama.com/install.sh | sh", { stdio: "pipe", timeout: 120000 });
+            json(res, 200, { ok: true, method: "script" });
+            return;
+          }
+          json(res, 200, { ok: false, message: "Windows: install Ollama from https://ollama.com/download" });
+          return;
+        } catch (e) {
+          json(res, 200, { ok: false, message: (e as Error).message });
+          return;
+        }
+      }
+
+      // ---- Ollama setup: start server ----
+      if (req.method === "POST" && pathname === "/api/ollama/start") {
+        const { spawn } = await import("node:child_process");
+        const os = await import("node:os");
+        const bin = os.platform() === "win32" ? "ollama.exe" : "ollama";
+        try {
+          const child = spawn(bin, ["serve"], { stdio: "ignore", detached: true });
+          child.unref();
+          // Wait for server to come up
+          let ready = false;
+          for (let i = 0; i < 10; i++) {
+            await new Promise((r) => setTimeout(r, 1000));
+            try {
+              const ctl = new AbortController();
+              const t = setTimeout(() => ctl.abort(), 2000);
+              const r2 = await fetch("http://localhost:11434/api/tags", { signal: ctl.signal });
+              clearTimeout(t);
+              if (r2.ok) { ready = true; break; }
+            } catch { /* not ready yet */ }
+          }
+          json(res, 200, { ok: ready });
+          return;
+        } catch (e) {
+          json(res, 200, { ok: false, message: (e as Error).message });
+          return;
+        }
+      }
+
+      // ---- Ollama setup: pull model ----
+      if (req.method === "POST" && pathname === "/api/ollama/pull") {
+        const model = url.searchParams.get("model");
+        if (!model) { json(res, 400, { error: "model required" }); return; }
+        const { execSync } = await import("node:child_process");
+        const os = await import("node:os");
+        const bin = os.platform() === "win32" ? "ollama.exe" : "ollama";
+        try {
+          execSync(`${bin} pull ${model}`, { stdio: "pipe", timeout: 600000 });
+          json(res, 200, { ok: true });
+          return;
+        } catch (e) {
+          json(res, 200, { ok: false, message: (e as Error).message });
+          return;
+        }
+      }
+
+      // ---- Ollama setup: verify embedding ----
+      if (req.method === "POST" && pathname === "/api/ollama/verify") {
+        const model = url.searchParams.get("model");
+        if (!model) { json(res, 400, { error: "model required" }); return; }
+        try {
+          const ctl = new AbortController();
+          const t = setTimeout(() => ctl.abort(), 10000);
+          const r2 = await fetch("http://localhost:11434/api/embeddings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model, prompt: "probe" }),
+            signal: ctl.signal,
+          });
+          clearTimeout(t);
+          if (!r2.ok) { json(res, 200, { ok: false, message: `HTTP ${r2.status}` }); return; }
+          const body = (await r2.json()) as { embedding?: number[] };
+          const ok = Boolean(body.embedding?.length);
+          if (ok) {
+            // Save the embedding model to config and reset caches so state refresh detects it
+            const cfg = readConfig(repoRoot);
+            const ollama = { ...cfg.ollama, embeddingModel: model };
+            writeConfig(repoRoot, { ollama });
+            resetEmbeddingProviderCache();
+            const { resetTextProviderCache } = await import("../knowledge/llm.js");
+            resetTextProviderCache();
+          }
+          json(res, 200, { ok });
+          return;
+        } catch (e) {
+          json(res, 200, { ok: false, message: (e as Error).message });
+          return;
+        }
+      }
+
+      // ---- Ollama setup: list all pulled models (for LLM model selection) ----
+      if (req.method === "GET" && pathname === "/api/ollama/models") {
+        const { execSync } = await import("node:child_process");
+        const os = await import("node:os");
+        const bin = os.platform() === "win32" ? "ollama.exe" : "ollama";
+        let models: string[] = [];
+        try {
+          const out = execSync(`${bin} list`, { encoding: "utf8", timeout: 5000 });
+          models = out.split("\n").slice(1).map((l) => l.split(/\s+/)[0]).filter(Boolean).map((m) => m.split(":")[0]);
+        } catch { /* not installed or not running */ }
+        const cfg = readConfig(repoRoot);
+        json(res, 200, {
+          models,
+          currentEmbeddingModel: cfg.ollama?.embeddingModel ?? "nomic-embed-text",
+          currentLlmModel: cfg.ollama?.llmModel ?? "llama3.1",
+        });
+        return;
+      }
+
+      // ---- Ollama setup: save model selection to config ----
+      if (req.method === "POST" && pathname === "/api/ollama/config") {
+        const b = await readBody(req);
+        const cfg = readConfig(repoRoot);
+        const ollama = { ...cfg.ollama };
+        if (b.embeddingModel) ollama.embeddingModel = String(b.embeddingModel);
+        if (b.llmModel) ollama.llmModel = String(b.llmModel);
+        writeConfig(repoRoot, { ollama });
+        // Reset caches so the new model takes effect
+        resetEmbeddingProviderCache();
+        const { resetTextProviderCache } = await import("../knowledge/llm.js");
+        resetTextProviderCache();
+        json(res, 200, { ok: true, ollama });
+        return;
+      }
+
       // ---- knowledge gaps (dim gaps) ----
       if (req.method === "GET" && pathname === "/api/gaps") {
         const days = Number(url.searchParams.get("days") ?? "30") || 30;
@@ -281,6 +506,22 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       // ---- provenance audit (dim audit) ----
       if (req.method === "GET" && pathname === "/api/audit") {
         json(res, 200, { findings: store.auditMemories({ limit: 50 }) });
+        return;
+      }
+
+      // ---- health dashboard (risk metrics, coverage heatmap) ----
+      if (req.method === "GET" && pathname === "/api/health") {
+        const { computeHealth } = await import("../health.js");
+        json(res, 200, computeHealth(store));
+        return;
+      }
+
+      // ---- analytics (trend charts, token usage, verify history) ----
+      if (req.method === "GET" && pathname === "/api/analytics") {
+        const { computeAnalytics } = await import("../analytics.js");
+        const days = Number(url.searchParams.get("days") ?? "30") || 30;
+        const since = new Date(Date.now() - days * 86_400_000).toISOString();
+        json(res, 200, computeAnalytics(store, { since }));
         return;
       }
 
@@ -404,12 +645,12 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
       if (req.method === "POST" && pathname === "/api/tickets/connect") {
         const b = await readBody(req);
         const provider = String(b.provider ?? "");
-        if (!["jira", "github", "linear", "http", "remote"].includes(provider)) {
-          json(res, 400, { error: "provider must be jira | github | linear | http | remote" });
+        if (!["jira", "github", "linear", "http", "remote", "gitlab", "azuredevops", "clickup", "shortcut", "youtrack", "asana", "trello", "notion", "pivotal"].includes(provider)) {
+          json(res, 400, { error: "provider must be jira | github | linear | http | remote | gitlab | azuredevops | clickup | shortcut | youtrack | asana | trello | notion | pivotal" });
           return;
         }
         const baseUrl = b.baseUrl ? String(b.baseUrl).replace(/\/$/, "") : undefined;
-        if (!baseUrl && !["linear", "remote"].includes(provider)) {
+        if (!baseUrl && !["linear", "clickup", "shortcut", "asana", "trello", "notion", "remote"].includes(provider)) {
           json(res, 400, { error: `baseUrl is required for ${provider}` });
           return;
         }
@@ -432,6 +673,23 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           if (t) validated = { id: t.id, title: t.title };
         }
         json(res, 200, { ok: true, validated });
+        return;
+      }
+      if (req.method === "POST" && pathname === "/api/tickets/validate") {
+        const b = await readBody(req);
+        const testId = String(b.testId ?? "");
+        if (!testId) { json(res, 400, { error: "missing testId" }); return; }
+        const p = ticketProviderFor(repoRoot);
+        if (!p) { json(res, 400, { error: "no ticket provider connected (or credential missing)" }); return; }
+        try {
+          const t = await p.getTicket(testId);
+          if (!t) json(res, 404, { error: `ticket ${testId} not found` });
+          else json(res, 200, { ticket: { id: t.id, title: t.title, status: t.status, url: t.url } });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "internal error";
+          if (msg.includes("no ticket provider configured")) json(res, 404, { error: "team ticket credentials were removed from the server" });
+          else json(res, 502, { error: msg });
+        }
         return;
       }
       if (req.method === "POST" && pathname === "/api/tickets/disconnect") {
@@ -465,9 +723,9 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           json(res, 400, { error: "repo is not cloud-linked — link a team server first" });
           return;
         }
-        const admin = String(b.adminToken ?? "");
+        const admin = String(b.adminToken ?? "") || getToken(cloud.server, repoRoot) || "";
         if (!admin) {
-          json(res, 400, { error: "adminToken is required" });
+          json(res, 400, { error: "adminToken is required (or link your cloud server with an API key)" });
           return;
         }
         const endpoint = `${cloud.server}/v1/ticket-config?brain=${encodeURIComponent(cloud.brain)}`;
@@ -477,7 +735,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           : await fetch(endpoint, {
               method: "PUT",
               headers,
-              body: JSON.stringify({ provider: b.provider, baseUrl: b.baseUrl ?? "", credential: b.credential }),
+              body: JSON.stringify({ provider: b.provider, baseUrl: b.baseUrl ?? "", credential: b.credential, pattern: b.pattern ?? undefined }),
             });
         json(res, upstream.status, await upstream.json());
         return;
@@ -522,6 +780,24 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
           upstream = await fetch(`${target}/v1/keys`, { headers });
         }
         json(res, upstream.status, await upstream.json());
+        return;
+      }
+
+      // ---- critical areas (protected code boundaries) ----
+      if (req.method === "GET" && pathname === "/api/critical-areas") {
+        const { readCriticalAreas } = await import("../verify/critical-areas.js");
+        json(res, 200, readCriticalAreas(repoRoot));
+        return;
+      }
+      if (req.method === "PUT" && pathname === "/api/critical-areas") {
+        const { writeCriticalAreas } = await import("../verify/critical-areas.js");
+        const b = await readBody(req);
+        if (!b || !Array.isArray(b.areas)) {
+          json(res, 400, { error: "expected { areas: [...] }" });
+          return;
+        }
+        writeCriticalAreas(repoRoot, { areas: b.areas });
+        json(res, 200, { ok: true });
         return;
       }
 
@@ -624,6 +900,138 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         else if (action === "forget") store.forget(full.id);
         else store.setPinned(full.id, action === "pin");
         json(res, 200, { ok: true });
+        return;
+      }
+
+      // ---- auth: device-code login (dim login) ----
+      if (req.method === "POST" && pathname === "/api/auth/login") {
+        const cloud = readCloudConfig(repoRoot);
+        const server = cloud?.server;
+        if (!server) { json(res, 400, { error: "no cloud server linked — use Connect Cloud first" }); return; }
+        const { startDeviceLogin } = await import("../sync/client.js");
+        try {
+          const start = await startDeviceLogin(server, cloud.brain);
+          json(res, 200, {
+            userCode: start.user_code,
+            deviceCode: start.device_code,
+            verifyUrl: `${start.verification_uri}?code=${encodeURIComponent(start.user_code)}`,
+            expiresIn: start.expires_in,
+            interval: start.interval,
+            server,
+          });
+        } catch (e) {
+          json(res, 500, { error: (e as Error).message });
+        }
+        return;
+      }
+      if (req.method === "POST" && pathname === "/api/auth/login/poll") {
+        const b = await readBody(req);
+        const server = String(b.server ?? "");
+        const deviceCode = String(b.deviceCode ?? "");
+        if (!server || !deviceCode) { json(res, 400, { error: "server and deviceCode required" }); return; }
+        try {
+          const res2 = await fetch(`${server}/v1/auth/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_code: deviceCode }),
+          });
+          if (res2.status === 428) { json(res, 200, { pending: true }); return; }
+          if (!res2.ok) { json(res, 400, { error: `login failed: HTTP ${res2.status}` }); return; }
+          const out = (await res2.json()) as { token: string; brain: string | null };
+          // Save token to config
+          const p = configPath(repoRoot);
+          let existing: Record<string, unknown> = {};
+          try { existing = JSON.parse(readFileSync(p, "utf8")); } catch { /* fresh */ }
+          existing.token = out.token;
+          writeFileSync(p, JSON.stringify(existing, null, 2) + "\n");
+          json(res, 200, { ok: true, brain: out.brain });
+        } catch (e) {
+          json(res, 500, { error: (e as Error).message });
+        }
+        return;
+      }
+      if (req.method === "POST" && pathname === "/api/auth/logout") {
+        const p = configPath(repoRoot);
+        let existing: Record<string, unknown> = {};
+        try { existing = JSON.parse(readFileSync(p, "utf8")); } catch { /* no config */ }
+        if (!existing.token) { json(res, 200, { ok: true, message: "no token stored" }); return; }
+        delete existing.token;
+        writeFileSync(p, JSON.stringify(existing, null, 2) + "\n");
+        json(res, 200, { ok: true });
+        return;
+      }
+
+      // ---- create ticket branch (dim branch) ----
+      if (req.method === "POST" && pathname === "/api/branch") {
+        const b = await readBody(req);
+        const ticketId = String(b.ticketId ?? "").trim();
+        if (!ticketId) { json(res, 400, { error: "ticketId required" }); return; }
+        const prefix = String(b.prefix ?? "feature");
+        const { ticketProviderFor, buildBranchName } = await import("../tickets/provider.js");
+        const provider = ticketProviderFor(repoRoot);
+        let title: string | undefined;
+        if (provider) {
+          const t = await provider.getTicket(ticketId).catch(() => null);
+          title = t?.title;
+        }
+        const name = buildBranchName(ticketId, title, prefix);
+        const { execFileSync } = await import("node:child_process");
+        try {
+          execFileSync("git", ["checkout", "-b", name], { cwd: repoRoot, stdio: "pipe" });
+          json(res, 200, { ok: true, branch: name, ticketTitle: title });
+        } catch (e) {
+          json(res, 400, { error: (e as Error).message, branch: name });
+        }
+        return;
+      }
+
+      // ---- Hermes plugin install (dim hermes install) ----
+      if (req.method === "POST" && pathname === "/api/hermes/install") {
+        const { copyFileSync, mkdirSync, existsSync: exists } = await import("node:fs");
+        const { homedir } = await import("node:os");
+        const { fileURLToPath } = await import("node:url");
+        const hermesHome = process.env.HERMES_HOME ?? path.join(homedir() ?? "~", ".hermes");
+        if (!exists(hermesHome)) {
+          json(res, 400, { error: `Hermes home not found at ${hermesHome}. Install Hermes Agent first.` });
+          return;
+        }
+        const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+        const pluginDir = path.join(hermesHome, "plugins", "aidimag");
+        const template = path.join(pkgRoot, "integrations", "hermes", "aidimag_hermes_provider.py");
+        if (!exists(template)) {
+          json(res, 400, { error: "provider template missing from this install — reinstall aidimag" });
+          return;
+        }
+        mkdirSync(pluginDir, { recursive: true });
+        copyFileSync(template, path.join(pluginDir, "__init__.py"));
+        const serverJs = path.join(pkgRoot, "dist", "mcp", "server.js");
+        const config: Record<string, unknown> = exists(serverJs)
+          ? { command: process.execPath, args: [serverJs] }
+          : {};
+        config.repo = repoRoot;
+        writeFileSync(path.join(pluginDir, "config.json"), JSON.stringify(config, null, 2) + "\n");
+        json(res, 200, { ok: true, path: pluginDir, repo: repoRoot });
+        return;
+      }
+
+      // ---- verify --trust: list untrusted evidence ----
+      if (req.method === "GET" && pathname === "/api/verify/trust") {
+        const pending = store.untrustedEvidence();
+        json(res, 200, { pending, count: pending.length });
+        return;
+      }
+      // ---- verify --trust: approve all untrusted evidence ----
+      if (req.method === "POST" && pathname === "/api/verify/trust/approve") {
+        const b = await readBody(req);
+        const approveAll = b.all !== false;
+        let approved = 0;
+        if (approveAll) {
+          approved = store.trustAllEvidence();
+        } else if (b.payload) {
+          store.trustEvidencePayload(String(b.payload));
+          approved = 1;
+        }
+        json(res, 200, { approved });
         return;
       }
 

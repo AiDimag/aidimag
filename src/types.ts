@@ -39,6 +39,10 @@ export interface Evidence {
   payload: string;
   lastRun: string | null; // ISO timestamp
   result: EvidenceResult;
+  /** cryptographic signature (Ed25519/SSH) over the evidence content — present when signed */
+  signature?: string | null;
+  /** identity of the signer (e.g. key fingerprint or email) */
+  signedBy?: string | null;
 }
 
 export type LinkRelation = "supports" | "contradicts" | "refines";
@@ -80,6 +84,13 @@ export interface MemoryEntry {
   links: MemoryLink[];
   /** enforcement level — present only when kind === "GUARDRAIL" */
   guardrailLevel?: GuardrailLevel;
+  /**
+   * For FAILED_APPROACH memories: conditions under which the failure applies.
+   * Prevents blocking a previously-failed solution after the underlying cause
+   * has been resolved. Stored as opaque condition strings (e.g. feature flags,
+   * dependency versions, architecture states).
+   */
+  appliesWhen?: string[];
 }
 
 export interface MemoryWriteInput {
@@ -94,6 +105,11 @@ export interface MemoryWriteInput {
   /** required when kind === "GUARDRAIL": always | ask-first | never */
   guardrailLevel?: GuardrailLevel;
   /**
+   * Conditions under which a FAILED_APPROACH memory applies. Lets the system warn
+   * only when the same preconditions are present, not forever.
+   */
+  appliesWhen?: string[];
+  /**
    * When true, executable evidence (STATIC_CHECK / TEST_RESULT / EXEC_TRACE) is
    * trusted for local verify. Default false — use for CLI human writes and
    * human-approved proposals only.
@@ -107,6 +123,8 @@ export interface MemorySearchOptions {
   status?: MemoryStatus;
   /** restrict to memories scoped to (or overlapping) these paths */
   paths?: string[];
+  /** restrict to memories scoped to (or overlapping) these symbols */
+  symbols?: string[];
   limit?: number;
   includeRefuted?: boolean;
 }
@@ -141,6 +159,8 @@ export interface ProposalInput {
   ticketRef?: string;
   /** enforcement level for GUARDRAIL proposals */
   guardrailLevel?: GuardrailLevel;
+  /** conditions under which a FAILED_APPROACH proposal applies */
+  appliesWhen?: string[];
 }
 
 export interface Proposal extends ProposalInput {
@@ -154,5 +174,6 @@ export interface Proposal extends ProposalInput {
   paths: string[];
   symbols: string[];
   evidence: Array<{ type: EvidenceType; payload: string }>;
+  appliesWhen?: string[];
 }
 

@@ -5,12 +5,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { MemoryStore } from "../db/store.js";
 import { verifyAll, decayedConfidence } from "../verify/engine.js";
 import { runEvidence } from "../verify/runners.js";
+import { checkDiff } from "../verify/check.js";
+import { mineCommits } from "../capture/commit-miner.js";
 
 function tempRepo(): string {
   const dir = mkdtempSync(path.join(tmpdir(), "aidimag-verify-"));
@@ -122,6 +124,195 @@ test("runEvidence: deep tier skipped without --deep; HUMAN_ATTESTED passes; TICK
     assert.equal(runEvidence({ ...base, type: "EXEC_TRACE", payload: "echo hello :: nope" }, dir, { deep: true }).result, "FAIL");
     assert.equal(runEvidence({ ...base, type: "HUMAN_ATTESTED", payload: "trust me" }, dir).result, "PASS");
     assert.equal(runEvidence({ ...base, type: "TICKET_REF", payload: "XXX-1" }, dir).result, "SKIPPED");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("checkDiff: warns when staged change resembles a FAILED_APPROACH memory", () => {
+  const dir = tempRepo();
+  const store = new MemoryStore(path.join(dir, ".aidimag", "memory.db"));
+  try {
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "Test User"], { cwd: dir });
+
+    store.write({
+      kind: "FAILED_APPROACH",
+      claim: "The approach \"Add automatic retry on declined payments\" was tried and reverted — caused duplicate ledger entries when idempotency keys are missing",
+      paths: ["src/payments"],
+      appliesWhen: ["original_commit:abc123"],
+      trustExecutableEvidence: true,
+    });
+
+    // make an initial commit so we have a diff baseline
+    mkdirSync(path.join(dir, "src", "payments"), { recursive: true });
+    writeFileSync(path.join(dir, "src", "payments", "retry.ts"), "// retry logic");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+
+    // staged change re-introduces the failed approach
+    writeFileSync(
+      path.join(dir, "src", "payments", "retry.ts"),
+      [
+        "// automatic retry on declined payments",
+        "export function retryDeclinedPayments() {",
+        "  // idempotency keys missing: this caused duplicate ledger entries",
+        "  return fetch('/retry');",
+        "}",
+      ].join("\n")
+    );
+    execFileSync("git", ["add", "."], { cwd: dir });
+
+    const report = checkDiff(store, dir);
+    assert.equal(report.violations.length, 1);
+    assert.equal(report.violations[0].memory.kind, "FAILED_APPROACH");
+    assert.equal(report.violations[0].severity, "warn");
+    assert.match(report.violations[0].detail, /FAILED_APPROACH/);
+    assert.match(report.violations[0].detail, /original_commit:abc123/);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("end-to-end: reverted commit is mined, approved, and warns on re-attempt", () => {
+  const dir = tempRepo();
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "Test User"], { cwd: dir });
+
+  const store = new MemoryStore(path.join(dir, ".aidimag", "memory.db"));
+  try {
+    // 1) initial commit so we have a baseline
+    mkdirSync(path.join(dir, "src", "payments"), { recursive: true });
+    writeFileSync(path.join(dir, "src", "payments", "retry.ts"), "// initial");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+
+    // 2) add a failed approach
+    writeFileSync(
+      path.join(dir, "src", "payments", "retry.ts"),
+      "export function retryDeclinedPayments() { return fetch('/retry'); }"
+    );
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync(
+      "git",
+      ["commit", "-m", "Add automatic retry on declined payments", "-m", "Immediate retries without idempotency keys."],
+      { cwd: dir }
+    );
+    const original = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir }).toString().trim();
+
+    // 3) revert the approach
+    execFileSync("git", ["revert", "--no-edit", original], { cwd: dir });
+
+    // 4) mine history: should propose a FAILED_APPROACH memory
+    const mineResult = mineCommits(store, dir, { full: true });
+    assert.equal(mineResult.proposed.length, 1, "expected one FAILED_APPROACH proposal");
+    assert.equal(mineResult.proposed[0].kind, "FAILED_APPROACH");
+    assert.match(mineResult.proposed[0].claim, /automatic retry/i);
+
+    // 5) human approves the proposal
+    const approved = store.approveProposal(mineResult.proposed[0].id, { pinned: true });
+    assert.equal(approved.kind, "FAILED_APPROACH");
+
+    // 6) agent re-introduces the failed approach
+    writeFileSync(
+      path.join(dir, "src", "payments", "retry.ts"),
+      "// automatic retry on declined payments\nexport function retryDeclinedPayments() { return fetch('/retry'); }"
+    );
+    execFileSync("git", ["add", "."], { cwd: dir });
+
+    // 7) dim check warns before the agent commits
+    const check = checkDiff(store, dir);
+    assert.equal(check.violations.length, 1);
+    assert.equal(check.violations[0].memory.kind, "FAILED_APPROACH");
+    assert.equal(check.violations[0].severity, "warn");
+    assert.match(check.violations[0].detail, /resembles a previously reverted approach/);
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("dim check --json outputs structured report with risk score", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "aidimag-json-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
+    mkdirSync(path.join(dir, ".aidimag"), { recursive: true });
+    mkdirSync(path.join(dir, "src"), { recursive: true });
+    writeFileSync(path.join(dir, "src", "a.ts"), "// initial");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+
+    const store = new MemoryStore(path.join(dir, ".aidimag", "memory.db"));
+    store.write({
+      kind: "CONVENTION",
+      claim: "All database access goes through src/db/store.ts",
+      paths: ["src/"],
+    });
+    store.close();
+
+    // Make a change
+    writeFileSync(path.join(dir, "src", "a.ts"), "// changed");
+    execFileSync("git", ["add", "."], { cwd: dir });
+
+    const out = execFileSync(
+      process.execPath,
+      [path.resolve("dist/cli/index.js"), "check", "--json", "--block"],
+      { cwd: dir, encoding: "utf8" }
+    );
+    const parsed = JSON.parse(out.trim());
+    assert.equal(typeof parsed.riskScore, "number");
+    assert.ok(parsed.riskScore >= 0 && parsed.riskScore <= 100);
+    assert.equal(typeof parsed.riskLevel, "string");
+    assert.ok(Array.isArray(parsed.violations));
+    assert.ok(Array.isArray(parsed.riskFactors));
+    assert.equal(typeof parsed.passed, "boolean");
+    assert.ok(Array.isArray(parsed.changedFiles));
+    assert.ok(parsed.changedFiles.includes("src/a.ts"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("dim check --risk-threshold exits 1 when score exceeds threshold", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "aidimag-threshold-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
+    mkdirSync(path.join(dir, ".aidimag"), { recursive: true });
+    mkdirSync(path.join(dir, "src"), { recursive: true });
+    writeFileSync(path.join(dir, "src", "a.ts"), "// initial");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: dir });
+
+    const store = new MemoryStore(path.join(dir, ".aidimag", "memory.db"));
+    store.write({
+      kind: "GUARDRAIL",
+      claim: "Never eval",
+      paths: ["src/"],
+      guardrailLevel: "never",
+    });
+    store.close();
+
+    // Change that trips the guardrail
+    writeFileSync(path.join(dir, "src", "a.ts"), "const result = eval('1 + 2');\n");
+    execFileSync("git", ["add", "."], { cwd: dir });
+
+    // With --json and --risk-threshold 0, should exit 1 (any risk > 0)
+    let exitCode = 0;
+    try {
+      execFileSync(
+        process.execPath,
+        [path.resolve("dist/cli/index.js"), "check", "--json", "--risk-threshold", "0"],
+        { cwd: dir, encoding: "utf8" }
+      );
+    } catch (e: any) {
+      exitCode = e.status ?? 1;
+    }
+    assert.ok(exitCode === 1, `expected exit 1, got ${exitCode}`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

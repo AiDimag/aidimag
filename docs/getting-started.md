@@ -32,13 +32,14 @@ This page gets aiDimag running in your repository.
 ## The whole setup at a glance
 
 ```sh
-dim init                # 1. create the memory store + git hooks
-dim bootstrap           # 2. (optional) seed memory from your codebase
-dim generate-context    # 3. feed your AI tools (or wire up MCP)
+dim setup               # 1. init + git hooks + MCP for detected agents
+dim setup-ollama        # 2. (optional) free local LLM + embeddings
+dim bootstrap           # 3. (optional) seed memory from your codebase
 dim status              # 4. confirm it's alive
 ```
 
-Each step is explained below.
+`dim setup` does everything `dim init` does and more — agent MCP configs, context files,
+and optional bootstrap — all in one command. Each step is explained below.
 
 ## Install
 
@@ -59,7 +60,7 @@ dim --version
 ### Option B — run without installing
 
 ```sh
-npx aidimag init
+npx aidimag setup
 ```
 
 ### Option C — from source (current repo)
@@ -74,20 +75,41 @@ npm link        # makes `dim` and `aidimag` available globally
 
 ## Initialize a repo
 
-From inside any git repository:
+From inside any git repository, the recommended way is:
+
+```sh
+dim setup
+```
+
+This does everything in one go:
+
+1. Creates `.aidimag/` with the memory database and a `config.json`.
+2. Adds the database files to your `.gitignore` (your local memory stays private).
+3. Installs additive git hooks (re-verify on pull, mine on commit, etc.).
+4. Detects installed AI coding agents (Claude Code, Cursor, Windsurf, OpenAI Codex,
+   GitHub Copilot) and wires up their MCP configs automatically.
+5. Optionally generates context files and runs bootstrap.
+
+```sh
+dim setup                              # interactive — prompts for each step
+dim setup --yes                        # accept all detected integrations
+dim setup --agent claude-code,cursor   # wire specific agents
+dim setup --context-files --bootstrap  # context files + bootstrap in one go
+```
+
+`dim setup` is idempotent and always backs up before modifying a file. Run `dim doctor`
+afterward to verify everything is wired correctly.
+
+### Manual alternative: `dim init`
+
+If you prefer to set things up step by step, `dim init` does the basics only:
 
 ```sh
 dim init
 ```
 
-This:
-
-1. Creates `.aidimag/` with the memory database and a `config.json`.
-2. Adds the database files to your `.gitignore` (your local memory stays private).
-3. Installs additive git hooks (re-verify on pull, mine on commit, etc.).
-4. Prints an MCP config snippet you can paste into your agent.
-
-You'll see something like:
+This creates `.aidimag/`, installs git hooks, and prints an MCP config snippet you can
+paste into your agent manually. You'll then need to configure MCP for each agent yourself.
 
 ```
 Initialized aidimag in /path/to/your-repo/.aidimag
@@ -100,6 +122,8 @@ Add the MCP server to your agent config, e.g. for Claude Code (.mcp.json):
   }
 }
 ```
+
+You can always run `dim setup` later to add agent integrations.
 
 ## Seed your memory (optional but recommended)
 
@@ -140,8 +164,22 @@ Without `--auto`, you must manually run `dim generate-context` after approving n
 
 By default search is keyword-only. To enable semantic recall:
 
+- **Ollama (free, local):** run `dim setup-ollama` — or click **Setup Ollama** in the
+  dashboard (`dim ui`) for a step-by-step guided flow. It installs Ollama, lets you pick an
+  embedding model (all-minilm ~45MB, nomic-embed-text ~274MB recommended,
+  mxbai-embed-large ~670MB, or snowflake-arctic-embed ~1.2GB) and an LLM model
+  (llama3.2 ~2GB recommended, llama3.1, qwen2.5, or phi3), pulls both, and verifies they work.
+  If you already have Ollama, it detects pulled models and offers to reuse them.
 - **OpenAI:** `export OPENAI_API_KEY=sk-...`
-- **Ollama:** install and run it locally (auto-detected).
+- **AWS Bedrock:** `export AIDIMAG_EMBEDDINGS=bedrock`
+
+Commands that need an LLM provider (`dim bootstrap`, `dim mine --llm`, `dim harvest`,
+`dim knowledge sync`) will automatically prompt you to set up Ollama if no provider is
+detected.
+
+You can change models later from the dashboard — click the **LLM** or **Embeddings** status
+card on the Actions page to open **Model Settings**, where you can select different models
+and pull new ones directly.
 
 Then build the index once:
 
@@ -176,3 +214,6 @@ AIDIMAG_DEBUG=1 dim <command>
 
 More fixes in the **[FAQ & troubleshooting](/faq)**.
 
+---
+
+Next: **[Quick start (5 minutes)](/quickstart)**.

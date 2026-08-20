@@ -86,3 +86,7 @@ by inheriting your console environment; if you still hit "cannot run program dim
 
 All three read and write the same `.aidimag/memory.db`, so you can mix and match freely.
 
+---
+
+Next: **[Web dashboard](/dashboard)**.
+

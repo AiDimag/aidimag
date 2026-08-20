@@ -60,14 +60,22 @@ dim init                    # creates .aidimag/, installs additive git hooks
 dim bootstrap               # optional: LLM-survey the repo into a starter memory set
 dim review                  # approve what enters memory (nothing is stored unreviewed)
 
-dim remember "All DB access goes through src/db/store.ts" -k INVARIANT -p src/db \
-  -e "STATIC_CHECK:grep -rL better-sqlite3 src --include=*.ts"
+dim remember "All DB access goes through src/db/store.ts" -k INVARIANT -p src \
+  -e "STATIC_CHECK:! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts"
 dim recall db access
 dim verify                  # re-run all evidence; stale beliefs get flagged
 dim brief                   # session-start briefing: in-scope memory, guardrails, gaps
 
 # For non-MCP tools (Copilot, Cursor without MCP, etc.):
 dim generate-context --format all --auto   # creates .cursorrules, CLAUDE.md, AGENTS.md, etc.
+```
+
+### One-command setup
+
+```sh
+dim setup --yes              # init + git hooks + MCP configs for detected agents + context files
+dim setup-ollama             # install Ollama + pull a free local embedding model for semantic search
+dim doctor                   # verify everything is wired correctly
 ```
 
 ## 🔌 Connect to Your AI Agent (MCP)

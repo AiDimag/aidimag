@@ -93,3 +93,7 @@ Reference material is exactly the "stays with the project forever, shouldn't fad
 case that [pinned memories](/guides/pinned) were built for — while remaining falsifiable, so
 a claim extracted from a style guide still goes stale if its evidence later fails.
 
+---
+
+Next: **[FAQ & troubleshooting](/faq)**.
+

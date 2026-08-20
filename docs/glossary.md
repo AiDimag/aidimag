@@ -81,3 +81,7 @@ confirm this passes at commit X").
 deliver understanding (Spec), let work be checked (Verifier), and keep a persistent improving
 workspace (Environment).
 
+---
+
+Next: **[Pricing & licensing](/pricing)**.
+

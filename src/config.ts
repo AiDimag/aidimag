@@ -20,6 +20,14 @@ export interface GenerateContextConfig {
 /** "block" → exit 1 on violations; true → warn (exit 0); falsy → hook is a no-op. */
 export type PreCommitCheckConfig = boolean | "warn" | "block";
 
+/**
+ * MCP pre-edit enforcement mode:
+ *  - "warn" — return STOP/ASK_FIRST decision but don't prevent the edit (default)
+ *  - "enforce" — return a structured error that the agent must respect
+ *  - "off" — no pre-edit checks
+ */
+export type McpEnforceConfig = "warn" | "enforce" | "off";
+
 /** Who summarizes dropped knowledge docs: auto (agent→llm), agent-only, llm-only, or off. */
 export type KnowledgeSummarizer = "auto" | "agent" | "llm" | "off";
 
@@ -40,11 +48,34 @@ export interface KnowledgeConfig {
   chunkBytes?: number;
 }
 
+export interface RetentionConfig {
+  /** memories older than this many days with no evidence are eligible for auto-forget — 0 = disabled */
+  maxAgeDays?: number;
+  /** also forget STALE memories older than this many days regardless of evidence — 0 = disabled */
+  staleAgeDays?: number;
+  /** never auto-forget pinned memories — default true */
+  preservePinned?: boolean;
+  /** never auto-forget memories created by these sources (e.g. "human", "knowledge:") */
+  preserveSources?: string[];
+  /** dry-run: report what would be forgotten without deleting — default false */
+  dryRun?: boolean;
+}
+
+export interface OllamaConfig {
+  /** embedding model for semantic search — default "nomic-embed-text" */
+  embeddingModel?: string;
+  /** chat/LLM model for mining/harvest/bootstrap — default "llama3.1" */
+  llmModel?: string;
+}
+
 export interface AidimagConfig {
   generateContext?: GenerateContextConfig;
   preCommitCheck?: PreCommitCheckConfig;
+  mcpEnforce?: McpEnforceConfig;
   knowledge?: KnowledgeConfig;
+  retention?: RetentionConfig;
   onboarded?: boolean;
+  ollama?: OllamaConfig;
   [k: string]: unknown;
 }
 
@@ -87,6 +118,26 @@ export function resolveKnowledgeConfig(repoRoot: string): ResolvedKnowledgeConfi
   };
 }
 
+export interface ResolvedRetentionConfig {
+  maxAgeDays: number;
+  staleAgeDays: number;
+  preservePinned: boolean;
+  preserveSources: string[];
+  dryRun: boolean;
+}
+
+/** Retention config with defaults filled in. maxAgeDays=0 means disabled. */
+export function resolveRetentionConfig(repoRoot: string): ResolvedRetentionConfig {
+  const r = readConfig(repoRoot).retention ?? {};
+  return {
+    maxAgeDays: r.maxAgeDays ?? 0,
+    staleAgeDays: r.staleAgeDays ?? 0,
+    preservePinned: r.preservePinned ?? true,
+    preserveSources: r.preserveSources ?? ["human", "knowledge:"],
+    dryRun: r.dryRun ?? false,
+  };
+}
+
 function configPath(repoRoot: string): string {
   return path.join(repoRoot, ".aidimag", "config.json");
 }
@@ -108,4 +159,10 @@ export function writeConfig(repoRoot: string, patch: Partial<AidimagConfig>): vo
 }
 
 export type { GuardrailLevel };
+
+export function resolveMcpEnforceConfig(repoRoot: string): McpEnforceConfig {
+  const cfg = readConfig(repoRoot).mcpEnforce;
+  if (cfg === "enforce" || cfg === "off" || cfg === "warn") return cfg;
+  return "warn";
+}
 

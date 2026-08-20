@@ -28,6 +28,44 @@ Example output:
 
 `✗` is a hard violation; `~` is an advisory reminder.
 
+`dim check` also displays a **risk score** (0–100) that aggregates violation severity,
+memory kind/status/confidence, evidence count, critical-area membership, and change breadth
+into a single signal:
+
+```
+Risk Score: 48/100 [MEDIUM]
+  ██████████░░░░░░░░░░
+  Factors:
+    +48 GUARDRAIL violation (fail) — NEVER guardrail: the staged change appears to do exactly what this forbids
+```
+
+Levels: **low** (<30), **medium** (30–59), **high** (60–79), **critical** (80+).
+
+## Critical areas
+
+Protect sensitive paths (auth, payments, PII, migrations) by defining critical areas in
+`.aidimag/critical-areas.yml`:
+
+```yaml
+areas:
+  - label: Authentication
+    paths: [src/auth]
+    owners: [alice@example.com]
+    block: true
+    approvalToken: "[AUTH-OK]"
+    requiredTests:
+      - npm test -- auth
+```
+
+When a change touches a critical area, `dim check` flags it as a `[CRITICAL]` violation
+unless the commit message contains the approval token (e.g. `[AUTH-OK]`). Areas with
+`block: true` cause `dim check --block` to exit 1.
+
+```sh
+git commit -m "refactor auth middleware [AUTH-OK]"   # passes
+git commit -m "refactor auth middleware"              # blocked
+```
+
 ## Warn vs block
 
 By default `dim check` only **warns** (exit 0). To make hard violations fail:
@@ -67,6 +105,62 @@ dim check: 1 blocking violation(s). Resolve them or commit with --no-verify.
 ```
 
 You can always bypass in a pinch with `git commit --no-verify`.
+
+## Run it on pull requests
+
+Use the reusable `aidimag-check` action to run `dim check --json --block` in CI and post a
+structured summary comment on every pull request with a risk score table, violation details,
+and critical area enforcement:
+
+```yaml
+name: AIDimag Check
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+jobs:
+  aidimag-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: AiDimag/aidimag/.github/actions/aidimag-check@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          risk-threshold: 60        # fail if risk score > 60
+          require-owner-approval: 'true'   # require listed owners to approve PRs touching critical areas
+          run-required-tests: 'true'       # run tests listed in critical-areas config
+```
+
+### Action inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `token` | `github.token` | Token for posting PR comments |
+| `base-ref` | `github.base_ref` | Base ref to diff against |
+| `risk-threshold` | (none) | Fail if risk score exceeds this (0–100) |
+| `require-owner-approval` | `false` | Require listed owners to approve PRs touching critical areas |
+| `run-required-tests` | `false` | Run tests listed in critical-areas config and fail if any fail |
+| `version` | `latest` | aiDimag npm version to install |
+
+The action diffs against the pull-request base ref, exits with an error on a blocking
+violation, and updates one sticky PR comment with the results. The comment includes:
+
+- A **risk score table** with color-coded badge (🟢 <30, 🟡 30–59, 🟠 60–79, 🔴 80+)
+- **Risk factors** breakdown showing each contribution
+- **Memory violations** (fail and warn) with claim text
+- **Critical area violations** with owners and required tests
+- **Owner approval status** (missing approvers are flagged)
+- **Required test results** (failed tests are flagged)
+- A **knowledge-impact report** from `dim impact`, listing verified memories whose scope
+  overlaps the changed files
+
+For CI, commit `.aidimag` to the repo (memories are usually safe to share) or run `dim cloud link`
+and `dim sync` so the runner pulls the team memory store before checking.
 
 ## How it compares to `dim verify`
 

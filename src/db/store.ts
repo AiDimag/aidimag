@@ -9,7 +9,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import path from "node:path";
-import { SCHEMA_SQL, SCHEMA_VERSION, MIGRATIONS, EVIDENCE_REBUILD_V6, MEMORIES_REBUILD_V8, PROPOSALS_REBUILD_V8, EVENTS_REBUILD_V9 } from "./schema.js";
+import { SCHEMA_SQL, SCHEMA_VERSION, MIGRATIONS, EVIDENCE_REBUILD_V6, MEMORIES_REBUILD_V8, PROPOSALS_REBUILD_V8, EVENTS_REBUILD_V9, EVENTS_REBUILD_V13 } from "./schema.js";
 import { debugLog } from "../debug.js";
 import type {
   Evidence,
@@ -83,7 +83,8 @@ export type MemoryEventType =
   | "verification_report"
   | "updated"
   | "evidence_added"
-  | "evidence_removed";
+  | "evidence_removed"
+  | "evidence_signed";
 
 export interface MemoryEvent {
   seq: number;
@@ -129,6 +130,7 @@ interface MemoryRow {
   guardrail_level?: string | null;
   cloud_synced?: number;
   cloud_seq?: number | null;
+  applies_when?: string | null;
 }
 
 export class MemoryStore {
@@ -207,6 +209,12 @@ export class MemoryStore {
       const tx = this.db.transaction(() => this.db.exec(EVENTS_REBUILD_V9));
       tx();
     }
+    // v13: events CHECK gains evidence_signed type; evidence table gains
+    // signature/signed_by columns; immutable history triggers added.
+    if (prevVersion > 0 && prevVersion < 13) {
+      const tx = this.db.transaction(() => this.db.exec(EVENTS_REBUILD_V13));
+      tx();
+    }
     this.db
       .prepare(
         "INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
@@ -276,8 +284,8 @@ export class MemoryStore {
     const insert = this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO memories (id, kind, claim, confidence, status, created_by, created_at, updated_at, pinned, guardrail_level)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO memories (id, kind, claim, confidence, status, created_by, created_at, updated_at, pinned, guardrail_level, applies_when)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           id,
@@ -289,7 +297,8 @@ export class MemoryStore {
           now,
           now,
           input.pinned ? 1 : 0,
-          input.kind === "GUARDRAIL" ? input.guardrailLevel ?? "ask-first" : null
+          input.kind === "GUARDRAIL" ? input.guardrailLevel ?? "ask-first" : null,
+          input.appliesWhen?.length ? JSON.stringify(input.appliesWhen) : null
         );
 
       const scopeStmt = this.db.prepare(
@@ -419,6 +428,17 @@ export class MemoryStore {
         OR EXISTS (SELECT 1 FROM memory_scopes s WHERE s.memory_id = m.id AND s.scope_type = 'path' AND (${pathClauses}))
       )`);
       for (const p of opts.paths) params.push(p, p);
+    }
+    if (opts.symbols?.length) {
+      // Boost/restrict to memories scoped to matching symbols
+      const symbolClauses = opts.symbols
+        .map(() => "s.value = ?")
+        .join(" OR ");
+      conditions.push(`(
+        NOT EXISTS (SELECT 1 FROM memory_scopes s WHERE s.memory_id = m.id AND s.scope_type = 'symbol')
+        OR EXISTS (SELECT 1 FROM memory_scopes s WHERE s.memory_id = m.id AND s.scope_type = 'symbol' AND (${symbolClauses}))
+      )`);
+      for (const s of opts.symbols) params.push(s);
     }
 
     const where = conditions.length ? `AND ${conditions.join(" AND ")}` : "";
@@ -576,8 +596,8 @@ export class MemoryStore {
     try {
       this.db
         .prepare(
-          `INSERT INTO proposals (id, kind, claim, paths, symbols, evidence, source, source_ref, rationale, created_at, updated_at, ticket_ref, guardrail_level)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO proposals (id, kind, claim, paths, symbols, evidence, source, source_ref, rationale, created_at, updated_at, ticket_ref, guardrail_level, applies_when)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           id,
@@ -594,7 +614,8 @@ export class MemoryStore {
           now,
           now,
           input.ticketRef ?? null,
-          input.kind === "GUARDRAIL" ? input.guardrailLevel ?? "ask-first" : null
+          input.kind === "GUARDRAIL" ? input.guardrailLevel ?? "ask-first" : null,
+          input.appliesWhen?.length ? JSON.stringify(input.appliesWhen) : null
         );
     } catch (err) {
       // UNIQUE(source, source_ref, claim) — already proposed
@@ -635,6 +656,7 @@ export class MemoryStore {
       evidence: p.evidence,
       createdBy: p.source,
       guardrailLevel: p.guardrailLevel,
+      appliesWhen: p.appliesWhen,
       // Knowledgebase docs are curated reference material — pin on approval so
       // they don't decay with age (still falsifiable if evidence fails).
       // Callers can override (e.g. requireReview:false auto-approval never pins).
@@ -858,6 +880,66 @@ export class MemoryStore {
     return findings.slice(0, Math.min(opts.limit ?? 20, 200));
   }
 
+  // ---------------------------------------------------------------- retention
+  // Auto-forget memories that are old, evidence-free, and not pinned.
+  // Configured via .aidimag/config.json → retention section.
+
+  /**
+   * Apply retention policy: forget memories older than maxAgeDays with no evidence
+   * (and optionally STALE memories older than staleAgeDays regardless of evidence).
+   * Returns the list of forgotten (or would-be-forgotten, in dry-run mode) memories.
+   */
+  applyRetention(opts: {
+    maxAgeDays: number;
+    staleAgeDays?: number;
+    preservePinned?: boolean;
+    preserveSources?: string[];
+    dryRun?: boolean;
+  }): MemoryEntry[] {
+    const now = Date.now();
+    const maxAgeMs = opts.maxAgeDays * 86_400_000;
+    const staleAgeMs = (opts.staleAgeDays ?? 0) * 86_400_000;
+    const preservePinned = opts.preservePinned ?? true;
+    const preserveSources = opts.preserveSources ?? ["human", "knowledge:"];
+
+    const all = this.list(10_000);
+    const eligible: MemoryEntry[] = [];
+
+    for (const m of all) {
+      // Never forget REFUTED — they're negative knowledge, intentionally kept
+      if (m.status === "REFUTED") continue;
+      // Preserve pinned
+      if (preservePinned && m.pinned) continue;
+      // Preserve by source
+      if (preserveSources.some((s) => m.createdBy === s || m.createdBy.startsWith(s))) continue;
+
+      const ageMs = now - Date.parse(m.createdAt);
+      const hasEvidence = m.grounding.length > 0;
+
+      let shouldForget = false;
+
+      // Old + no evidence → forget
+      if (opts.maxAgeDays > 0 && ageMs > maxAgeMs && !hasEvidence) {
+        shouldForget = true;
+      }
+
+      // STALE + old enough → forget regardless of evidence
+      if (staleAgeMs > 0 && m.status === "STALE" && ageMs > staleAgeMs) {
+        shouldForget = true;
+      }
+
+      if (shouldForget) eligible.push(m);
+    }
+
+    if (!opts.dryRun) {
+      for (const m of eligible) {
+        this.forget(m.id);
+      }
+    }
+
+    return eligible;
+  }
+
   /** Last mined commit sha (commit-miner cursor), or null. */
   getMeta(key: string): string | null {
     const row = this.db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
@@ -889,6 +971,7 @@ export class MemoryStore {
       updatedAt: (row.updated_at as string | null) ?? null,
       ticketRef: (row.ticket_ref as string | null) ?? undefined,
       guardrailLevel: (row.guardrail_level as GuardrailLevel | null) ?? undefined,
+      appliesWhen: row.applies_when ? JSON.parse(row.applies_when as string) as string[] : undefined,
     };
   }
 
@@ -1030,6 +1113,37 @@ export class MemoryStore {
       .run(id, memoryId, ev.type, ev.payload);
     this.recordEvent("evidence_added", memoryId, { evidenceId: id, type: ev.type });
     return id;
+  }
+
+  /** Sign an evidence row with a cryptographic signature. */
+  signEvidence(evidenceId: string, signature: string, signedBy: string): void {
+    this.db
+      .prepare("UPDATE evidence SET signature = ?, signed_by = ? WHERE id = ?")
+      .run(signature, signedBy, evidenceId);
+    const row = this.db
+      .prepare("SELECT memory_id FROM evidence WHERE id = ?")
+      .get(evidenceId) as { memory_id: string } | undefined;
+    if (row) {
+      this.recordEvent("evidence_signed", row.memory_id, { evidenceId, signedBy });
+    }
+  }
+
+  /** Get a single evidence row by ID. */
+  getEvidence(evidenceId: string): { id: string; memoryId: string; type: string; payload: string; result: string } | undefined {
+    const row = this.db
+      .prepare("SELECT id, memory_id, type, payload, result FROM evidence WHERE id = ?")
+      .get(evidenceId) as { id: string; memory_id: string; type: string; payload: string; result: string } | undefined;
+    if (!row) return undefined;
+    return { id: row.id, memoryId: row.memory_id, type: row.type, payload: row.payload, result: row.result };
+  }
+
+  /** Resolve an 8-char evidence ID prefix to a full ID. */
+  resolveEvidenceId(shortId: string): string | undefined {
+    if (shortId.length >= 32) return shortId;
+    const row = this.db
+      .prepare("SELECT id FROM evidence WHERE id LIKE ? || '%' LIMIT 1")
+      .get(shortId) as { id: string } | undefined;
+    return row?.id;
   }
 
   removeEvidence(evidenceId: string): void {
@@ -1268,6 +1382,8 @@ export class MemoryStore {
       payload: string;
       last_run: string | null;
       result: Evidence["result"];
+      signature: string | null;
+      signed_by: string | null;
     }>;
     const links = this.db
       .prepare("SELECT from_id, to_id, relation FROM memory_links WHERE from_id = ? OR to_id = ?")
@@ -1300,9 +1416,12 @@ export class MemoryStore {
         payload: e.payload,
         lastRun: e.last_run,
         result: e.result,
+        signature: (e.signature as string | null) ?? null,
+        signedBy: (e.signed_by as string | null) ?? null,
       })),
       links: links.map((l) => ({ fromId: l.from_id, toId: l.to_id, relation: l.relation })),
       guardrailLevel: (row.guardrail_level as GuardrailLevel | null) ?? undefined,
+      appliesWhen: row.applies_when ? JSON.parse(row.applies_when as string) as string[] : undefined,
     };
   }
 }
