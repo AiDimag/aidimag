@@ -683,15 +683,9 @@ export function checkBranchName(repoRoot: string, branch: string): BranchCheckRe
   return { branch, ok, exempt: false, enforce, pattern };
 }
 
-/** Build a conforming branch name: feature/XXX-2100-serialize-token-refresh */
-export function buildBranchName(ticketId: string, title?: string, prefix = "feature"): string {
-  const slug = (title ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .split("-")
-    .slice(0, 6)
-    .join("-");
-  return slug ? `${prefix}/${ticketId}-${slug}` : `${prefix}/${ticketId}`;
+/** Build a conforming branch name: feature/XXX-2100 or XXX-2100 (no prefix) */
+export function buildBranchName(ticketId: string, _title?: string, prefix = "feature"): string {
+  if (!prefix) return ticketId;
+  return `${prefix}/${ticketId}`;
 }
 

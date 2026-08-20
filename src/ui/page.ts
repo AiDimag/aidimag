@@ -29,10 +29,10 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
     --ring: 199 89% 48%;
     --radius: 0.75rem;
     --surface-glow: 0 0 0 1px rgba(37, 99, 235, 0.08), 0 8px 32px rgba(37, 99, 235, 0.08);
-    --verified: #15803d;
-    --unverified: #475569;
-    --stale: #a16207;
-    --refuted: #dc2626;
+    --verified: #22c55e;
+    --unverified: #64748b;
+    --stale: #eab308;
+    --refuted: #ef4444;
     --path: #2563eb;
     --icon-stroke: #1e293b;
     --grad-highlight: #f8fafc;
@@ -153,11 +153,13 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   .card:hover { border-color: hsl(var(--primary) / 0.3); }
   .card .claim { font-size: 13px; margin-bottom: 6px; line-height: 1.5; }
   .card .meta { font-size: 11px; color: hsl(var(--muted-foreground)); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .card .meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .card .meta svg, .card .meta img { width: 14px; height: 14px; flex-shrink: 0; vertical-align: middle; }
   .badge { padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; border: 1px solid transparent; }
-  .badge.VERIFIED { background: color-mix(in srgb, var(--verified) 20%, transparent); color: var(--verified); }
-  .badge.UNVERIFIED { background: color-mix(in srgb, var(--unverified) 20%, transparent); color: var(--unverified); }
-  .badge.STALE { background: color-mix(in srgb, var(--stale) 20%, transparent); color: var(--stale); }
-  .badge.REFUTED { background: color-mix(in srgb, var(--refuted) 20%, transparent); color: var(--refuted); }
+  .badge.VERIFIED { background: color-mix(in srgb, var(--verified) 15%, transparent); color: var(--verified); }
+  .badge.UNVERIFIED { background: color-mix(in srgb, var(--unverified) 15%, transparent); color: var(--unverified); }
+  .badge.STALE { background: color-mix(in srgb, var(--stale) 15%, transparent); color: var(--stale); }
+  .badge.REFUTED { background: color-mix(in srgb, var(--refuted) 15%, transparent); color: var(--refuted); }
   .kind { font-weight: 500; }
   .actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
   .actions button { display: inline-flex; align-items: center; gap: 4px; }
@@ -854,6 +856,29 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   </div>
 </dialog>
 
+<!-- Create ticket branch dialog (dim branch) -->
+<dialog id="dlg-branch">
+  <h3>🌿 Create ticket branch</h3>
+  <div class="hint">Fetches the ticket title and creates a convention-conforming branch.</div>
+  <label>Branch prefix</label>
+  <select id="branch-prefix">
+    <option value="feature">feature</option>
+    <option value="bugfix">bugfix</option>
+    <option value="hotfix">hotfix</option>
+    <option value="chore">chore</option>
+    <option value="docs">docs</option>
+    <option value="refactor">refactor</option>
+    <option value="test">test</option>
+    <option value="">(none — just ticket id)</option>
+  </select>
+  <label>Ticket id</label>
+  <input id="branch-ticket-id" placeholder="PROJ-123">
+  <div class="dialog-actions">
+    <button type="button" onclick="document.getElementById('dlg-branch').close()">Cancel</button>
+    <button type="button" class="primary" onclick="runBranchFromDialog()">Create branch</button>
+  </div>
+</dialog>
+
 <!-- Generic output panel for action results -->
 <dialog id="dlg-output">
   <h3 id="out-title"></h3>
@@ -910,7 +935,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
 </div>
 
 <script>
-const COLORS = { VERIFIED: "#15803d", UNVERIFIED: "#475569", STALE: "#a16207", REFUTED: "#dc2626" };
+const COLORS = { VERIFIED: "#22c55e", UNVERIFIED: "#94a3b8", STALE: "#eab308", REFUTED: "#ef4444" };
 let state = null;
 let csrfToken = null;
 
@@ -1240,8 +1265,8 @@ function renderProposals() {
       <div class="claim">\${esc(p.claim)}</div>
       <div class="meta"><span class="kind" style="color:\${KIND_COLORS[p.kind] || 'hsl(var(--primary))'}">\${p.kind}</span><span>via \${esc(p.source)}</span>\${p.ticketRef ? \`<span>\${IC_TICKET} \${esc(p.ticketRef)}</span>\` : ""}</div>
       <div class="actions">
-        <button class="primary" onclick="act('/api/proposals/\${p.id}/approve','approved')">\${IC_THUMBUP} Approve</button>
-        <button class="danger" onclick="act('/api/proposals/\${p.id}/reject','rejected')">\${IC_THUMBDOWN} Reject</button>
+        <button class="primary" onclick="act('/api/proposals/\${p.id}/approve','approved')">Approve</button>
+        <button class="danger" onclick="act('/api/proposals/\${p.id}/reject','rejected')">Reject</button>
       </div>
     </div>\`).join("");
 }
@@ -1982,11 +2007,10 @@ async function loadHealth() {
 }
 
 function riskColor(score) {
-  const dark = document.documentElement.classList.contains("dark");
-  if (score >= 80) return dark ? "#ef4444" : COLORS.REFUTED;
-  if (score >= 60) return dark ? "#f97316" : "#ea580c";
-  if (score >= 30) return dark ? "#eab308" : COLORS.STALE;
-  return dark ? "#22c55e" : COLORS.VERIFIED;
+  if (score >= 80) return COLORS.REFUTED;
+  if (score >= 60) return "#f97316";
+  if (score >= 30) return COLORS.STALE;
+  return COLORS.VERIFIED;
 }
 
 function riskLevel(score) {
@@ -2445,6 +2469,11 @@ const ACTION_GROUPS = [
         help: "Deletes the sync token stored for this device.",
         disabled: () => state && !state.cloud ? "Connect a cloud server first" : null,
         run: () => runLogout() },
+    ],
+  },
+  {
+    icon: IC_BRANCH, title: "Ticketing", sub: "Connect, browse, create branches, and sync ticket context into memory",
+    actions: [
       { id: "tickets", icon: () => state && state.tickets ? (state.tickets.provider === "remote" && state.teamTickets ? (PROVIDER_LOGOS[state.teamTickets.provider] || IC_TICKET) : (PROVIDER_LOGOS[state.tickets.provider] || IC_TICKET)) : IC_TICKET, title: "Connect Ticketing App", cli: "dim ticket connect",
         desc: "Jira, GitHub Issues, Linear, HTTP middleware or team server.",
         help: "Once connected, proposals mined from commits carry ticket context, and branch-naming conventions can be enforced by git hooks. Credentials stay on this machine.",
@@ -2456,13 +2485,14 @@ const ACTION_GROUPS = [
         run: () => document.getElementById("dlg-ticket-show").showModal() },
       { id: "branch", icon: IC_BRANCH, title: "Create Ticket Branch", cli: "dim branch <ticketId>",
         desc: "Create a convention-conforming branch for a ticket.",
-        help: "Fetches the ticket title and creates a branch like feature/PROJ-123-fix-retries. Creates the branch in your working tree.",
+        help: "Fetches the ticket details, extracts context into UNVERIFIED memories, and creates a branch like feature/PROJ-123. Creates the branch in your working tree.",
         disabled: () => state && !state.tickets ? "Connect a ticket provider first" : null,
-        run: () => { const id = prompt("Ticket id (e.g. PROJ-123):"); if (id) runBranch(id.trim()); } },
-      { id: "hermes", icon: IC_HERMES, title: "Install Hermes Agent", cli: "dim hermes install",
-        desc: "Register aidimag as a native Hermes memory provider.",
-        help: "Installs a stdlib-only Python bridge into $HERMES_HOME/plugins/aidimag that delegates to the MCP server. Session briefings are injected into the system prompt, recall is prefetched per turn, and learnings become review-queue proposals.",
-        run: () => runHermesInstall() },
+        run: () => { document.getElementById("branch-ticket-id").value = ""; document.getElementById("dlg-branch").showModal(); } },
+      { id: "branch-resync", icon: IC_REFRESH, title: "Resync Current Branch Ticket", cli: "dim branch --resync",
+        desc: "Fetch updated ticket details for the current branch and create memories.",
+        help: "Detects the ticket ID from your current git branch, fetches the latest ticket details from your provider, and creates UNVERIFIED memories if anything changed. Useful when ticket details are updated mid-sprint.",
+        disabled: () => state && !state.tickets ? "Connect a ticket provider first" : null,
+        run: () => runBranchResync() },
     ],
   },
   {
@@ -2492,6 +2522,10 @@ const ACTION_GROUPS = [
         desc: "Install Ollama and pull a free local embedding model for semantic search.",
         help: "Installs Ollama (via Homebrew or install script), starts the server, and lets you pick an embedding model (all-minilm ~45MB, nomic-embed-text ~274MB recommended, mxbai-embed-large ~670MB, or snowflake-arctic-embed ~1.2GB). If you already have Ollama, detects pulled embedding models and offers to reuse them. Free and fully local — no API key needed.",
         run: () => runSetupOllama() },
+      { id: "hermes", icon: IC_HERMES, title: "Install Hermes Agent", cli: "dim hermes install",
+        desc: "Register aidimag as a native Hermes memory provider.",
+        help: "Installs a stdlib-only Python bridge into $HERMES_HOME/plugins/aidimag that delegates to the MCP server. Session briefings are injected into the system prompt, recall is prefetched per turn, and learnings become review-queue proposals.",
+        run: () => runHermesInstall() },
       { id: "scratch-jot", icon: IC_WRITING, title: "Jot Note", cli: "dim scratch",
         desc: "Quick working note. Expires in 24 h by default.",
         help: "Session working memory for hypotheses, plans and intermediate findings. TTL-expiring, local-only, never becomes durable memory — promote anything worth keeping via Add Memory.",
@@ -2975,13 +3009,27 @@ async function runLogout() {
 
 // ---- create ticket branch via server API ----
 
-async function runBranch(ticketId) {
+async function runBranchFromDialog() {
+  const ticketId = document.getElementById("branch-ticket-id").value.trim();
+  if (!ticketId) { toast("Enter a ticket id"); return; }
+  const prefix = document.getElementById("branch-prefix").value;
+  document.getElementById("dlg-branch").close();
+  await runBranch(ticketId, prefix);
+}
+
+async function runBranch(ticketId, prefix) {
   setBusy("branch", true);
   toastLoading("Creating branch for " + ticketId + "…");
   try {
-    const r = await api("/api/branch", { method: "POST", body: JSON.stringify({ ticketId }) });
+    const body = { ticketId };
+    if (prefix !== undefined) body.prefix = prefix;
+    const r = await api("/api/branch", { method: "POST", body: JSON.stringify(body) });
     if (r.ok) {
-      toastDone("🌿 Created branch " + r.branch + (r.ticketTitle ? " (from '" + r.ticketTitle + "')" : ""));
+      let msg = "🌿 Created branch " + r.branch;
+      if (r.ticketTitle) msg += " (ticket: '" + r.ticketTitle + "')";
+      if (r.memoriesCount > 0) msg += " — " + r.memoriesCount + " memor" + (r.memoriesCount > 1 ? "ies" : "y") + " created";
+      toastDone(msg);
+      load();
     } else {
       toast("Error: " + r.error);
     }
@@ -2993,6 +3041,27 @@ async function runBranch(ticketId) {
     }
   }
   finally { setBusy("branch", false); }
+}
+
+async function runBranchResync() {
+  setBusy("branch-resync", true);
+  toastLoading("Resyncing ticket from current branch…");
+  try {
+    const r = await api("/api/branch/resync", { method: "POST" });
+    if (r.ok) {
+      let msg = "🔄 Resynced ticket " + r.ticketId + " from branch " + r.branch;
+      if (r.message) msg += " — " + r.message;
+      else if (r.memoriesCount > 0) msg += " — " + r.memoriesCount + " memor" + (r.memoriesCount > 1 ? "ies" : "y") + " created";
+      else msg += " — no changes detected";
+      toastDone(msg);
+      load();
+    } else {
+      toast("Error: " + r.error);
+    }
+  } catch (e) {
+    toast("Error: " + e.message);
+  }
+  finally { setBusy("branch-resync", false); }
 }
 
 // ---- Hermes plugin install via server API ----
@@ -3396,15 +3465,12 @@ function renderGraph() {
   // Memory nodes — brain icon on colored status ring with breathing pulse
   const memNode = node.filter(d => d.type === "memory");
   const memRadius = d => 9 + d.conf * 8;
-  // Colored background ring
+  // Invisible collision circle (keeps physics + breathing pulse, hides sphere)
   memNode.append("circle")
     .attr("r", memRadius)
-    .attr("fill", d => palette[d.status] || palette.UNVERIFIED)
-    .attr("fill-opacity", 0.9)
-    .attr("stroke", d => palette[d.status] || palette.UNVERIFIED)
-    .attr("stroke-width", 2)
-    .attr("stroke-opacity", 0.5)
-    .attr("filter", LARGE ? null : "url(#node-glow)")
+    .attr("fill", "transparent")
+    .attr("stroke", "transparent")
+    .attr("stroke-width", 0)
     .each(function(d) {
       if (LARGE) return;
       const r0 = memRadius(d);
@@ -3441,7 +3507,7 @@ function renderGraph() {
         g.append("path")
           .attr("d", p)
           .attr("fill", "none")
-          .attr("stroke", palette.iconStroke)
+          .attr("stroke", d => palette[d.status] || palette.UNVERIFIED)
           .attr("stroke-width", 2)
           .attr("stroke-linecap", "round")
           .attr("stroke-linejoin", "round");
@@ -3469,13 +3535,13 @@ function renderGraph() {
       });
   }
 
-  // Scope nodes — Lucide FileCode2 icon on blue circle
+  // Scope nodes — Lucide FileCode2 icon (no sphere)
   const pathNode = node.filter(d => d.type === "path");
   pathNode.append("circle")
     .attr("r", 12)
-    .attr("fill", palette.path).attr("fill-opacity", 0.9)
-    .attr("stroke", palette.path).attr("stroke-width", 2).attr("stroke-opacity", 0.5)
-    .attr("filter", LARGE ? null : "url(#node-glow)");
+    .attr("fill", "transparent")
+    .attr("stroke", "transparent")
+    .attr("stroke-width", 0);
   {
     const fileCodePaths = [
       "M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4",
@@ -3492,7 +3558,7 @@ function renderGraph() {
         g.append("path")
           .attr("d", p)
           .attr("fill", "none")
-          .attr("stroke", palette.iconStroke)
+          .attr("stroke", palette.path)
           .attr("stroke-width", 2)
           .attr("stroke-linecap", "round")
           .attr("stroke-linejoin", "round");

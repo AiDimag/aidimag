@@ -67,6 +67,118 @@ function readBody(req: import("node:http").IncomingMessage): Promise<Record<stri
   });
 }
 
+/** Extract durable claims from a ticket using the connected LLM, then write memories directly. */
+async function extractTicketProposals(
+  store: MemoryStore,
+  ticket: { id: string; url?: string; title: string; body?: string; type?: string; status?: string; labels?: string[]; parent?: { id: string; title: string } },
+  source: string,
+): Promise<{ created: number; duplicates: number; provider: string | null }> {
+  const result = { created: 0, duplicates: 0, provider: null as string | null };
+
+  const { getTextProvider } = await import("../knowledge/llm.js");
+  const { parseClaims } = await import("../knowledge/extract.js");
+  const provider = await getTextProvider();
+  if (!provider) {
+    // Fallback: single TODO_CONTEXT memory without LLM
+    const claim = `Ticket ${ticket.id}: ${ticket.title}`;
+    const rationaleParts = [`Type: ${ticket.type ?? "other"}`, `Status: ${ticket.status ?? "open"}`];
+    if (ticket.labels?.length) rationaleParts.push(`Labels: ${ticket.labels.join(", ")}`);
+    if (ticket.parent) rationaleParts.push(`Parent: ${ticket.parent.id} — ${ticket.parent.title}`);
+    if (ticket.body) rationaleParts.push(`Description: ${ticket.body.slice(0, 800)}`);
+    const evidence: Array<{ type: import("../types.js").EvidenceType; payload: string }> = [
+      { type: "TICKET_REF", payload: ticket.id },
+    ];
+    if (ticket.url) evidence.push({ type: "TICKET_REF", payload: ticket.url });
+    const existing = store.list(1000).find(m => m.claim === claim);
+    if (existing) { result.duplicates++; return result; }
+    const entry = store.write({ kind: "TODO_CONTEXT", claim, evidence, createdBy: source });
+    await indexMemory(store, entry).catch(() => false);
+    result.created++;
+    return result;
+  }
+
+  result.provider = `${provider.name}/${provider.model}`;
+
+  const instructions = `You are extracting durable, project-specific knowledge from a ticket (Jira/GitHub/Linear/etc.) that a developer is about to work on.
+
+Turn the ticket details into a set of FALSIFIABLE claims. Rules:
+
+1. Use ALL available ticket fields (title, description, type, status, labels, parent) to extract maximum context.
+2. Pick the SINGLE BEST kind for each concept — never create multiple claims that say the same thing with different kinds.
+3. Kinds:
+   - TODO_CONTEXT: the work to be done, with enough context to resume it (use for bugs/defects/features)
+   - CONVENTION: a coding convention or pattern the ticket mentions
+   - GUARDRAIL: a hard constraint the agent must follow (set guardrail_level: never|ask-first|always)
+   - INVARIANT: a condition that must always hold
+   - GOTCHA: a pitfall or surprising behavior
+   - ARCHITECTURE: architectural context relevant to the ticket
+   - DECISION: a decision already made with the rejected alternative
+4. Write each claim as a checkable statement about the codebase.
+5. In "rationale", note which part of the ticket the claim came from.
+6. For simple tickets (a single bug, a small feature), create 1–2 claims only. For complex tickets (epics, multi-part features), create up to 5. Consolidate related details into fewer, richer claims.
+7. Do NOT invent rules the ticket doesn't support. Do NOT rephrase the same idea as different kinds.
+8. Leave "paths" and "symbols" as empty arrays [] unless the ticket explicitly mentions file paths or symbol names.
+
+Respond with ONLY a JSON object of this exact shape:
+{"claims":[{"kind":"TODO_CONTEXT","claim":"...","paths":[],"symbols":[],"guardrail_level":null,"rationale":"from ticket description: ..."}]}`;
+
+  const ticketContent = [
+    `Ticket: ${ticket.id}`,
+    `Title: ${ticket.title}`,
+    `Type: ${ticket.type ?? "other"}`,
+    `Status: ${ticket.status ?? "open"}`,
+    ticket.labels?.length ? `Labels: ${ticket.labels.join(", ")}` : null,
+    ticket.parent ? `Parent: ${ticket.parent.id} — ${ticket.parent.title}` : null,
+    ticket.url ? `URL: ${ticket.url}` : null,
+    ticket.body ? `\nDescription:\n${ticket.body}` : null,
+  ].filter(Boolean).join("\n");
+
+  let claims;
+  try {
+    const raw = await provider.generate(instructions, ticketContent.slice(0, 8000));
+    claims = parseClaims(raw);
+  } catch {
+    // LLM failed — fallback to single memory
+    const claim = `Ticket ${ticket.id}: ${ticket.title}`;
+    const evidence: Array<{ type: import("../types.js").EvidenceType; payload: string }> = [
+      { type: "TICKET_REF", payload: ticket.id },
+    ];
+    if (ticket.url) evidence.push({ type: "TICKET_REF", payload: ticket.url });
+    const existing = store.list(1000).find(m => m.claim === claim);
+    if (existing) { result.duplicates++; return result; }
+    const entry = store.write({ kind: "TODO_CONTEXT", claim, evidence, createdBy: source });
+    await indexMemory(store, entry).catch(() => false);
+    result.created++;
+    return result;
+  }
+
+  const evidence: Array<{ type: import("../types.js").EvidenceType; payload: string }> = [
+    { type: "TICKET_REF", payload: ticket.id },
+  ];
+  if (ticket.url) evidence.push({ type: "TICKET_REF", payload: ticket.url });
+
+  const existingClaims = new Set(store.list(1000).map(m => m.claim));
+
+  for (const c of claims) {
+    if (existingClaims.has(c.claim)) { result.duplicates++; continue; }
+    const entry = store.write({
+      kind: c.kind,
+      claim: c.claim,
+      paths: c.paths,
+      symbols: c.symbols,
+      evidence,
+      createdBy: source,
+      guardrailLevel: c.guardrailLevel,
+      appliesWhen: c.appliesWhen,
+    });
+    await indexMemory(store, entry).catch(() => false);
+    existingClaims.add(c.claim);
+    result.created++;
+  }
+
+  return result;
+}
+
 
 export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517): Promise<string> {
   process.env.AIDIMAG_REPO_ROOT = repoRoot;
@@ -966,22 +1078,79 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         const b = await readBody(req);
         const ticketId = String(b.ticketId ?? "").trim();
         if (!ticketId) { json(res, 400, { error: "ticketId required" }); return; }
-        const prefix = String(b.prefix ?? "feature");
+        const prefix = b.prefix !== undefined ? String(b.prefix) : "feature";
         const { ticketProviderFor, buildBranchName } = await import("../tickets/provider.js");
         const provider = ticketProviderFor(repoRoot);
-        let title: string | undefined;
+        let ticket: { id: string; title: string; body?: string; status?: string; url?: string; labels?: string[] } | null = null;
         if (provider) {
-          const t = await provider.getTicket(ticketId).catch(() => null);
-          title = t?.title;
+          ticket = await provider.getTicket(ticketId).catch(() => null);
         }
-        const name = buildBranchName(ticketId, title, prefix);
+        const name = buildBranchName(ticketId, undefined, prefix);
         const { execFileSync } = await import("node:child_process");
         try {
           execFileSync("git", ["checkout", "-b", name], { cwd: repoRoot, stdio: "pipe" });
-          json(res, 200, { ok: true, branch: name, ticketTitle: title });
         } catch (e) {
           json(res, 400, { error: (e as Error).message, branch: name });
+          return;
         }
+
+        // Extract claims from ticket and create memories
+        let memoriesCreated = false;
+        let memoriesCount = 0;
+        if (ticket) {
+          try {
+            const r = await extractTicketProposals(store, ticket, "ticket-branch");
+            memoriesCount = r.created;
+            memoriesCreated = r.created > 0;
+          } catch { /* ignore errors */ }
+        }
+
+        json(res, 200, { ok: true, branch: name, ticketTitle: ticket?.title, memoriesCreated, memoriesCount });
+        return;
+      }
+
+      // ---- resync current branch ticket ----
+      if (req.method === "POST" && pathname === "/api/branch/resync") {
+        const { execFileSync } = await import("node:child_process");
+        let branch: string;
+        try {
+          branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).trim();
+        } catch {
+          json(res, 400, { error: "Not in a git repo" });
+          return;
+        }
+        // Extract ticket ID from branch name
+        const { readTicketsConfig, ticketProviderFor } = await import("../tickets/provider.js");
+        const tcfg = readTicketsConfig(repoRoot);
+        const pattern = tcfg.pattern || DEFAULT_TICKET_PATTERN;
+        const match = branch.match(new RegExp(pattern));
+        if (!match) {
+          json(res, 400, { error: `No ticket ID found in branch "${branch}" (pattern: ${pattern})` });
+          return;
+        }
+        const ticketId = match[0];
+        const provider = ticketProviderFor(repoRoot);
+        if (!provider) {
+          json(res, 400, { error: "No ticket provider connected" });
+          return;
+        }
+        const ticket = await provider.getTicket(ticketId).catch(() => null);
+        if (!ticket) {
+          json(res, 400, { error: `Could not fetch ticket ${ticketId}` });
+          return;
+        }
+
+        // Check if memories from this ticket already exist
+        const existingMemories = store.list(1000).filter(m => m.claim.includes(ticketId));
+        if (existingMemories.length) {
+          json(res, 200, { ok: true, ticketId, branch, ticketTitle: ticket.title, message: "Memory already up to date" });
+          return;
+        }
+
+        // Extract claims from updated ticket and create memories
+        const r = await extractTicketProposals(store, ticket, "ticket-resync");
+
+        json(res, 200, { ok: true, ticketId, branch, ticketTitle: ticket.title, memoriesCreated: r.created > 0, memoriesCount: r.created });
         return;
       }
 
