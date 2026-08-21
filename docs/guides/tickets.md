@@ -49,7 +49,7 @@ in your config — no provider needed. Mined proposals are tagged with that id a
 
 ### Live context at review time
 
-![Ticket context shown next to a proposal in dim review](/screenshots/placeholder.svg)
+![Ticket context shown next to a proposal in dim review](/screenshots/dim-review-ticket-context.png)
 *Ticket context in review: the ticket's title, type, and status appear next to each mined proposal.*
 
 When a provider *is* connected, `dim review` shows the ticket's title, type, status, and body

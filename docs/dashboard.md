@@ -45,7 +45,7 @@ dim ui stop -p 5000 # stop server on custom port
   guardrails, tickets, scratchpad, Ollama setup). Most actions execute directly via server
   API calls — no need to copy commands to a terminal. A **copy icon** (⧉) next to each CLI
   command lets you copy the equivalent terminal command if preferred.
-![Interactive onboarding tour with spotlight positioning](/screenshots/placeholder.svg)
+![Interactive onboarding tour with spotlight positioning](/screenshots/dashboard-onboarding.png)
 *Interactive onboarding: a 14-step guided walkthrough with spotlight positioning.*
 
 - **Interactive onboarding tour** — a 14-step guided walkthrough covering the full first-time
@@ -61,7 +61,7 @@ dim ui stop -p 5000 # stop server on custom port
 - **Setup Ollama dialog** — guided step-by-step flow: install Ollama → start server →
   pull embedding + LLM models → verify. Shows progress with spinners for each step.
 
-![Model Settings dialog with model selection and pull buttons](/screenshots/placeholder.svg)
+![Model Settings dialog with model selection and pull buttons](/screenshots/dashboard-model-settings.png)
 *Model Settings dialog: change embedding or LLM models, pull new ones with status indicators.*
 
 - **Model Settings dialog** — change embedding or LLM model selection, pull new models

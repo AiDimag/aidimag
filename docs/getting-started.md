@@ -195,7 +195,7 @@ set, else Ollama if running, else keyword-only).
 
 ## Verify it's working
 
-![Terminal output from dim doctor showing green checkmarks for all components](/screenshots/placeholder.svg)
+![Terminal output from dim doctor showing green checkmarks for all components](/screenshots/dim-doctor.png)
 *dim doctor: verifies that git hooks, MCP configs, embeddings, and sync are all wired correctly.*
 
 ```sh
