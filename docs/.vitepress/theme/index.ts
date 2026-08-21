@@ -122,7 +122,11 @@ function setupDiagramLightbox() {
   }
 
   function attachListeners() {
-    document.querySelectorAll("img.dim-diagram").forEach((img) => {
+    // Auto-tag screenshot images with dim-screenshot class for zoom + lightbox
+    document.querySelectorAll(".vp-doc img[src*='/screenshots/']:not(.dim-diagram):not(.dim-screenshot)").forEach((img) => {
+      img.classList.add("dim-screenshot");
+    });
+    document.querySelectorAll("img.dim-diagram, img.dim-screenshot").forEach((img) => {
       if (img.getAttribute("data-lightbox-attached")) return;
       img.setAttribute("data-lightbox-attached", "true");
       img.addEventListener("click", () => {

@@ -805,6 +805,23 @@ body {
   box-shadow: 0 0 0 2px hsl(var(--aid-ring) / 0.4), 0 12px 48px rgba(37, 99, 235, 0.15);
 }
 
+/* Screenshot images — same zoom hover + lightbox as diagrams */
+.dim-screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 24px auto;
+  border-radius: calc(var(--aid-radius) + 4px);
+  border: 1px solid hsl(var(--aid-border) / 0.6);
+  box-shadow: var(--surface-glow);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: zoom-in;
+}
+.dim-screenshot:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 2px hsl(var(--aid-ring) / 0.4), 0 12px 48px rgba(37, 99, 235, 0.15);
+}
+
 /* Lightbox close button hover */
 .dim-lightbox-close:hover {
   background: rgba(255, 255, 255, 0.3) !important;
