@@ -114,7 +114,7 @@ dim sync
 
 ## 6. Day-to-day workflow
 
-![Dashboard showing cloud sync status with brain icon and connected server](/screenshots/placeholder.svg)
+![Dashboard showing cloud sync status with brain icon and connected server](/screenshots/dim-sync.png)
 *Cloud sync status: the dashboard shows the connected server, brain name, and sync state at a glance.*
 
 ```sh

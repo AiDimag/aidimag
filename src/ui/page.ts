@@ -240,6 +240,7 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   }
   .tk-dropdown-item:hover { background: hsl(var(--primary) / 0.1); }
   .tk-dropdown-item svg { flex-shrink: 0; }
+  html.dark .svg-invert { filter: invert(1); }
   .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
   .ev-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
   .ev-row select { width: 160px; }
@@ -1774,12 +1775,17 @@ const PROVIDER_LOGOS = {
 };
 
 var _TK_PROVIDER_ICONS = PROVIDER_LOGOS;
+var _DARK_ICON_PROVIDERS = ['github', 'cursor', 'copilot'];
 function initTkDropdownIcons() {
   document.querySelectorAll('.tk-dropdown-item').forEach(function(item) {
     var val = item.getAttribute('data-value');
     var icon = _TK_PROVIDER_ICONS[val];
     if (icon && item.querySelector('svg') === null) {
       item.innerHTML = icon + ' ' + item.textContent;
+      if (_DARK_ICON_PROVIDERS.indexOf(val) !== -1) {
+        var svg = item.querySelector('svg');
+        if (svg) svg.classList.add('svg-invert');
+      }
     }
   });
 }
@@ -1798,6 +1804,10 @@ function tkDropdownSelect(val, label) {
   document.getElementById('tk-provider').value = val;
   var icon = _TK_PROVIDER_ICONS[val] || '';
   document.getElementById('tk-provider-label').innerHTML = icon + ' ' + label;
+  if (_DARK_ICON_PROVIDERS.indexOf(val) !== -1) {
+    var svg = document.querySelector('#tk-provider-label svg');
+    if (svg) svg.classList.add('svg-invert');
+  }
   document.getElementById('tk-provider-menu').style.display = 'none';
   document.getElementById('dlg-tickets').style.overflow = 'auto';
   ticketsProviderHint();
@@ -1907,6 +1917,11 @@ function openTickets() {
     if (isRemote) provLabel = provLabel + ' (remote)';
     var provIcon = isRemote && team ? (PROVIDER_LOGOS[team.provider] || IC_REMOTE) : (PROVIDER_LOGOS[t.provider] || '');
     document.getElementById('tk-provider-label').innerHTML = provIcon + ' ' + provLabel;
+    var provKey = isRemote && team ? team.provider : t.provider;
+    if (_DARK_ICON_PROVIDERS.indexOf(provKey) !== -1) {
+      var svg = document.querySelector('#tk-provider-label svg');
+      if (svg) svg.classList.add('svg-invert');
+    }
     if (t.baseUrl) document.getElementById("tk-url").value = t.baseUrl;
     document.getElementById("tk-pattern").value = (isRemote && team && team.pattern) ? team.pattern : (t.pattern || "");
     document.getElementById('tk-provider-btn').disabled = isRemote;
@@ -3148,7 +3163,6 @@ async function runSetupOllama() {
   const actions = document.getElementById("ollama-actions");
   document.getElementById("ollama-title").innerHTML = IC_OLLAMA + ' Setup Ollama for Semantic Search';
   document.getElementById("dlg-ollama").showModal();
-  toastLoading("Setting up Ollama…");
 
   const stepIcon = (state) => state === 'done' ? IC_CHECK_C : state === 'active' ? '<span class="spinner" style="width:14px;height:14px;border-width:1.5px"></span>' : IC_CIRCLE;
   const renderSteps = (steps) => {
@@ -3239,16 +3253,17 @@ async function runSetupOllama() {
     modelHtml += '<div style="margin-bottom:4px;font-size:12px;color:hsl(var(--muted-foreground))">Already pulled:</div>';
     pulledEmb.forEach((m, i) => {
       const info = modelOptions.find(em => em.name === m);
-      modelHtml += '<label style="display:flex;align-items:start;gap:6px;margin-bottom:4px;cursor:pointer"><input type="radio" name="ollama-emb-model" value="' + esc(m) + '"' + (i === 0 ? ' checked' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m) + '</b>' + (info ? ' — ' + esc(info.size) + ', ' + esc(info.desc) : ' (already available)') + '</span></label>';
+      modelHtml += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label style="display:flex;align-items:start;gap:6px;cursor:pointer;flex:1;min-width:0"><input type="radio" name="ollama-emb-model" value="' + esc(m) + '"' + (i === 0 ? ' checked' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m) + '</b>' + (info ? ' — ' + esc(info.size) + ', ' + esc(info.desc) : ' (already available)') + ' ✓</span></label><button type="button" data-del-model="' + esc(m) + '" class="ollama-del-btn" style="flex-shrink:0;padding:2px 6px;font-size:11px;border-radius:4px;border:1px solid hsl(var(--border));background:transparent;color:hsl(var(--muted-foreground));cursor:pointer" title="Delete model">🗑</button></div>';
     });
-    modelHtml += '<div style="margin:6px 0 4px;font-size:12px;color:hsl(var(--muted-foreground))">Or pull a new one:</div>';
   }
-
-  modelOptions.forEach((m) => {
-    const already = pulledEmb.includes(m.name);
-    const isDefault = m.name === 'nomic-embed-text';
-    modelHtml += '<label style="display:flex;align-items:start;gap:6px;margin-bottom:4px;cursor:pointer"><input type="radio" name="ollama-emb-model" value="' + esc(m.name) + '"' + (pulledEmb.length === 0 && isDefault ? ' checked' : '') + (already ? ' disabled' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m.name) + '</b> — ' + esc(m.size) + ', ' + esc(m.desc) + (already ? ' ✓ already pulled' : '') + '</span></label>';
-  });
+  const unpulledEmb = modelOptions.filter(m => !pulledEmb.includes(m.name));
+  if (unpulledEmb.length > 0) {
+    modelHtml += '<div style="margin:6px 0 4px;font-size:12px;color:hsl(var(--muted-foreground))">' + (pulledEmb.length > 0 ? 'Or pull a new one:' : 'Available to pull:') + '</div>';
+    unpulledEmb.forEach((m) => {
+      const isDefault = m.name === 'nomic-embed-text';
+      modelHtml += '<label style="display:flex;align-items:start;gap:6px;margin-bottom:4px;cursor:pointer"><input type="radio" name="ollama-emb-model" value="' + esc(m.name) + '"' + (pulledEmb.length === 0 && isDefault ? ' checked' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m.name) + '</b> — ' + esc(m.size) + ', ' + esc(m.desc) + '</span></label>';
+    });
+  }
 
   // LLM model section
   modelHtml += '<div style="margin:12px 0 6px;font-weight:600">LLM model (for mining, harvest, bootstrap):</div>';
@@ -3257,18 +3272,22 @@ async function runSetupOllama() {
     pulledLlm.forEach((m) => {
       const info = llmOptions.find(lm => lm.name === m);
       const isCurrent = m === currentLlm;
-      modelHtml += '<label style="display:flex;align-items:start;gap:6px;margin-bottom:4px;cursor:pointer"><input type="radio" name="ollama-llm-model" value="' + esc(m) + '"' + (isCurrent ? ' checked' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m) + '</b>' + (info ? ' — ' + esc(info.size) + ', ' + esc(info.desc) : ' (already available)') + (isCurrent ? ' ✓ current' : '') + '</span></label>';
+      modelHtml += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><label style="display:flex;align-items:start;gap:6px;cursor:pointer;flex:1;min-width:0"><input type="radio" name="ollama-llm-model" value="' + esc(m) + '"' + (isCurrent ? ' checked' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m) + '</b>' + (info ? ' — ' + esc(info.size) + ', ' + esc(info.desc) : ' (already available)') + (isCurrent ? ' ✓ current' : ' ✓') + '</span></label><button type="button" data-del-model="' + esc(m) + '" class="ollama-del-btn" style="flex-shrink:0;padding:2px 6px;font-size:11px;border-radius:4px;border:1px solid hsl(var(--border));background:transparent;color:hsl(var(--muted-foreground));cursor:pointer" title="Delete model">🗑</button></div>';
     });
-    modelHtml += '<div style="margin:6px 0 4px;font-size:12px;color:hsl(var(--muted-foreground))">Or pull a new one:</div>';
+  }
+  const unpulledLlm = llmOptions.filter(m => !pulledLlm.includes(m.name));
+  if (unpulledLlm.length > 0) {
+    modelHtml += '<div style="margin:6px 0 4px;font-size:12px;color:hsl(var(--muted-foreground))">' + (pulledLlm.length > 0 ? 'Or pull a new one:' : 'Available to pull:') + '</div>';
+    unpulledLlm.forEach((m) => {
+      const isDefault = m.name === 'llama3.2' && !pulledLlm.length;
+      modelHtml += '<label style="display:flex;align-items:start;gap:6px;margin-bottom:4px;cursor:pointer"><input type="radio" name="ollama-llm-model" value="' + esc(m.name) + '"' + (isDefault ? ' checked' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m.name) + '</b> — ' + esc(m.size) + ', ' + esc(m.desc) + '</span></label>';
+    });
   }
 
-  llmOptions.forEach((m) => {
-    const already = pulledLlm.includes(m.name);
-    const isDefault = m.name === 'llama3.2' && !pulledLlm.length;
-    modelHtml += '<label style="display:flex;align-items:start;gap:6px;margin-bottom:4px;cursor:pointer"><input type="radio" name="ollama-llm-model" value="' + esc(m.name) + '"' + (isDefault ? ' checked' : '') + (already ? ' disabled' : '') + ' style="margin:3px 0 0 0;padding:0;flex-shrink:0;width:auto"><span style="flex:1;min-width:0"><b>' + esc(m.name) + '</b> — ' + esc(m.size) + ', ' + esc(m.desc) + (already ? ' ✓ already pulled' : '') + '</span></label>';
-  });
-
   content.innerHTML = modelHtml;
+  content.querySelectorAll('.ollama-del-btn').forEach(function(btn) {
+    btn.onclick = function() { deleteOllamaModel(btn.getAttribute('data-del-model')); };
+  });
   setActions('<button class="primary" id="ollama-pull-btn">Pull & Setup</button>');
   document.getElementById("ollama-pull-btn").onclick = async () => {
     const embSelected = document.querySelector('input[name="ollama-emb-model"]:checked');
@@ -3295,6 +3314,7 @@ async function runSetupOllama() {
     }
     renderSteps(steps);
     setActions('');
+    if (!embAlreadyPulled || !llmAlreadyPulled) toastLoading("Downloading models…");
 
     if (!embAlreadyPulled) {
       try {
@@ -3362,6 +3382,23 @@ async function runSetupOllama() {
       content.innerHTML = '<div style="color:hsl(var(--destructive))">Error: ' + esc(e.message) + '</div>';
     }
   };
+}
+
+async function deleteOllamaModel(model) {
+  const ok = await showConfirm("Delete model?", "Remove '" + model + "' from Ollama? This frees disk space. You can pull it again later.");
+  if (!ok) return;
+  toastLoading("Deleting " + model + "…");
+  try {
+    const r = await api("/api/ollama/delete?model=" + encodeURIComponent(model), { method: "POST" });
+    if (r.ok) {
+      toastDone("Model " + model + " deleted");
+      runSetupOllama();
+    } else {
+      toast("Delete failed: " + (r.message || "error"));
+    }
+  } catch (e) {
+    toast("Error: " + e.message);
+  }
 }
 
 // restore last-used tab

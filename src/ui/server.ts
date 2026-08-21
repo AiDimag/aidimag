@@ -519,6 +519,23 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         }
       }
 
+      // ---- Ollama setup: delete model ----
+      if (req.method === "POST" && pathname === "/api/ollama/delete") {
+        const model = url.searchParams.get("model");
+        if (!model) { json(res, 400, { error: "model required" }); return; }
+        const { execSync } = await import("node:child_process");
+        const os = await import("node:os");
+        const bin = os.platform() === "win32" ? "ollama.exe" : "ollama";
+        try {
+          execSync(`${bin} rm ${model}`, { stdio: "pipe", timeout: 30000 });
+          json(res, 200, { ok: true });
+          return;
+        } catch (e) {
+          json(res, 200, { ok: false, message: (e as Error).message });
+          return;
+        }
+      }
+
       // ---- Ollama setup: verify embedding ----
       if (req.method === "POST" && pathname === "/api/ollama/verify") {
         const model = url.searchParams.get("model");

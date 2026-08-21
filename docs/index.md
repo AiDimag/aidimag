@@ -116,7 +116,7 @@ Now imagine someone imports `better-sqlite3` somewhere it shouldn't be. Run veri
 **The memory noticed the code drifted.** That's the core value — memory that proves itself,
 instead of memory you hope is right.
 
-![Dashboard overview showing memory browser, stat cards, memory graph, and health metrics](/screenshots/placeholder.svg)
+![Dashboard overview showing memory browser, stat cards, memory graph, and health metrics](/screenshots/dashboard-overview.png)
 *The web dashboard: memory browser with trust badges, stat cards, and force-directed memory graph.*
 
 ### Try the interactive demo

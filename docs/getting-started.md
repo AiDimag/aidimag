@@ -75,7 +75,7 @@ npm link        # makes `dim` and `aidimag` available globally
 
 ## Initialize a repo
 
-![Terminal output from dim setup showing detected agents and installed hooks](/screenshots/placeholder.svg)
+![Terminal output from dim setup showing detected agents and installed hooks](/screenshots/dim-setup.png)
 *dim setup: detects installed AI agents, wires MCP configs, installs git hooks, and generates context files.*
 
 From inside any git repository, the recommended way is:

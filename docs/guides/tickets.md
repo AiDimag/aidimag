@@ -23,7 +23,7 @@ so that context flows into your memory.
 
 ## Connect
 
-![Tickets modal with provider dropdown, URL and credential fields](/screenshots/placeholder.svg)
+![Tickets modal with provider dropdown, URL and credential fields](/screenshots/dashboard-tickets-modal.png)
 *The Tickets modal: select a provider, enter your base URL and credential, and connect.*
 
 ```sh
@@ -68,7 +68,7 @@ branch) at session end, so its proposals carry the real rationale.
 
 ## Branch conventions
 
-![Branch rule enforcement output in the terminal](/screenshots/placeholder.svg)
+![Branch rule enforcement output in the terminal](/screenshots/dim-ticket-branch-rule.png)
 *Branch rule enforcement: aiDimag warns or blocks non-conforming branches at checkout and push.*
 
 You can define a branch-naming convention and have aiDimag warn or block on violations:
@@ -86,7 +86,7 @@ dim branch XXX-2100           # create a conforming branch (fetches the title fo
 
 ## Team-shared credentials (Remote provider)
 
-![Team ticket auto-discovery showing the Connect now button](/screenshots/placeholder.svg)
+![Team ticket auto-discovery showing the Connect now button](/screenshots/dim-ticket-share.png)
 *Team auto-discovery: when the admin has shared ticket credentials, the dashboard shows the team's provider with a Connect now button.*
 
 So every teammate doesn't need their own ticket token, one person can share the credential

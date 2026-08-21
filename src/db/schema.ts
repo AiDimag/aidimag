@@ -47,7 +47,7 @@ CREATE TABLE evidence (
   last_run  TEXT,
   result    TEXT NOT NULL DEFAULT 'UNKNOWN' CHECK (result IN ('PASS','FAIL','UNKNOWN'))
 );
-INSERT INTO evidence SELECT * FROM evidence_v5;
+INSERT INTO evidence (id, memory_id, type, payload, last_run, result) SELECT id, memory_id, type, payload, last_run, result FROM evidence_v5;
 DROP TABLE evidence_v5;
 CREATE INDEX IF NOT EXISTS idx_evidence_memory ON evidence(memory_id);
 `;
@@ -135,7 +135,7 @@ CREATE TABLE events (
   created_at     TEXT NOT NULL,
   synced         INTEGER NOT NULL DEFAULT 0
 );
-INSERT INTO events SELECT * FROM events_v8;
+INSERT INTO events (seq, id, type, memory_id, payload, machine, schema_version, created_at, synced) SELECT seq, id, type, memory_id, payload, machine, schema_version, created_at, synced FROM events_v8;
 DROP TABLE events_v8;
 CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced, seq);
 `;
@@ -162,7 +162,7 @@ CREATE TABLE events (
   created_at     TEXT NOT NULL,
   synced         INTEGER NOT NULL DEFAULT 0
 );
-INSERT INTO events SELECT * FROM events_v12;
+INSERT INTO events (seq, id, type, memory_id, payload, machine, schema_version, created_at, synced) SELECT seq, id, type, memory_id, payload, machine, schema_version, created_at, synced FROM events_v12;
 DROP TABLE events_v12;
 CREATE INDEX IF NOT EXISTS idx_events_synced ON events(synced, seq);
 `;
