@@ -6,20 +6,41 @@ so that context flows into your memory.
 
 ## Supported providers
 
-- **Jira**
-- **GitHub Issues**
-- **Linear**
-- **GitLab Issues**
-- **Azure DevOps**
-- **ClickUp**
-- **Shortcut**
-- **YouTrack**
-- **Asana**
-- **Trello**
-- **Notion**
-- **Pivotal Tracker**
-- **A custom HTTP provider** (your own middleware — see `design/HTTP_PROVIDER.md` in the repo)
-- **Remote (team sync server)** — share one credential with the whole team; teammates hold zero local credentials
+<style>
+.integration-logos { display:flex;flex-wrap:wrap;gap:20px;justify-content:center;align-items:center;margin:24px 0; }
+.integration-logos .ic-tooltip { position:relative;display:inline-flex;align-items:center; }
+.integration-logos .ic-tooltip img { height:32px;transition:transform 0.15s ease; }
+.integration-logos .ic-tooltip:hover img { transform:scale(1.12); }
+.integration-logos .ic-tooltip::after {
+  content: attr(data-name);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: hsl(222 47% 11%); color: #fff;
+  padding: 4px 10px; border-radius: 6px; font-size: 12px;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s ease; z-index: 10;
+}
+.integration-logos .ic-tooltip:hover::after { opacity: 1; }
+.dark .integration-logos .ic-dark-invert { filter: invert(1); }
+.dark .integration-logos .ic-tooltip::after { background: hsl(210 40% 98%); color: hsl(222 47% 11%); }
+</style>
+<div class="integration-logos">
+  <span class="ic-tooltip" data-name="Jira"><img src="https://api.iconify.design/simple-icons:jira.svg?color=%230052CC" alt="Jira"></span>
+  <span class="ic-tooltip" data-name="GitHub Issues"><img src="https://api.iconify.design/simple-icons:github.svg?color=%23000000" class="ic-dark-invert" alt="GitHub Issues"></span>
+  <span class="ic-tooltip" data-name="Linear"><img src="https://api.iconify.design/simple-icons:linear.svg?color=%235E6AD2" alt="Linear"></span>
+  <span class="ic-tooltip" data-name="GitLab Issues"><img src="https://api.iconify.design/simple-icons:gitlab.svg?color=%23FC6D26" alt="GitLab Issues"></span>
+  <span class="ic-tooltip" data-name="Azure DevOps"><img src="https://api.iconify.design/simple-icons:azuredevops.svg?color=%230078D7" alt="Azure DevOps"></span>
+  <span class="ic-tooltip" data-name="ClickUp"><img src="https://api.iconify.design/simple-icons:clickup.svg?color=%237B68EE" alt="ClickUp"></span>
+  <span class="ic-tooltip" data-name="Shortcut"><img src="https://api.iconify.design/simple-icons:shortcut.svg?color=%2336b37e" alt="Shortcut"></span>
+  <span class="ic-tooltip" data-name="YouTrack"><img src="https://api.iconify.design/logos:youtrack.svg" alt="YouTrack"></span>
+  <span class="ic-tooltip" data-name="Asana"><img src="https://api.iconify.design/simple-icons:asana.svg?color=%23F06A6A" alt="Asana"></span>
+  <span class="ic-tooltip" data-name="Trello"><img src="https://api.iconify.design/simple-icons:trello.svg?color=%230052CC" alt="Trello"></span>
+  <span class="ic-tooltip" data-name="Notion"><img src="https://api.iconify.design/simple-icons:notion.svg?color=%23000000" class="ic-dark-invert" alt="Notion"></span>
+  <span class="ic-tooltip" data-name="Pivotal Tracker"><img src="https://api.iconify.design/simple-icons:pivotaltracker.svg?color=%230060A0" alt="Pivotal Tracker"></span>
+</div>
+
+Plus a **custom HTTP provider** (your own middleware — see `design/HTTP_PROVIDER.md` in the repo)
+and **Remote (team sync server)** — share one credential with the whole team; teammates hold zero
+local credentials.
 
 ## Connect
 
