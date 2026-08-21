@@ -808,7 +808,7 @@ body {
 /* Screenshot images — same zoom hover + lightbox as diagrams */
 .dim-screenshot {
   display: block;
-  width: 100%;
+  max-width: 100%;
   height: auto;
   margin: 24px auto;
   border-radius: calc(var(--aid-radius) + 4px);
