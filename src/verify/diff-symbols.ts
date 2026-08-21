@@ -6,6 +6,8 @@
  * actually changed in the diff.
  */
 
+import { execFileSync } from "node:child_process";
+
 const SYMBOL_PATTERNS = [
   // Function declarations: function foo, async function foo
   /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g,
@@ -72,7 +74,6 @@ export function extractDiffSymbols(diff: string): string[] {
  * Extract symbols from a git diff between refs.
  */
 export function gitDiffSymbols(repoRoot: string, base?: string, staged = false): string[] {
-  const { execFileSync } = require("node:child_process");
   const args = base
     ? ["diff", "--unified=0", `${base}`, "--"]
     : staged

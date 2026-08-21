@@ -171,8 +171,9 @@ git commit -q -m "Add automatic retry on declined payments"
 
 # Revert the bad commit (this is what dim mine detects)
 git revert --no-edit HEAD 2>/dev/null || true
+# Revert already creates a commit; only commit if there are staged changes
 git add -A
-git commit -q -m "Revert: automatic retry caused duplicate ledger entries"
+git diff --cached --quiet || git commit -q -m "Revert: automatic retry caused duplicate ledger entries"
 
 # Build the AIDimag memory store using the CLI
 echo "Seeding memories..."
