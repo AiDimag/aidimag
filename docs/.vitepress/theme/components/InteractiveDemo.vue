@@ -277,7 +277,7 @@ const steps = [
     flags: [
       { flag: 'dim setup', desc: 'Creates .aidimag/ directory, config.json, memory.db, and installs git pre-commit hook' },
     ],
-    output: '⚙️  AI Dimag setup\n\n  ✓ Created .aidimag/ directory\n  ✓ Created .aidimag/config.json (added to .gitignore)\n  ✓ Created .aidimag/memory.db (SQLite)\n  ✓ Installed git pre-commit hook (.git/hooks/pre-commit)\n  ✓ Configured default model: claude-sonnet-4-20250514\n\nSetup complete. Run `dim bootstrap` to scan your repo\nand suggest your first memories.',
+    output: '✅ Initialized .aidimag\n✓ Installed git hooks: post-merge, post-checkout, post-rewrite, post-commit, pre-push, pre-commit\nNo MCP configs detected. Configure Claude Code, Cursor, Windsurf, Codex, and Copilot anyway? (y/n) y\n✅ Configured Claude Code → .mcp.json\n✅ Configured Cursor → .cursor/mcp.json\n✅ Configured Windsurf → .windsurf/mcp_config.json\n✅ Configured OpenAI Codex → .codex/config.json\n✅ Configured GitHub Copilot → .vscode/settings.json\n\nNext: run `dim doctor` to verify the installation.',
     memory: {
       id: '—',
       kind: 'SETUP',
@@ -302,9 +302,9 @@ const steps = [
     flags: [
       { flag: 'dim bootstrap', desc: 'Surveys README, manifests, directory structure, and git history — LLM suggests memories with evidence commands' },
     ],
-    output: '🔍  Surveying repo...\n     Scanning README.md, package.json, tsconfig.json\n     Analyzing directory structure (47 files)\n     Reading last 50 commits\n\nFound 3 memory candidates:\n\n  1. [CONVENTION] All DB access goes through src/db/store.ts\n     evidence: STATIC_CHECK: ! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts\n     scope: src\n\n  2. [DECISION] We use better-sqlite3 instead of Prisma\n     evidence: COMMIT_REF: a1b2c3d\n     scope: src/db\n\n  3. [CONVENTION] Error responses use { error: { code, message } } format\n     evidence: (none — manual review needed)\n     scope: src/api\n\nRun `dim review` to approve or reject.',
+    output: 'Surveying the repo (docs, manifests, structure, churn)…\nSurveyed 3 file(s) with ollama/llama3.1: 3 proposal(s) queued.\n\nFound 3 memory candidates:\n\n  1. [CONVENTION] All DB access goes through src/db/store.ts\n     evidence: STATIC_CHECK: ! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts\n     scope: src\n\n  2. [DECISION] We use better-sqlite3 instead of Prisma\n     evidence: COMMIT_REF: a1b2c3d\n     scope: src/db\n\n  3. [CONVENTION] Error responses use { error: { code, message } } format\n     evidence: (none — manual review needed)\n     scope: src/api\n\nRun `dim review` to approve or reject.',
     memory: {
-      id: '4f3a9c21',
+      id: '82288285',
       kind: 'CONVENTION',
       claim: 'All DB access goes through src/db/store.ts',
       status: 'UNVERIFIED',
@@ -318,18 +318,18 @@ const steps = [
     shortLabel: 'Review',
     title: '3. Review and approve proposals',
     subtitle: 'Approve the proposals — AI Dimag runs the evidence command automatically',
-    hint: 'Type: dim review --yes',
-    placeholder: 'dim review --yes',
-    accept: ['dim review', 'dim rev', 'dim review --yes'],
-    cli: 'dim review --yes',
+    hint: 'Type: dim review approve all',
+    placeholder: 'dim review approve all',
+    accept: ['dim review', 'dim rev', 'dim review approve all'],
+    cli: 'dim review approve all',
     explain: 'AI Dimag doesn\'t trust its own suggestions — you need to approve them first. This is the human review step. You can approve all at once (--yes) or review one by one.',
     explainAfter: 'All 3 proposals are now approved. But they\'re still just claims — the evidence hasn\'t been run yet. That\'s what verification is for.',
     flags: [
-      { flag: 'dim review --yes', desc: 'Approves all pending proposals — you can also review one-by-one with `dim review`' },
+      { flag: 'dim review approve all', desc: 'Approves all pending proposals — you can also review one-by-one with `dim review`' },
     ],
-    output: '📋  Reviewing 3 proposals...\n\n  ✓ Approved  4f3a9c21  CONVENTION  All DB access goes through src/db/store.ts\n  ✓ Approved  7a2c8e15  DECISION   We use better-sqlite3 instead of Prisma\n  ✓ Approved  9b1d3f07  CONVENTION Error responses use { error: { code, message } } format\n\n3 proposals approved. Run `dim verify` to run\nevidence commands and boost confidence.',
+    output: '✓ approved → memory 82288285: [CONVENTION] All DB access goes through src/db/store.ts\n✓ approved → memory 0d6405cc: [DECISION] We use better-sqlite3 instead of Prisma\n✓ approved → memory 3881fc14: [CONVENTION] Error responses use { error: { code, message } } format\n\n3 proposals approved. Run `dim verify` to run\nevidence commands and boost confidence.',
     memory: {
-      id: '4f3a9c21',
+      id: '82288285',
       kind: 'CONVENTION',
       claim: 'All DB access goes through src/db/store.ts',
       status: 'APPROVED',
@@ -348,13 +348,13 @@ const steps = [
     accept: ['dim verify', 'dim v'],
     cli: 'dim verify',
     explain: 'This is the magic step. AI Dimag runs the evidence command for each memory. If the command passes, the memory earns VERIFIED status and higher confidence. If it fails, the memory stays unverified or goes stale.',
-    explainAfter: '2 memories are now VERIFIED with boosted confidence (0.50 → 0.80). The evidence command actually ran — this isn\'t just a claim, it\'s a proven fact about your codebase.',
+    explainAfter: '1 memory is now VERIFIED with boosted confidence (0.70 → 0.80). The evidence command actually ran — this isn\'t just a claim, it\'s a proven fact about your codebase. 1 memory went STALE because its commit ref no longer exists.',
     flags: [
       { flag: 'dim verify', desc: 'Runs all pending evidence commands. PASS → VERIFIED + confidence boost. FAIL → stays UNVERIFIED or goes STALE' },
     ],
-    output: '🔬  Verifying 3 memories...\n\n  Running STATIC_CHECK for 4f3a9c21...\n    $ grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts\n    (no output — check passed)\n\n  Running COMMIT_REF for 7a2c8e15...\n    $ git show a1b2c3d --stat\n    commit a1b2c3d "Switch from Prisma to better-sqlite3"\n    (verified)\n\n  9b1d3f07 has no evidence command — skipping.\n\n✓ [CONVENTION] All DB access goes through src/db/store.ts\n    id=4f3a9c21  status=VERIFIED  conf=0.80  scope=src\n    evidence: STATIC_CHECK (PASS)\n\n✓ [DECISION] We use better-sqlite3 instead of Prisma\n    id=7a2c8e15  status=VERIFIED  conf=0.85  scope=src/db\n    evidence: COMMIT_REF (verified)\n\n2 memories verified. Confidence boosted 0.50 → 0.80.',
+    output: '? [UNVERIFIED] conf 0.50→0.50  Error responses use { error: { code, message } } format\n~ [UNVERIFIED → STALE] conf 0.70→0.20  We use better-sqlite3 instead of Prisma\n    COMMIT_REF: FAIL (commit  a1b2c3d no longer exists in history)\n✓ [UNVERIFIED → VERIFIED] conf 0.70→0.80  All DB access goes through src/db/store.ts\n    STATIC_CHECK: PASS (exit 0)\n\n⚠ 1 memory went stale — the code changed under it. Stale memories are down-ranked in recall until they recover.\n(checked 3: 1 verified, 1 stale, 0 decayed, 1 unchanged)',
     memory: {
-      id: '4f3a9c21',
+      id: '82288285',
       kind: 'CONVENTION',
       claim: 'All DB access goes through src/db/store.ts',
       status: 'VERIFIED',
@@ -377,9 +377,9 @@ const steps = [
     flags: [
       { flag: '--block', desc: 'Exits with code 1 on violations — used by the git pre-commit hook to block the commit' },
     ],
-    output: '🚫  [CONVENTION] All DB access goes through src/db/store.ts\n     severity: fail\n     detail: src/api/handler.ts imports better-sqlite3 outside src/db/store.ts\n\n     Risk Score: 72/100 (HIGH)\n       +40  convention violation\n       +20  critical path touched (src/db)\n       +12  change breadth (1 file)\n\n     exit 1 — blocked by --block flag\n\n💡  Fix: move the import into src/db/store.ts or\n     add a scoped exception with `dim remember --exception`.',
+    output: '✗ [CONVENTION] STATIC_CHECK now fails (exit 1) — this change contradicts the claim\n    "All DB access goes through src/db/store.ts"\n~ [CONVENTION] CONVENTION covers a file you changed — make sure it still holds (no automated check attached)\n    "Error responses use { error: { code, message } } format"\nRisk Score: 49/100 [MEDIUM]\n  ██████████░░░░░░░░░░\n  Factors:\n    +38 CONVENTION violation (fail) — STATIC_CHECK now fails (exit 1) — this change contradicts the claim\n    +21 CONVENTION violation (warn) — CONVENTION covers a file you changed — make sure it still holds (no automated check attached)\n\ndim check: 1 blocking violation(s). Resolve them or commit with --no-verify.',
     memory: {
-      id: '4f3a9c21',
+      id: '82288285',
       kind: 'CONVENTION',
       claim: 'All DB access goes through src/db/store.ts',
       status: 'VERIFIED',
@@ -387,7 +387,7 @@ const steps = [
       scope: 'src',
       evidence: 'STATIC_CHECK (FAIL) — grep found stray import in handler.ts',
     },
-    risk: { score: 72, level: 'HIGH' },
+    risk: { score: 49, level: 'MEDIUM' },
     diff: {
       file: 'src/api/handler.ts',
       added: [
@@ -395,7 +395,7 @@ const steps = [
         'const db = new Database("./app.db");',
       ],
     },
-    changed: 'The pre-commit hook detected a violation! The VERIFIED memory\'s evidence command now FAILS because of the stray import. The commit is blocked. Risk score: 72/100 HIGH.',
+    changed: 'The pre-commit hook detected a violation! The VERIFIED memory\'s evidence command now FAILS because of the stray import. The commit is blocked. Risk score: 49/100 MEDIUM.',
   },
   {
     shortLabel: 'Stale',
@@ -407,9 +407,9 @@ const steps = [
     cli: 'dim verify',
     explain: 'What if someone bypasses the hook with --no-verify? The next time `dim verify` runs, it re-checks the evidence. Since the code drifted, the memory automatically flips to STALE.',
     explainAfter: 'The memory is now STALE. This is the key difference from static context files — AI Dimag notices when reality changes. Agents will see a STALE warning instead of trusting outdated information.',
-    output: '🔬  Verifying 3 memories...\n\n  Running STATIC_CHECK for 4f3a9c21...\n    $ grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts\n    src/api/handler.ts\n    (output found — check FAILED)\n\n~  [VERIFIED → STALE]  conf 0.80 → 0.20\n   All DB access goes through src/db/store.ts\n   id=4f3a9c21  scope=src\n   evidence: STATIC_CHECK (FAIL)\n   src/api/handler.ts imports better-sqlite3 outside src/db/store.ts\n\n1 memory went stale. The memory noticed the code drifted.\n\nNext `dim generate-context` will include a STALE warning\nso agents know this convention is currently broken.',
+    output: '? [UNVERIFIED] conf 0.50→0.50  Error responses use { error: { code, message } } format\n~ [STALE] conf 0.20→0.20  We use better-sqlite3 instead of Prisma\n    COMMIT_REF: FAIL (commit  a1b2c3d no longer exists in history)\n~ [VERIFIED → STALE] conf 0.80→0.20  All DB access goes through src/db/store.ts\n    STATIC_CHECK: FAIL (exit 1)\n\n⚠ 2 memories went stale — the code changed under them. Stale memories are down-ranked in recall until they recover.\n(checked 3: 0 verified, 2 stale, 0 decayed, 2 unchanged)',
     memory: {
-      id: '4f3a9c21',
+      id: '82288285',
       kind: 'CONVENTION',
       claim: 'All DB access goes through src/db/store.ts',
       status: 'STALE',
@@ -434,9 +434,9 @@ const steps = [
       { flag: '--applies-when', desc: 'Only fires when these keywords appear in the code being written' },
       { flag: '--path src/payments', desc: 'Scoped to this directory — only triggers for changes in src/payments' },
     ],
-    output: '✓  Memory written\n   id=8b2e1f04  kind=FAILED_APPROACH  conf=0.50\n   scope: src/payments\n   applies_when: keyword:retry, keyword:idempotency\n\nNext time an agent tries to add retry logic\nin src/payments, it will see this warning first:\n\n  ⚠️  FAILED_APPROACH detected\n      "Retry on declined payments caused duplicate\n       ledger entries" (PR #417, reverted)\n      Recommendation: Add idempotency protection\n      before retrying.',
+    output: '🧠 Got it — I\'ll remember:\n? [FAILED_APPROACH] Retry on declined payments caused duplicate ledger entries\n    id=50704c4d status=UNVERIFIED conf=0.50 scope=src/payments\n    applies when: keyword:retry keyword:idempotency\n\nTip: claims with evidence re-verify themselves as the code evolves —\n     e.g. -e "STATIC_CHECK:grep -q something src/file.ts"',
     memory: {
-      id: '8b2e1f04',
+      id: '50704c4d',
       kind: 'FAILED_APPROACH',
       claim: 'Retry on declined payments caused duplicate ledger entries',
       status: 'UNVERIFIED',
@@ -476,19 +476,19 @@ const steps = [
     shortLabel: 'Export',
     title: '9. Generate context files for your agents',
     subtitle: 'Export verified memories to CLAUDE.md, .cursorrules, AGENTS.md, or MCP server — all from one source of truth',
-    hint: 'Type: dim generate-context --all',
+    hint: 'Type: dim generate-context --format all',
     placeholder: 'dim generate-context ...',
-    accept: ['dim generate-context', 'dim gen', 'dim generate', 'dim generate-context --all'],
-    cli: 'dim generate-context --all',
+    accept: ['dim generate-context', 'dim gen', 'dim generate', 'dim generate-context --format all'],
+    cli: 'dim generate-context --format all',
     explain: 'Finally, let\'s export your verified memories into context files that coding agents can read. One command generates files for Claude Code, Cursor, GitHub Copilot, and more — all from the same source of truth.',
     explainAfter: 'That\'s cross-agent portability! Every agent on your team — Claude Code, Cursor, Copilot — now has the same verified knowledge, including STALE warnings and failed-approach lessons. No more maintaining separate context files.',
     flags: [
-      { flag: '--all', desc: 'Generates all supported formats: CLAUDE.md, .cursorrules, AGENTS.md, .github/copilot-instructions.md' },
+      { flag: '--format all', desc: 'Generates all supported formats: CLAUDE.md, .cursorrules, .windsurfrules, AGENTS.md, .github/copilot-instructions.md' },
       { flag: '--mcp', desc: 'Alternatively, serve memories live via the MCP server (dim mcp start) — no file generation needed' },
     ],
-    output: '📄  Generating context files...\n\n  ✓ .claude/CLAUDE.md          (3 verified, 1 stale, 1 failed_approach)\n  ✓ .cursor/rules/aidimag.mdc  (3 verified, 1 stale, 1 failed_approach)\n  ✓ AGENTS.md                  (3 verified, 1 stale, 1 failed_approach)\n  ✓ .github/copilot-instructions.md (3 verified, 1 stale, 1 failed_approach)\n\n  STALE warning included for:\n    4f3a9c21  All DB access goes through src/db/store.ts\n\n  FAILED_APPROACH warning included for:\n    8b2e1f04  Retry on declined payments...\n\n4 files generated. Every coding agent on your team\nnow has the same verified knowledge — no matter\nwhich tool they use.',
+    output: '📝 Wrote CLAUDE.md, .cursorrules, .github/copilot-instructions.md, .windsurfrules, AGENTS.md — 2 memories (0 pinned).',
     memory: {
-      id: '4f3a9c21',
+      id: '82288285',
       kind: 'CONVENTION',
       claim: 'All DB access goes through src/db/store.ts',
       status: 'STALE',
@@ -1227,9 +1227,9 @@ onUnmounted(() => {
   color: #28c840;
 }
 .term-step-pill.active {
-  background: var(--vp-c-brand);
-  color: #fff;
-  border-color: var(--vp-c-brand);
+  background: var(--vp-button-brand-bg);
+  color: var(--vp-button-brand-text);
+  border-color: var(--vp-button-brand-border);
 }
 .term-step-num {
   font-family: 'JetBrains Mono', monospace;
@@ -1752,26 +1752,27 @@ onUnmounted(() => {
 .term-tb-btn {
   padding: 6px 14px;
   border-radius: 6px;
-  border: 1px solid #1e2330;
-  background: transparent;
-  color: #9ca3af;
+  border: 1px solid var(--vp-button-alt-border, var(--vp-c-border));
+  background: var(--vp-button-alt-bg, transparent);
+  color: var(--vp-button-alt-text, var(--vp-c-text-2));
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
 }
 .term-tb-btn:hover:not(:disabled) {
-  border-color: var(--vp-c-brand);
-  color: var(--vp-c-brand);
+  background: var(--vp-button-alt-hover-bg, var(--vp-c-bg-alt));
+  border-color: var(--vp-button-alt-hover-border, var(--vp-c-border));
+  color: var(--vp-button-alt-hover-text, var(--vp-c-text-1));
 }
 .term-tb-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 .term-tb-btn.active {
-  background: var(--vp-c-brand);
-  color: #fff;
-  border-color: var(--vp-c-brand);
+  background: var(--vp-button-brand-bg);
+  color: var(--vp-button-brand-text);
+  border-color: var(--vp-button-brand-border);
 }
 .term-kb-hint {
   font-size: 11px;
@@ -1966,11 +1967,6 @@ html:not(.dark) .term-step-pill.done {
   border-color: #6ee7b7;
   color: #065f46;
 }
-html:not(.dark) .term-step-pill.active {
-  background: var(--vp-c-brand);
-  color: #fff;
-  border-color: var(--vp-c-brand);
-}
 html:not(.dark) .term-body {
   background: #f6f7f9;
   color: #3a3f4d;
@@ -2082,14 +2078,6 @@ html:not(.dark) .term-progress {
 html:not(.dark) .term-toolbar {
   background: #ebedf0;
   border-color: #d0d4da;
-}
-html:not(.dark) .term-tb-btn {
-  background: #f6f7f9;
-  border-color: #d0d4da;
-  color: #4a5060;
-}
-html:not(.dark) .term-tb-btn:hover:not(:disabled) {
-  background: #e0e3e8;
 }
 html:not(.dark) .term-kb-hint {
   color: #9ca3af;
