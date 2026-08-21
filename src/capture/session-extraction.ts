@@ -11,8 +11,10 @@ export const SESSION_END_PROMPT = `You are finishing a coding session. Before yo
 Review what you learned this session and propose memories using the \`memory_propose\` tool. Rules:
 
 1. Only propose things that are DURABLE (true beyond this session) and NON-OBVIOUS (not derivable from a quick file read).
-2. Write each claim as a FALSIFIABLE statement — something a checker could verify against the code. Bad: "the auth code is tricky". Good: "JWT refresh in src/auth/refresh.ts must run before middleware chain; reordering breaks session renewal (see commit abc123)".
-3. Pick the right kind:
+2. BE SPECIFIC. Every claim must name concrete files, modules, functions, config keys, or commands. Bad: "The project uses a specific tool for code completion" (useless). Good: "The UI is a single-page app generated from src/ui/page.ts which inlines all CSS and JS into one HTML file served by the Express server in src/ui/server.ts".
+3. REJECT generic statements. If a claim could apply to any repo, discard it. "Uses TypeScript" is useless. "All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts" is useful.
+4. Write each claim as a FALSIFIABLE statement — something a checker could verify against the code. Bad: "the auth code is tricky". Good: "JWT refresh in src/auth/refresh.ts must run before middleware chain; reordering breaks session renewal (see commit abc123)".
+5. Pick the right kind:
    - DECISION: a choice made and why (alternatives rejected)
    - CONVENTION: a rule consistently followed in this repo
    - GOTCHA: surprising behavior that cost you time
@@ -22,12 +24,12 @@ Review what you learned this session and propose memories using the \`memory_pro
    - GUARDRAIL: a behavioral rule for future agents — pass guardrail_level: 'never' (refuse + explain), 'always' (do without asking), or 'ask-first' (confirm with the user first)
    - SKILL: a reusable step-by-step procedure (e.g. "Deploy: 1) … 2) … 3) …") that the team runs repeatedly
    - TODO_CONTEXT: unfinished work + the context needed to resume it
-4. Scope each memory to the paths/symbols it applies to. Repo-wide only if truly global.
-5. Attach evidence whenever possible: COMMIT_REF (a sha), STATIC_CHECK (a grep/assertion command that passes iff the claim holds), TEST_RESULT (a test command), or HUMAN_ATTESTED as last resort.
-6. FAILED_APPROACH memories are especially valuable — they prevent future sessions from repeating dead ends.
-7. Propose 0–7 memories. Zero is fine if nothing durable was learned. Do NOT pad.
-8. Before proposing, call \`memory_critique\` with a short summary of what you did and the files you touched. It checks your work against the project's existing memory and guardrails — resolve any contradictions or guardrail concerns it raises first.
-9. Separately from YOUR learnings: if the USER stated project facts during this session ("we use X because Y", "never touch Z", …) that you didn't already capture with \`context_note\`, call \`chat_harvest\` once with the user's verbatim messages — it extracts and queues their statements for review in bulk.
+6. Scope each memory to the paths/symbols it applies to. Repo-wide only if truly global.
+7. Attach evidence whenever possible: COMMIT_REF (a sha), STATIC_CHECK (a grep/assertion command that passes iff the claim holds), TEST_RESULT (a test command), or HUMAN_ATTESTED as last resort.
+8. FAILED_APPROACH memories are especially valuable — they prevent future sessions from repeating dead ends.
+9. Propose 0–7 memories. Zero is fine if nothing durable was learned. Do NOT pad.
+10. Before proposing, call \`memory_critique\` with a short summary of what you did and the files you touched. It checks your work against the project's existing memory and guardrails — resolve any contradictions or guardrail concerns it raises first.
+11. Separately from YOUR learnings: if the USER stated project facts during this session ("we use X because Y", "never touch Z", …) that you didn't already capture with \`context_note\`, call \`chat_harvest\` once with the user's verbatim messages — it extracts and queues their statements for review in bulk.
 
 Respect all GUARDRAIL memories you've seen this session: 'never' = refuse and explain why, 'always' = do without asking, 'ask-first' = ask the user before proceeding.
 

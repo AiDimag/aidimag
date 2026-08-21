@@ -125,10 +125,9 @@ export function registerTicketCommands(program: Command): void {
               baseUrl,
               pattern: opts.pattern ?? existing.pattern ?? (provider === "github" ? "#\\d+" : tickets.DEFAULT_TICKET_PATTERN),
             });
-            if (token) tickets.saveTicketCredential(credKey, token);
+            if (token) tickets.saveTicketCredential(credKey, token, root);
             console.log(`\n🎫 Connected ${provider}${baseUrl ? ` at ${baseUrl}` : ""}.`);
-            console.log(`   Config in .aidimag/config.json (commit it — no secrets inside).`);
-            if (token) console.log(`   Credential stored in ~/.aidimag/credentials.json (this machine only).`);
+            console.log(`   Config + credential in .aidimag/config.json (this machine only — not committed).`);
 
             // trust-building: validate with a live round-trip
             const p = tickets.ticketProviderFor(root);
@@ -160,7 +159,7 @@ export function registerTicketCommands(program: Command): void {
             console.log(`provider: remote (via the team sync server)\nserver:   ${cloud?.server ?? "NOT LINKED — dim cloud link"}\nbrain:    ${cloud?.brain ?? "—"}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${cloud && getToken(cloud.server, root) ? "sync token stored" : "MISSING — dim login"}`);
           } else {
             const credKey = cfg.baseUrl ?? cfg.provider ?? "linear";
-            console.log(`provider: ${cfg.provider}${cfg.baseUrl ? `\nbaseUrl:  ${cfg.baseUrl}` : ""}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${tickets.getTicketCredential(credKey) ? "stored" : "MISSING"}`);
+            console.log(`provider: ${cfg.provider}${cfg.baseUrl ? `\nbaseUrl:  ${cfg.baseUrl}` : ""}\npattern:  ${cfg.pattern ?? tickets.DEFAULT_TICKET_PATTERN}\ntoken:    ${tickets.getTicketCredential(credKey, root) ? "stored" : "MISSING"}`);
           }
           const branch = cfg.branch;
           if (branch?.pattern) console.log(`branch:   ${branch.pattern} (enforce: ${branch.enforce ?? "off"})`);
@@ -169,7 +168,7 @@ export function registerTicketCommands(program: Command): void {
         case "disconnect": {
           const existing = tickets.readTicketsConfig(root);
           tickets.writeTicketsConfig(root, { branch: existing.branch }); // keep branch rules, drop provider
-          console.log("🎫 Disconnected (credential kept in ~/.aidimag/credentials.json — remove manually if needed).");
+          console.log("🎫 Disconnected (config.json ticket section cleared).");
           break;
         }
         case "show": {
@@ -200,7 +199,7 @@ export function registerTicketCommands(program: Command): void {
           const provider = (opts.provider ?? (local.provider !== "remote" ? local.provider : undefined)) as string | undefined;
           if (!provider) fail("usage: dim ticket share --provider <name> --url <baseUrl> --token <credential> (defaults come from this repo's `dim ticket connect`)");
           const baseUrl = (opts.url as string | undefined)?.replace(/\/$/, "") ?? local.baseUrl ?? "";
-          const credential = (opts.token as string | undefined) ?? tickets.getTicketCredential(baseUrl || provider || "linear") ?? undefined;
+          const credential = (opts.token as string | undefined) ?? tickets.getTicketCredential(baseUrl || provider || "linear", root) ?? undefined;
           if (!credential && provider !== "http") fail("no credential to share — pass --token (or connect locally first so it can be reused)");
           const res = await fetch(endpoint, {
             method: "PUT",

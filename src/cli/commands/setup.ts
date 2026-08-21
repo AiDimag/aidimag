@@ -607,7 +607,8 @@ const EMBEDDING_MODELS: Array<{ name: string; size: string; dim: number; desc: s
 const LLM_MODELS: Array<{ name: string; size: string; desc: string }> = [
   { name: "llama3.2", size: "~2.0GB", desc: "Latest, fast, good balance. Recommended." },
   { name: "llama3.1", size: "~4.9GB", desc: "Capable, larger. Good for complex repos." },
-  { name: "qwen2.5", size: "~4.7GB", desc: "Strong code understanding." },
+  { name: "qwen2.5-coder", size: "~4.7GB", desc: "Code-tuned. Best for bootstrap/mine/harvest." },
+  { name: "qwen2.5", size: "~4.7GB", desc: "Strong general code understanding." },
   { name: "phi3", size: "~2.2GB", desc: "Compact, efficient for simple tasks." },
 ];
 

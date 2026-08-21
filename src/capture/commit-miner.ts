@@ -266,6 +266,43 @@ export function scopeFromFiles(files: string[], maxPaths = 4): string[] {
     .map(([d]) => d);
 }
 
+const STOP_WORDS = new Set([
+  "the", "this", "that", "with", "from", "have", "will", "must", "should",
+  "project", "memory", "system", "using", "uses", "used", "code", "file",
+  "files", "when", "then", "into", "onto", "over", "under", "they", "them",
+  "their", "there", "here", "what", "which", "where", "been", "were", "your",
+  "about", "above", "below", "after", "before", "between", "through", "during",
+  "claim", "ticket", "branch", "commit", "verify", "verified", "stale",
+]);
+
+/**
+ * Try to find files relevant to a claim by extracting keywords and running
+ * `git grep`. Returns scoped paths (via scopeFromFiles) if matches are found,
+ * otherwise returns [] (repo-wide). Never throws.
+ */
+export function scopeFromClaim(claim: string, repoRoot: string, maxPaths = 4): string[] {
+  const words = claim
+    .replace(/[^a-zA-Z0-9_/.]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !STOP_WORDS.has(w.toLowerCase()));
+  if (words.length === 0) return [];
+
+  // Try the most distinctive keywords (longest first), a few at a time
+  const keywords = [...new Set(words)].sort((a, b) => b.length - a.length).slice(0, 3);
+  for (const kw of keywords) {
+    try {
+      const out = execFileSync("git", ["grep", "-l", "--cached", "-i", kw], {
+        cwd: repoRoot, encoding: "utf8", maxBuffer: 4 * 1024 * 1024, timeout: 3000,
+      }).trim();
+      if (out) {
+        const files = out.split("\n").filter(Boolean);
+        if (files.length > 0) return scopeFromFiles(files, maxPaths);
+      }
+    } catch { /* grep found nothing or git not available — try next keyword */ }
+  }
+  return [];
+}
+
 export function mineCommits(
   store: MemoryStore,
   repoRoot: string,
@@ -364,12 +401,14 @@ export const COMMIT_EXTRACT_INSTRUCTIONS = `You are mining a git commit for dura
 Rules:
 1. Most commits contain NOTHING durable — routine features/fixes/refactors. Return zero claims for those. Do NOT invent.
 2. When there IS signal, SYNTHESIZE a falsifiable claim about the codebase — do not parrot the commit message. Bad: "A decision was made: use Redis". Good: "Rate limiting uses Redis (src/limits); the in-memory limiter was abandoned because multi-instance deploys need shared counters".
-3. Use the DIFF, not just the message — renamed modules, deleted approaches, and added config tell the real story.
-4. kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL (guardrail_level never|ask-first|always), SKILL, TODO_CONTEXT.
-5. Scope with the touched paths; add "static_check" (cheap shell command, exit 0 iff true) when an honest one exists.
-6. 0–2 claims per commit. Zero is the common case.
+3. BE SPECIFIC. Every claim must name concrete files, modules, functions, config keys, or commands. Bad: "The project uses a specific tool for code completion" (useless). Good: "The UI is a single-page app generated from src/ui/page.ts which inlines all CSS and JS into one HTML file served by the Express server in src/ui/server.ts".
+4. REJECT generic statements. If a claim could apply to any repo, discard it. "Uses TypeScript" is useless. "All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts" is useful.
+5. Use the DIFF, not just the message — renamed modules, deleted approaches, and added config tell the real story.
+6. kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL (guardrail_level never|ask-first|always), SKILL, TODO_CONTEXT.
+7. Scope with the touched paths; add "static_check" (cheap shell command, exit 0 iff true) when an honest one exists.
+8. 0–2 claims per commit. Zero is the common case.
 
-Respond with ONLY: {"claims":[{"kind":"DECISION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"applies_when":[],"rationale":"...","static_check":null}]}`;
+Respond with ONLY: {"claims":[{"kind":"DECISION","claim":"Rate limiting uses Redis (src/limits); the in-memory limiter was abandoned because multi-instance deploys need shared counters","paths":["src/limits"],"symbols":[],"guardrail_level":null,"applies_when":[],"rationale":"commit switched from in-memory limiter to Redis","static_check":"grep -r 'redis' src/limits/"}]}`;
 
 function commitDiff(repoRoot: string, sha: string): string {
   try {

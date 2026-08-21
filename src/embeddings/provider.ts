@@ -15,6 +15,7 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { findRepoRoot } from "../db/store.js";
 
 export interface EmbeddingProvider {
   readonly name: string;
@@ -29,7 +30,7 @@ const OPENAI_MODEL = process.env.AIDIMAG_OPENAI_MODEL ?? "text-embedding-3-small
 /** Resolve the Ollama embedding model: env var → config.json → default */
 function getOllamaEmbeddingModel(): string {
   if (process.env.AIDIMAG_OLLAMA_MODEL) return process.env.AIDIMAG_OLLAMA_MODEL;
-  const root = process.env.AIDIMAG_REPO_ROOT;
+  const root = process.env.AIDIMAG_REPO_ROOT ?? findRepoRoot();
   if (root) {
     try {
       const cfg = JSON.parse(readFileSync(path.join(root, ".aidimag", "config.json"), "utf8"));

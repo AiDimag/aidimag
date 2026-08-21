@@ -19,6 +19,7 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { findRepoRoot } from "../db/store.js";
 
 export interface TextProvider {
   readonly name: string;
@@ -33,7 +34,7 @@ const OPENAI_CHAT_MODEL = process.env.AIDIMAG_OPENAI_CHAT_MODEL ?? "gpt-4o-mini"
 /** Resolve the Ollama chat/LLM model: env var → config.json → default */
 function getOllamaChatModel(): string {
   if (process.env.AIDIMAG_OLLAMA_CHAT_MODEL) return process.env.AIDIMAG_OLLAMA_CHAT_MODEL;
-  const root = process.env.AIDIMAG_REPO_ROOT;
+  const root = process.env.AIDIMAG_REPO_ROOT ?? findRepoRoot();
   if (root) {
     try {
       const cfg = JSON.parse(readFileSync(path.join(root, ".aidimag", "config.json"), "utf8"));

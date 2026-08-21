@@ -187,6 +187,11 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   #toast.toast-info    { background: hsl(217 91% 50% / 0.95); color: #fff; border-left-color: hsl(217 91% 38%); }
   #toast.toast-loading { background: hsl(var(--card)); color: hsl(var(--foreground)); border-left-color: hsl(var(--primary)); }
   .empty { color: hsl(var(--muted-foreground)); font-size: 12px; padding: 8px 0; display: flex; align-items: center; gap: 6px; }
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+  *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); background-clip: padding-box; }
   svg text { fill: hsl(var(--muted-foreground)); font-size: 10px; pointer-events: none; }
   dialog {
     background: hsl(var(--card)); color: hsl(var(--foreground));
@@ -224,11 +229,10 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
   .tk-dropdown-trigger:disabled { opacity: 0.6; cursor: not-allowed; }
   .tk-dropdown-trigger svg { flex-shrink: 0; opacity: 0.6; }
   .tk-dropdown-menu {
-    position: fixed; z-index: 10001;
+    position: absolute; top: 100%; left: 0; width: 100%; z-index: 10001;
     background: hsl(var(--card)); border: 1px solid hsl(var(--border));
     border-radius: calc(var(--radius) - 2px); box-shadow: var(--surface-glow);
-    overflow: hidden; margin-top: 2px; max-height: 280px; overflow-y: auto;
-    min-width: 240px;
+    overflow: hidden; max-height: 280px; overflow-y: auto;
   }
   .tk-dropdown-item {
     display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13px;
@@ -760,6 +764,22 @@ export const PAGE_HTML = /* html */ `<!DOCTYPE html>
       <span id="tk-provider-label">Jira</span>
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </button>
+  <div class="tk-dropdown-menu" id="tk-provider-menu" style="display:none">
+    <div class="tk-dropdown-item" data-value="jira" onclick="tkDropdownSelect('jira','Jira')">Jira</div>
+    <div class="tk-dropdown-item" data-value="github" onclick="tkDropdownSelect('github','GitHub Issues')">GitHub Issues</div>
+    <div class="tk-dropdown-item" data-value="linear" onclick="tkDropdownSelect('linear','Linear')">Linear</div>
+    <div class="tk-dropdown-item" data-value="gitlab" onclick="tkDropdownSelect('gitlab','GitLab Issues')">GitLab Issues</div>
+    <div class="tk-dropdown-item" data-value="azuredevops" onclick="tkDropdownSelect('azuredevops','Azure DevOps')">Azure DevOps</div>
+    <div class="tk-dropdown-item" data-value="clickup" onclick="tkDropdownSelect('clickup','ClickUp')">ClickUp</div>
+    <div class="tk-dropdown-item" data-value="shortcut" onclick="tkDropdownSelect('shortcut','Shortcut')">Shortcut</div>
+    <div class="tk-dropdown-item" data-value="youtrack" onclick="tkDropdownSelect('youtrack','YouTrack')">YouTrack</div>
+    <div class="tk-dropdown-item" data-value="asana" onclick="tkDropdownSelect('asana','Asana')">Asana</div>
+    <div class="tk-dropdown-item" data-value="trello" onclick="tkDropdownSelect('trello','Trello')">Trello</div>
+    <div class="tk-dropdown-item" data-value="notion" onclick="tkDropdownSelect('notion','Notion')">Notion</div>
+    <div class="tk-dropdown-item" data-value="pivotal" onclick="tkDropdownSelect('pivotal','Pivotal Tracker')">Pivotal Tracker</div>
+    <div class="tk-dropdown-item" data-value="http" onclick="tkDropdownSelect('http','HTTP middleware')">HTTP middleware (your own)</div>
+    <div class="tk-dropdown-item" data-value="remote" onclick="tkDropdownSelect('remote','Remote')">Remote (team sync server — zero local credentials)</div>
+  </div>
   </div>
   <input type="hidden" id="tk-provider" value="jira">
   <div id="tk-url-row">
@@ -1291,13 +1311,20 @@ function renderMemories(list) {
           ? \`<button onclick="act('/api/memories/\${m.id}/unpin','unpinned')">\${IC_UNPIN} Unpin</button>\`
           : \`<button onclick="act('/api/memories/\${m.id}/pin','pinned')">\${IC_PIN_BTN} Pin</button>\`}
         \${m.status !== "REFUTED" ? \`<button class="danger" onclick="act('/api/memories/\${m.id}/refute','refuted')">\${IC_REFUTE} Refute</button>\` : ""}
-        <button class="danger" onclick="if(confirm('Delete permanently?'))act('/api/memories/\${m.id}/forget','forgotten')">\${IC_FORGET} Forget</button>
+        <button class="danger" onclick="confirmForget('\${m.id}')">\${IC_FORGET} Forget</button>
       </div>
     </div>\`).join("");
 }
 
 async function act(path, verb) {
   try { await api(path, { method: "POST" }); toast("Memory " + verb); load(); }
+  catch (e) { toast("Error: " + e.message); }
+}
+
+async function confirmForget(id) {
+  const ok = await showConfirm("Forget memory", "Delete this memory permanently? This cannot be undone.");
+  if (!ok) return;
+  try { await api("/api/memories/" + id + "/forget", { method: "POST" }); toast("Memory forgotten"); load(); }
   catch (e) { toast("Error: " + e.message); }
 }
 
@@ -1758,15 +1785,13 @@ function initTkDropdownIcons() {
 }
 function tkDropdownToggle() {
   var menu = document.getElementById('tk-provider-menu');
-  var btn = document.getElementById('tk-provider-btn');
+  var dialog = document.getElementById('dlg-tickets');
   if (menu.style.display === 'none') {
-    var rect = btn.getBoundingClientRect();
     menu.style.display = '';
-    menu.style.top = (rect.bottom + 2) + 'px';
-    menu.style.left = rect.left + 'px';
-    menu.style.width = rect.width + 'px';
+    dialog.style.overflow = 'visible';
   } else {
     menu.style.display = 'none';
+    dialog.style.overflow = 'auto';
   }
 }
 function tkDropdownSelect(val, label) {
@@ -1774,6 +1799,7 @@ function tkDropdownSelect(val, label) {
   var icon = _TK_PROVIDER_ICONS[val] || '';
   document.getElementById('tk-provider-label').innerHTML = icon + ' ' + label;
   document.getElementById('tk-provider-menu').style.display = 'none';
+  document.getElementById('dlg-tickets').style.overflow = 'auto';
   ticketsProviderHint();
 }
 document.addEventListener('click', function(e) {
@@ -1782,6 +1808,7 @@ document.addEventListener('click', function(e) {
   var btn = document.getElementById('tk-provider-btn');
   if (menu && menu.style.display !== 'none' && !wrap.contains(e.target) && !menu.contains(e.target) && e.target !== btn) {
     menu.style.display = 'none';
+    document.getElementById('dlg-tickets').style.overflow = 'auto';
   }
 });
 
@@ -2041,7 +2068,7 @@ function renderHealth() {
 
   // Summary metrics grid
   html += '<div class="health-section"><h3>Memory Summary</h3><div class="health-grid">';
-  html += healthCard("Total Memories", s.total, "good", state.cloud ? (state.cloud.server && state.cloud.server.includes("cloud.aidimag.com") ? SVG_AIDIMAG: IC_BRAIN) : IC_BRAIN);
+  html += healthCard("Total Memories", s.total, "good", (state && state.cloud) ? (state.cloud.server && state.cloud.server.includes("cloud.aidimag.com") ? SVG_AIDIMAG: IC_BRAIN) : IC_BRAIN);
   html += healthCard("Verified", s.byStatus.VERIFIED, "good", IC_CHECK_C);
   html += healthCard("Unverified", s.unverified, s.unverified > 5 ? "warning" : "", IC_CANCEL);
   html += healthCard("Stale", s.stale, s.stale > 0 ? "warning" : "good", IC_SCROLL_OLD);
@@ -2672,7 +2699,7 @@ function renderActionsView() {
     statCard("Embeddings", state.embeddingProvider ? ((state.embeddingProvider.name === "ollama" ? IC_OLLAMA + " " : "") + esc(state.embeddingProvider.name)) : "off", state.embeddingProvider ? esc(state.embeddingProvider.model) : "keyword search only — click to set up", !state.embeddingProvider, state.embeddingProvider ? "openModelSettings()" : "runSetupOllama()", "stat-embeddings", !!state.embeddingProvider, IC_CALC) +
     '</div>',
     statCard("Team sync", state.cloud ? (state.cloud.server && state.cloud.server.includes("cloud.aidimag.com") ? SVG_AIDIMAG + " linked" : IC_BRAIN + " linked") : "off", state.cloud ? esc(state.cloud.brain) + " @ " + esc(state.cloud.server) : "link a server to share memory", false, null, null, !!state.cloud, IC_SYNC),
-    statCard("Tickets", state.tickets ? (state.tickets.provider === "remote" && state.teamTickets ? (PROVIDER_LOGOS[state.teamTickets.provider] || IC_TICKET) + " linked" : (PROVIDER_LOGOS[state.tickets.provider] || IC_TICKET) + " linked") : state.teamTickets ? (PROVIDER_LOGOS[state.teamTickets.provider] || IC_TICKET) + " team" : "off", state.tickets ? (state.tickets.provider === "remote" ? "team credentials on server" : state.tickets.hasCredential ? "credential stored" : IC_WARN + " no credential") : state.teamTickets ? "admin shared " + esc(state.teamTickets.provider) + " — click to connect" : "connect Jira / GitHub / Linear", false, state.teamTickets ? "openTickets()" : null, null, !!state.tickets, IC_TICKET),
+    statCard("Tickets", state.tickets ? (state.tickets.provider === "remote" && state.teamTickets ? (PROVIDER_LOGOS[state.teamTickets.provider] || IC_TICKET) + " linked" : (PROVIDER_LOGOS[state.tickets.provider] || IC_TICKET) + " linked") : "off", state.tickets ? (state.tickets.provider === "remote" ? "team credentials on server" : state.tickets.hasCredential ? "credential stored" : IC_WARN + " no credential") : state.teamTickets ? "team has " + esc(state.teamTickets.provider) + " — click to connect" : "connect Jira / GitHub / Linear", false, (state.tickets || state.teamTickets) ? "openTickets()" : null, null, !!state.tickets, IC_TICKET),
   ].join("");
 
   const groupsEl = document.getElementById("action-groups");
@@ -3646,22 +3673,6 @@ window.addEventListener("keydown", (e) => {
   }
 });
 </script>
-<div class="tk-dropdown-menu" id="tk-provider-menu" style="display:none">
-  <div class="tk-dropdown-item" data-value="jira" onclick="tkDropdownSelect('jira','Jira')">Jira</div>
-  <div class="tk-dropdown-item" data-value="github" onclick="tkDropdownSelect('github','GitHub Issues')">GitHub Issues</div>
-  <div class="tk-dropdown-item" data-value="linear" onclick="tkDropdownSelect('linear','Linear')">Linear</div>
-  <div class="tk-dropdown-item" data-value="gitlab" onclick="tkDropdownSelect('gitlab','GitLab Issues')">GitLab Issues</div>
-  <div class="tk-dropdown-item" data-value="azuredevops" onclick="tkDropdownSelect('azuredevops','Azure DevOps')">Azure DevOps</div>
-  <div class="tk-dropdown-item" data-value="clickup" onclick="tkDropdownSelect('clickup','ClickUp')">ClickUp</div>
-  <div class="tk-dropdown-item" data-value="shortcut" onclick="tkDropdownSelect('shortcut','Shortcut')">Shortcut</div>
-  <div class="tk-dropdown-item" data-value="youtrack" onclick="tkDropdownSelect('youtrack','YouTrack')">YouTrack</div>
-  <div class="tk-dropdown-item" data-value="asana" onclick="tkDropdownSelect('asana','Asana')">Asana</div>
-  <div class="tk-dropdown-item" data-value="trello" onclick="tkDropdownSelect('trello','Trello')">Trello</div>
-  <div class="tk-dropdown-item" data-value="notion" onclick="tkDropdownSelect('notion','Notion')">Notion</div>
-  <div class="tk-dropdown-item" data-value="pivotal" onclick="tkDropdownSelect('pivotal','Pivotal Tracker')">Pivotal Tracker</div>
-  <div class="tk-dropdown-item" data-value="http" onclick="tkDropdownSelect('http','HTTP middleware')">HTTP middleware (your own)</div>
-  <div class="tk-dropdown-item" data-value="remote" onclick="tkDropdownSelect('remote','Remote')">Remote (team sync server — zero local credentials)</div>
-</div>
 </body>
 </html>`;
 

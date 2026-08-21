@@ -20,7 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MemoryStore, findRepoRoot } from "../db/store.js";
 import { sessionEndPromptFor, proposalSummaryLine } from "../capture/session-extraction.js";
-import { mineCommits, mineCommitsLlm, describeMineResult } from "../capture/commit-miner.js";
+import { mineCommits, mineCommitsLlm, describeMineResult, scopeFromClaim } from "../capture/commit-miner.js";
 import { buildSessionBriefing, renderBriefing, sessionStartPrompt } from "../capture/session-briefing.js";
 import { critique } from "../critique/critique.js";
 import { ticketProviderFor, detectBranchTicket } from "../tickets/provider.js";
@@ -694,13 +694,14 @@ async function main() {
       }
       const agent = args.agent_id ?? "agent";
       const sessionTag = args.session_id ?? new Date().toISOString();
+      const root = process.env.AIDIMAG_REPO ?? findRepoRoot() ?? process.cwd();
       let proposed = 0;
       let duplicates = 0;
       for (const c of claims) {
         const p = store.propose({
           kind: c.kind,
           claim: c.claim,
-          paths: c.paths,
+          paths: (c.paths && c.paths.length > 0) ? c.paths : scopeFromClaim(c.claim, root),
           symbols: c.symbols,
           guardrailLevel: c.guardrailLevel,
           rationale: c.rationale ?? `Stated by the user in a live ${agent} chat session.`,

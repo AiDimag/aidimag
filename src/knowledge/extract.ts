@@ -36,9 +36,11 @@ export const KNOWLEDGE_EXTRACT_INSTRUCTIONS = `You are extracting durable, proje
 
 Turn it into a small set of FALSIFIABLE claims. Rules:
 
-1. Only DURABLE, NON-OBVIOUS facts about THIS project — rules, decisions, architecture, invariants, guardrails, procedures. Skip generic advice, tutorials, and anything a quick file read already shows.
-2. Write each claim as a checkable statement. Bad: "auth is complex". Good: "JWT refresh in src/auth/refresh.ts must run before the middleware chain; reordering breaks session renewal".
-3. Pick the right kind:
+1. BE SPECIFIC. Every claim must name concrete files, modules, functions, config keys, or commands. Bad: "The project uses a specific tool for code completion" (useless). Good: "The UI is a single-page app generated from src/ui/page.ts which inlines all CSS and JS into one HTML file served by the Express server in src/ui/server.ts". Bad: "The project uses a specific file format for README files" (which format? why?).
+2. REJECT generic statements. If a claim could apply to any repo, discard it. "Uses TypeScript" is useless. "All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts" is useful.
+3. Only DURABLE, NON-OBVIOUS facts about THIS project — rules, decisions, architecture, invariants, guardrails, procedures. Skip generic advice, tutorials, and anything a quick file read already shows.
+4. Write each claim as a checkable statement. Bad: "auth is complex". Good: "JWT refresh in src/auth/refresh.ts must run before the middleware chain; reordering breaks session renewal".
+5. Pick the right kind:
    - DECISION: a choice + the rejected alternative
    - CONVENTION: a rule the repo follows
    - GOTCHA: surprising behavior that costs time
@@ -48,11 +50,11 @@ Turn it into a small set of FALSIFIABLE claims. Rules:
    - GUARDRAIL: a behavioral rule for future agents — set guardrail_level to "never" (refuse), "ask-first" (confirm), or "always" (do automatically)
    - SKILL: a reusable step-by-step procedure (write the steps as "1) ... 2) ...")
    - TODO_CONTEXT: unfinished work + the context to resume it
-4. Scope each claim with paths/symbols it applies to when the document names them; otherwise leave them empty (repo-wide).
-5. Extract 0–12 claims. Zero is fine. Do NOT pad, and do NOT invent rules the document doesn't support.
+6. Scope each claim with paths/symbols it applies to when the document names them; otherwise leave them empty (repo-wide).
+7. Extract 0–12 claims. Zero is fine. Do NOT pad, and do NOT invent rules the document doesn't support.
 
 Respond with ONLY a JSON object of this exact shape:
-{"claims":[{"kind":"CONVENTION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"applies_when":[],"rationale":"..."}]}`;
+{"claims":[{"kind":"CONVENTION","claim":"All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts","paths":["src/api/registry.ts"],"symbols":["BaseHandler"],"guardrail_level":null,"applies_when":[],"rationale":"from ADR-003: API handler registration pattern"}]}`;
 
 /** Build the user message for the LLM: instructions + the document. */
 export function buildExtractionUser(filename: string, content: string): string {

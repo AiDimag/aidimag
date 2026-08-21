@@ -21,3 +21,13 @@ docs/.vitepress/cache/
 .icon-cache/
 
 
+!.aidimag/
+!.aidimag/critical-areas.yml
+!.aidimag/critical-areas.yaml
+!.aidimag/critical-areas.json
+knowledge
+CLAUDE.md
+.cursorrules
+.windsurfrules
+AGENTS.md
+.github/copilot-instructions.md

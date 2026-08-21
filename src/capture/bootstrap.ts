@@ -115,10 +115,54 @@ function collectDocs(repoRoot: string): Array<{ file: string; content: string }>
     out.push({ file: cand, content: readCapped(abs).slice(0, 4_000) });
   }
   // existing hand-written AI context files are pre-distilled knowledge — gold
-  for (const cand of ["CLAUDE.md", ".cursorrules", ".github/copilot-instructions.md"]) {
+  // but skip auto-generated aidimag context files (they just echo existing memories)
+  for (const cand of ["CLAUDE.md", ".cursorrules", ".github/copilot-instructions.md", "AGENTS.md", ".windsurfrules"]) {
     const abs = path.join(repoRoot, cand);
-    if (existsSync(abs) && !statSync(abs).isDirectory()) out.push({ file: cand, content: readCapped(abs) });
+    if (!existsSync(abs) || statSync(abs).isDirectory()) continue;
+    const content = readCapped(abs);
+    if (content.includes("aidimag — do not edit manually")) continue; // auto-generated, skip
+    out.push({ file: cand, content });
   }
+  // Fallback: if we found very few docs, read top source files from the tree
+  // so the LLM has real code to reason about, not just a directory listing.
+  if (out.length < 3) {
+    const srcFiles = collectSourceFiles(repoRoot, 8);
+    for (const sf of srcFiles) {
+      if (out.join("\n").length > MAX_TOTAL_CHARS * 0.6) break;
+      out.push({ file: sf.file, content: sf.content });
+    }
+  }
+  return out;
+}
+
+/** Collect a few representative source files when docs are sparse. */
+function collectSourceFiles(repoRoot: string, max: number): Array<{ file: string; content: string }> {
+  const skip = new Set(["node_modules", ".git", "dist", "build", ".aidimag", "coverage", "target", ".idea", ".vscode"]);
+  const exts = [".ts", ".js", ".py", ".go", ".rs", ".java", ".rb", ".cs", ".tsx", ".jsx"];
+  const out: Array<{ file: string; content: string }> = [];
+  const walk = (dir: string, rel: string) => {
+    if (out.length >= max) return;
+    let entries: string[];
+    try { entries = readdirSync(dir).filter((e) => !skip.has(e) && !e.startsWith(".")); } catch { return; }
+    // Sort: prefer files with "index", "main", "server", "store", "handler" in the name
+    entries.sort((a, b) => {
+      const score = (n: string) => /index|main|server|store|handler|api|config/i.test(n) ? 0 : 1;
+      return score(a) - score(b);
+    });
+    for (const e of entries) {
+      if (out.length >= max) return;
+      const abs = path.join(dir, e);
+      const relPath = rel ? `${rel}/${e}` : e;
+      let isDir = false;
+      try { isDir = statSync(abs).isDirectory(); } catch { continue; }
+      if (isDir) {
+        walk(abs, relPath);
+      } else if (exts.some((ext) => e.endsWith(ext))) {
+        out.push({ file: relPath, content: readCapped(abs).slice(0, 4_000) });
+      }
+    }
+  };
+  walk(repoRoot, "");
   return out;
 }
 
@@ -126,14 +170,17 @@ export const BOOTSTRAP_INSTRUCTIONS = `You are bootstrapping a "repo brain" for 
 
 Extract the durable, project-specific knowledge as FALSIFIABLE claims. Rules:
 
-1. Only facts THIS survey supports — architecture, conventions, decisions, invariants, build/deploy procedures (SKILL), behavioral rules (GUARDRAIL with guardrail_level never|ask-first|always). Do NOT invent or pad; skip anything generic ("uses TypeScript" is useless unless there's a rule attached).
-2. Write each claim as a checkable statement scoped with paths when the survey names them.
-3. Where possible, include "static_check": a cheap shell command (grep/test/ls) that exits 0 iff the claim holds. Omit it when no honest check exists.
-4. kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL, SKILL, TODO_CONTEXT.
-5. Extract 5–30 claims depending on how much real signal exists. Quality over quantity.
+1. PRIORITIZE ARCHITECTURE AND TECH STACK. The most valuable claims describe what the project IS and how it's built: "This is a React + TypeScript SPA that wraps a D3.js graph visualization for a memory-verification tool, with a Node.js/Express API server in src/ui/server.ts and a SQLite-backed store in src/db/store.ts". Start with 1-3 ARCHITECTURE claims about the project's purpose, tech stack, and component layout before drilling into conventions.
+2. BE SPECIFIC but NOT TRIVIAL. Every claim must explain WHY something matters, not just THAT it exists. Bad: "The project uses a specific directory structure, with separate directories for api, db, knowledge, and src" (just parroting the tree — every repo has directories). Good: "All DB access goes through src/db/store.ts which wraps better-sqlite3; no other file imports better-sqlite3 directly". Bad: "Code completion is configured via Copilot in .vscode/settings.json with telemetry disabled" (trivial config). Bad: "The project has no verified memories yet" (transient state). Bad: "The project uses a specific file format for README files" (trivial).
+3. REJECT generic statements. If a claim could apply to any repo, discard it. "Uses TypeScript" is useless. "All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts" is useful. If your claim is just listing what directories exist, discard it — describe what the code IN those directories does and how the pieces connect.
+4. Only facts THIS survey supports — architecture, conventions, decisions, invariants, build/deploy procedures (SKILL), behavioral rules (GUARDRAIL with guardrail_level never|ask-first|always). Do NOT invent or pad.
+5. Write each claim as a checkable statement scoped with the actual paths from the survey.
+6. Where possible, include "static_check": a cheap shell command (grep/test/ls) that exits 0 iff the claim holds. Omit it when no honest check exists.
+7. kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL, SKILL, TODO_CONTEXT.
+8. Extract 3–20 claims. Quality over quantity. If the survey has little real signal, return fewer — zero is acceptable.
 
 Respond with ONLY a JSON object:
-{"claims":[{"kind":"ARCHITECTURE","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"rationale":"from README section ...","static_check":"test -f src/x/index.ts"}]}`;
+{"claims":[{"kind":"ARCHITECTURE","claim":"This is a React + TypeScript SPA that renders a D3.js force-directed graph of memory nodes; the UI is a single HTML file generated from src/ui/page.ts, served by an Express API in src/ui/server.ts backed by SQLite in src/db/store.ts","paths":["src/ui/page.ts","src/ui/server.ts","src/db/store.ts"],"symbols":[],"guardrail_level":null,"rationale":"from package.json deps + directory structure","static_check":"grep -q 'd3' package.json && test -f src/ui/page.ts && test -f src/ui/server.ts"}]}`;
 
 /** Turn a repo survey into an initial proposal set. */
 export async function bootstrapRepo(

@@ -12,7 +12,7 @@ import { watch, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:
 import path from "node:path";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { verifyAll } from "../verify/engine.js";
-import { mineCommits } from "../capture/commit-miner.js";
+import { mineCommits, scopeFromClaim } from "../capture/commit-miner.js";
 import { hybridSearch, indexMemory, reindexAll } from "../embeddings/search.js";
 import { readCloudConfig, writeCloudConfig, getToken, sync as cloudSync, configPath } from "../sync/client.js";
 import { resolveKnowledgeConfig, readConfig, writeConfig, type ContextFormat } from "../config.js";
@@ -72,6 +72,7 @@ async function extractTicketProposals(
   store: MemoryStore,
   ticket: { id: string; url?: string; title: string; body?: string; type?: string; status?: string; labels?: string[]; parent?: { id: string; title: string } },
   source: string,
+  repoRoot: string,
 ): Promise<{ created: number; duplicates: number; provider: string | null }> {
   const result = { created: 0, duplicates: 0, provider: null as string | null };
 
@@ -104,8 +105,10 @@ async function extractTicketProposals(
 Turn the ticket details into a set of FALSIFIABLE claims. Rules:
 
 1. Use ALL available ticket fields (title, description, type, status, labels, parent) to extract maximum context.
-2. Pick the SINGLE BEST kind for each concept — never create multiple claims that say the same thing with different kinds.
-3. Kinds:
+2. BE SPECIFIC. Every claim must name concrete files, modules, functions, config keys, or commands mentioned in the ticket. Bad: "The project uses a specific tool for code completion" (useless). Good: "The UI is a single-page app generated from src/ui/page.ts which inlines all CSS and JS into one HTML file served by the Express server in src/ui/server.ts".
+3. REJECT generic statements. If a claim could apply to any repo, discard it. "Uses TypeScript" is useless. "The auth middleware in src/middleware/auth.ts checks JWT expiry before forwarding to the route handler" is useful.
+4. Pick the SINGLE BEST kind for each concept — never create multiple claims that say the same thing with different kinds.
+5. Kinds:
    - TODO_CONTEXT: the work to be done, with enough context to resume it (use for bugs/defects/features)
    - CONVENTION: a coding convention or pattern the ticket mentions
    - GUARDRAIL: a hard constraint the agent must follow (set guardrail_level: never|ask-first|always)
@@ -113,14 +116,14 @@ Turn the ticket details into a set of FALSIFIABLE claims. Rules:
    - GOTCHA: a pitfall or surprising behavior
    - ARCHITECTURE: architectural context relevant to the ticket
    - DECISION: a decision already made with the rejected alternative
-4. Write each claim as a checkable statement about the codebase.
-5. In "rationale", note which part of the ticket the claim came from.
-6. For simple tickets (a single bug, a small feature), create 1–2 claims only. For complex tickets (epics, multi-part features), create up to 5. Consolidate related details into fewer, richer claims.
-7. Do NOT invent rules the ticket doesn't support. Do NOT rephrase the same idea as different kinds.
-8. Leave "paths" and "symbols" as empty arrays [] unless the ticket explicitly mentions file paths or symbol names.
+6. Write each claim as a checkable statement about the codebase.
+7. In "rationale", note which part of the ticket the claim came from.
+8. For simple tickets (a single bug, a small feature), create 1–2 claims only. For complex tickets (epics, multi-part features), create up to 5. Consolidate related details into fewer, richer claims.
+9. Do NOT invent rules the ticket doesn't support. Do NOT rephrase the same idea as different kinds.
+10. Leave "paths" and "symbols" as empty arrays [] unless the ticket explicitly mentions file paths or symbol names.
 
 Respond with ONLY a JSON object of this exact shape:
-{"claims":[{"kind":"TODO_CONTEXT","claim":"...","paths":[],"symbols":[],"guardrail_level":null,"rationale":"from ticket description: ..."}]}`;
+{"claims":[{"kind":"TODO_CONTEXT","claim":"The rate limiter in src/middleware/rateLimit.ts uses in-memory counters which break behind load balancers; ticket requests migrating to Redis-backed counters in src/limits/redis.ts","paths":["src/middleware/rateLimit.ts"],"symbols":["rateLimit"],"guardrail_level":null,"rationale":"from ticket description: rate limiting fails with multiple instances"}]}`;
 
   const ticketContent = [
     `Ticket: ${ticket.id}`,
@@ -142,6 +145,7 @@ Respond with ONLY a JSON object of this exact shape:
     const claim = `Ticket ${ticket.id}: ${ticket.title}`;
     const evidence: Array<{ type: import("../types.js").EvidenceType; payload: string }> = [
       { type: "TICKET_REF", payload: ticket.id },
+      { type: "HUMAN_ATTESTED", payload: `Extracted from ticket ${ticket.id} by user action` },
     ];
     if (ticket.url) evidence.push({ type: "TICKET_REF", payload: ticket.url });
     const existing = store.list(1000).find(m => m.claim === claim);
@@ -154,6 +158,7 @@ Respond with ONLY a JSON object of this exact shape:
 
   const evidence: Array<{ type: import("../types.js").EvidenceType; payload: string }> = [
     { type: "TICKET_REF", payload: ticket.id },
+    { type: "HUMAN_ATTESTED", payload: `Extracted from ticket ${ticket.id} by user action` },
   ];
   if (ticket.url) evidence.push({ type: "TICKET_REF", payload: ticket.url });
 
@@ -161,10 +166,11 @@ Respond with ONLY a JSON object of this exact shape:
 
   for (const c of claims) {
     if (existingClaims.has(c.claim)) { result.duplicates++; continue; }
+    const paths = (c.paths && c.paths.length > 0) ? c.paths : scopeFromClaim(c.claim, repoRoot);
     const entry = store.write({
       kind: c.kind,
       claim: c.claim,
-      paths: c.paths,
+      paths,
       symbols: c.symbols,
       evidence,
       createdBy: source,
@@ -310,7 +316,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
                 hasCredential:
                   tcfg.provider === "remote"
                     ? !!(cloud && getToken(cloud.server, repoRoot))
-                    : !!getTicketCredential(tcfg.baseUrl ?? "linear"),
+                    : !!getTicketCredential(tcfg.baseUrl ?? "linear", repoRoot),
                 branch: tcfg.branch ?? null,
               }
             : null,
@@ -426,7 +432,8 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         const llmModels = [
           { name: "llama3.2", size: "~2.0GB", desc: "Latest, fast, good balance. Recommended." },
           { name: "llama3.1", size: "~4.9GB", desc: "Capable, larger. Good for complex repos." },
-          { name: "qwen2.5", size: "~4.7GB", desc: "Strong code understanding." },
+          { name: "qwen2.5-coder", size: "~4.7GB", desc: "Code-tuned. Best for bootstrap/mine/harvest." },
+          { name: "qwen2.5", size: "~4.7GB", desc: "Strong general code understanding." },
           { name: "phi3", size: "~2.2GB", desc: "Compact, efficient for simple tasks." },
         ];
         const pulledEmbedding = pulledModels.filter((m) => embeddingModels.some((em) => em.name === m) || /embed/i.test(m));
@@ -776,7 +783,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
             existing.pattern ??
             (provider === "github" ? "#\\d+" : DEFAULT_TICKET_PATTERN),
         });
-        if (b.token) saveTicketCredential(baseUrl ?? "linear", String(b.token));
+        if (b.token) saveTicketCredential(baseUrl ?? "linear", String(b.token), repoRoot);
         // trust-building: optional live validation round-trip
         let validated: { id: string; title: string } | null = null;
         if (b.testId) {
@@ -1099,7 +1106,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         let memoriesCount = 0;
         if (ticket) {
           try {
-            const r = await extractTicketProposals(store, ticket, "ticket-branch");
+            const r = await extractTicketProposals(store, ticket, "ticket-branch", repoRoot);
             memoriesCount = r.created;
             memoriesCreated = r.created > 0;
           } catch { /* ignore errors */ }
@@ -1148,7 +1155,7 @@ export function startUiServer(store: MemoryStore, repoRoot: string, port = 4517)
         }
 
         // Extract claims from updated ticket and create memories
-        const r = await extractTicketProposals(store, ticket, "ticket-resync");
+        const r = await extractTicketProposals(store, ticket, "ticket-resync", repoRoot);
 
         json(res, 200, { ok: true, ticketId, branch, ticketTitle: ticket.title, memoriesCreated: r.created > 0, memoriesCount: r.created });
         return;

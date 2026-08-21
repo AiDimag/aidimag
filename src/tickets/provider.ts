@@ -17,7 +17,6 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { homedir } from "node:os";
 import path from "node:path";
 import { isAllowedTicketBaseUrl } from "../security/url.js";
 
@@ -100,28 +99,28 @@ export function writeTicketsConfig(repoRoot: string, tickets: TicketsConfig): vo
   writeFileSync(p, JSON.stringify({ ...existing, tickets }, null, 2) + "\n");
 }
 
-// ---------------------------------------------------------------- credentials (never the repo)
+// ---------------------------------------------------------------- credentials (per-repo, stored in .aidimag/config.json)
 
-function credentialsPath(): string {
-  return path.join(homedir(), ".aidimag", "credentials.json");
-}
-
-/** Ticket credentials live alongside sync tokens, keyed `ticket:<baseUrl>`. */
-export function getTicketCredential(baseUrl: string): string | null {
+/** Ticket credential stored per-repo in config.json (same pattern as cloud sync token). */
+export function getTicketCredential(baseUrl: string, repoRoot?: string): string | null {
   if (process.env.AIDIMAG_TICKET_TOKEN) return process.env.AIDIMAG_TICKET_TOKEN;
+  if (!repoRoot) return null;
   try {
-    return JSON.parse(readFileSync(credentialsPath(), "utf8"))[`ticket:${baseUrl}`] ?? null;
+    const cfg = JSON.parse(readFileSync(configPath(repoRoot), "utf8"));
+    return cfg.tickets?.token ?? null;
   } catch {
     return null;
   }
 }
 
-export function saveTicketCredential(baseUrl: string, credential: string): void {
-  const p = credentialsPath();
+export function saveTicketCredential(baseUrl: string, credential: string, repoRoot?: string): void {
+  if (!repoRoot) return;
+  const p = configPath(repoRoot);
   mkdirSync(path.dirname(p), { recursive: true });
-  const creds = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : {};
-  creds[`ticket:${baseUrl}`] = credential;
-  writeFileSync(p, JSON.stringify(creds, null, 2) + "\n", { mode: 0o600 });
+  const existing = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : {};
+  if (!existing.tickets) existing.tickets = {};
+  existing.tickets.token = credential;
+  writeFileSync(p, JSON.stringify(existing, null, 2) + "\n", { mode: 0o600 });
   try { chmodSync(p, 0o600); } catch { /* best-effort */ }
 }
 
@@ -647,7 +646,7 @@ export function ticketProviderFor(repoRoot: string): TicketProvider | null {
   }
   if (!cfg.baseUrl && !["linear", "clickup", "shortcut", "asana", "trello", "notion", "remote"].includes(cfg.provider)) return null;
   const credKey = cfg.baseUrl ?? cfg.provider ?? "linear";
-  return buildDirectProvider(cfg.provider, cfg.baseUrl ?? "", getTicketCredential(credKey));
+  return buildDirectProvider(cfg.provider, cfg.baseUrl ?? "", getTicketCredential(credKey, repoRoot));
 }
 
 // ---------------------------------------------------------------- branch convention (T1.5)

@@ -23,6 +23,7 @@ import { getTextProvider } from "../knowledge/llm.js";
 import { parseClaims, type ExtractedClaim } from "../knowledge/extract.js";
 import { debugLog } from "../debug.js";
 import { TRANSCRIPT_SOURCES, type TranscriptSource } from "./transcript-sources.js";
+import { scopeFromClaim } from "./commit-miner.js";
 
 // re-export for back-compat (tests, external callers)
 export { claudeProjectDir, userMessagesFromTranscript } from "./transcript-sources.js";
@@ -67,14 +68,16 @@ export const HARVEST_EXTRACT_INSTRUCTIONS = `You are reviewing messages a DEVELO
 Extract that durable knowledge as FALSIFIABLE claims. Rules:
 
 1. Only durable, project-specific facts the HUMAN stated — not the task of the day, not questions, not generic programming advice.
-2. Write each claim as a checkable statement about the codebase.
-3. kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL (set guardrail_level: never|ask-first|always), SKILL, TODO_CONTEXT.
-4. Scope with paths/symbols when the messages name them; else leave empty.
-5. In "rationale", QUOTE the fragment of the developer's message the claim came from.
-6. Extract 0–8 claims. Zero is fine — most sessions contain none. Do NOT invent.
+2. BE SPECIFIC. Every claim must name concrete files, modules, functions, config keys, or commands. Bad: "The project uses a specific tool for code completion" (useless). Good: "The UI is a single-page app generated from src/ui/page.ts which inlines all CSS and JS into one HTML file served by the Express server in src/ui/server.ts".
+3. REJECT generic statements. If a claim could apply to any repo, discard it. "Uses TypeScript" is useless. "All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts" is useful.
+4. Write each claim as a checkable statement about the codebase.
+5. kinds: DECISION, CONVENTION, GOTCHA, FAILED_APPROACH, ARCHITECTURE, INVARIANT, GUARDRAIL (set guardrail_level: never|ask-first|always), SKILL, TODO_CONTEXT.
+6. Scope with paths/symbols when the messages name them; else leave empty.
+7. In "rationale", QUOTE the fragment of the developer's message the claim came from.
+8. Extract 0–8 claims. Zero is fine — most sessions contain none. Do NOT invent.
 
 Respond with ONLY a JSON object of this exact shape:
-{"claims":[{"kind":"CONVENTION","claim":"...","paths":["src/x"],"symbols":[],"guardrail_level":null,"rationale":"user said: \\"...\\""}]}`;
+{"claims":[{"kind":"CONVENTION","claim":"All API handlers in src/api/ must extend BaseHandler and register via src/api/registry.ts","paths":["src/api/registry.ts"],"symbols":["BaseHandler"],"guardrail_level":null,"rationale":"user said: \\"we always extend BaseHandler for API handlers\\""}]}`;
 
 function cursorMetaKey(source: TranscriptSource): string {
   // claude-code keeps its historical key so existing installs don't rescan
@@ -179,7 +182,7 @@ export async function harvestSessions(
         const p = store.propose({
           kind: c.kind,
           claim: c.claim,
-          paths: c.paths,
+          paths: (c.paths && c.paths.length > 0) ? c.paths : scopeFromClaim(c.claim, repoRoot),
           symbols: c.symbols,
           guardrailLevel: c.guardrailLevel,
           appliesWhen: c.appliesWhen,
