@@ -29,18 +29,18 @@ function showCookieBanner() {
   const banner = document.createElement("div");
   banner.id = "cookie-consent-banner";
   banner.innerHTML = `
-    <div style="position: fixed; bottom: 0; left: 0; right: 0; background: hsl(222 47% 8%); border-top: 1px solid hsl(217 33% 16%); padding: 1rem 1.5rem; z-index: 9999; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; box-shadow: 0 -4px 24px rgba(0,0,0,0.3);">
-      <div style="flex: 1; min-width: 250px;">
-        <p style="margin: 0; color: hsl(210 40% 98%); font-size: 0.9375rem; line-height: 1.5;">
-          We use cookies to improve your experience and analyze site traffic. By clicking "Accept", you consent to our use of cookies.
+    <div style="position: fixed; bottom: 0; left: 0; right: 0; background: hsl(222 47% 8%); border-top: 1px solid hsl(217 33% 16%); padding: 0.5rem 1rem; z-index: 9999; display: flex; align-items: center; justify-content: center; gap: 0.75rem; flex-wrap: wrap; box-shadow: 0 -2px 12px rgba(0,0,0,0.2);">
+      <div style="flex: 0 1 auto; max-width: 600px;">
+        <p style="margin: 0; color: hsl(210 40% 98%); font-size: 0.8125rem; line-height: 1.4;">
+          We use cookies to improve your experience and analyze site traffic.
           <a href="/privacy" style="color: #60a5fa; text-decoration: underline; margin-left: 0.25rem;">Learn more</a>
         </p>
       </div>
-      <div style="display: flex; gap: 0.75rem; flex-shrink: 0;">
-        <button id="cookie-decline" style="padding: 0.5rem 1rem; border-radius: 0.5rem; border: 1px solid hsl(217 33% 16%); background: transparent; color: hsl(215 20% 65%); font-weight: 500; cursor: pointer; font-size: 0.875rem; transition: all 0.15s;">
+      <div style="display: flex; gap: 0.5rem; flex-shrink: 0;">
+        <button id="cookie-decline" style="padding: 0.375rem 0.875rem; border-radius: 0.375rem; border: 1px solid hsl(217 33% 16%); background: transparent; color: hsl(215 20% 65%); font-weight: 500; cursor: pointer; font-size: 0.8125rem; transition: all 0.15s;">
           Decline
         </button>
-        <button id="cookie-accept" style="padding: 0.5rem 1.25rem; border-radius: 0.5rem; border: none; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; font-size: 0.875rem; transition: all 0.15s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+        <button id="cookie-accept" style="padding: 0.375rem 1rem; border-radius: 0.375rem; border: none; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; font-size: 0.8125rem; transition: all 0.15s; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);">
           Accept
         </button>
       </div>

@@ -3,9 +3,9 @@ import { defineConfig } from "vitepress";
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "AI Dimag",
-  titleTemplate: ":title | AI Dimag - Verified Memory for AI Coding Agents",
+  titleTemplate: ":title | AI Dimag - Cross-Agent Trust Layer for Coding Agents",
   description:
-    "aiDimag — persistent, verified memory for AI coding agents. Plain-English docs for the dim CLI, MCP server, IDE extensions, and team sync.",
+    "AI Dimag — a cross-agent trust layer that verifies engineering knowledge, detects when it becomes stale, and prevents coding agents from repeating known mistakes. Plain-English docs for the dim CLI, MCP server, IDE extensions, and team sync.",
   lang: "en-US",
 
   // Custom domain (aidimag.com) - base path is root
@@ -32,25 +32,25 @@ export default defineConfig({
     ["meta", { name: "viewport", content: "width=device-width, initial-scale=1.0" }],
     ["meta", { name: "robots", content: "index, follow" }],
     ["meta", { name: "author", content: "Anup Khanal" }],
-    ["meta", { name: "keywords", content: "coding agent memory, codebase memory, verified memory, AI coding assistant, Claude Code memory, Cursor memory, GitHub Copilot, MCP, dim CLI, aiDimag, codebase knowledge, stale context detection, repository context for AI agents" }],
+    ["meta", { name: "keywords", content: "coding agent memory, codebase memory, verified memory, AI coding assistant, Claude Code memory, Cursor memory, GitHub Copilot, MCP, dim CLI, AI Dimag, codebase knowledge, stale context detection, repository context for AI agents" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:site_name", content: "AI Dimag" }],
     ["meta", { property: "og:url", content: "https://aidimag.com" }],
-    ["meta", { property: "og:title", content: "AI Dimag — verified memory for AI coding agents" }],
+    ["meta", { property: "og:title", content: "AI Dimag — cross-agent trust layer for coding agents" }],
     [
       "meta",
       {
         property: "og:description",
         content:
-          "Your coding agent forgets your codebase. AIDimag doesn't. Persistent, evidence-backed memory that verifies itself against the code.",
+          "Your coding agents remember. AI Dimag makes sure they remember correctly. One verified knowledge layer for every coding agent your team uses.",
       },
     ],
     ["meta", { property: "og:image", content: "https://aidimag.com/logo.svg" }],
     ["meta", { property: "og:image:alt", content: "AI Dimag logo" }],
     ["meta", { name: "twitter:card", content: "summary_large_image" }],
     ["meta", { name: "twitter:site", content: "@aidimag" }],
-    ["meta", { name: "twitter:title", content: "AI Dimag — verified memory for AI coding agents" }],
-    ["meta", { name: "twitter:description", content: "Your coding agent forgets your codebase. AIDimag doesn't. Persistent, evidence-backed memory that verifies itself against the code." }],
+    ["meta", { name: "twitter:title", content: "AI Dimag — cross-agent trust layer for coding agents" }],
+    ["meta", { name: "twitter:description", content: "Your coding agents remember. AI Dimag makes sure they remember correctly. One verified knowledge layer for every coding agent your team uses." }],
     ["meta", { name: "twitter:image", content: "https://aidimag.com/logo.svg" }],
     [
       "script",
@@ -82,7 +82,7 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
         "name": "AI Dimag",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Cross-platform",
-        "description": "Persistent, verified memory for AI coding agents. Your codebase remembers its decisions, conventions, gotchas, and rules — and proves they're still true.",
+        "description": "A cross-agent trust layer that verifies engineering knowledge, detects when it becomes stale, and prevents coding agents from repeating known mistakes.",
         "url": "https://aidimag.com",
         "author": {
           "@type": "Person",
@@ -105,10 +105,11 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
   ],
 
   themeConfig: {
-    logo: { src: "/logo.svg", alt: "aiDimag logo" },
+    logo: { src: "/logo.svg", alt: "AI Dimag logo" },
 
     nav: [
-      { text: "Why AIDimag", link: "/why-aidimag" },
+      { text: "Demo", link: "/demo" },
+      { text: "Why AI Dimag", link: "/why-aidimag" },
       { text: "Use Cases", link: "/use-cases" },
       { text: "Getting Started", link: "/getting-started" },
       { text: "Docs", link: "/introduction" },
@@ -119,12 +120,12 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
       {
         text: "Overview",
         items: [
-          { text: "Why AIDimag?", link: "/why-aidimag" },
+          { text: "Why AI Dimag?", link: "/why-aidimag" },
           { text: "Use cases", link: "/use-cases" },
           { text: "Introduction", link: "/introduction" },
           { text: "Core concepts", link: "/concepts" },
           { text: "How it works", link: "/how-it-works" },
-          { text: "How aiDimag compares", link: "/comparison" },
+          { text: "How AI Dimag compares", link: "/comparison" },
         ],
       },
       {
@@ -134,7 +135,7 @@ gtag('config', 'G-TGYE1Y8YGJ');`,
           { text: "Quick start (5 minutes)", link: "/quickstart" },
           { text: "Interactive demo", link: "/demo" },
           { text: "Sample repo", link: "/sample-repo" },
-          { text: "Cloud sync TLDR", link: "/cloud-quickstart" },
+          { text: "Cloud Sync Setup", link: "/cloud-quickstart" },
         ],
       },
       {

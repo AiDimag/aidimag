@@ -1,17 +1,17 @@
 ---
 layout: home
-title: AI Dimag — Verified Memory for AI Coding Agents
-description: Give your coding agents persistent, verified memory of your codebase. Claims with evidence that re-runs against the code — so agents stop trusting stale facts.
+title: AI Dimag — Cross-Agent Trust Layer for Coding Agents
+description: One verified knowledge layer for every coding agent your team uses. Detect stale assumptions, enforce engineering rules, and stop agents from repeating known mistakes.
 head:
   - - meta
     - name: keywords
-      content: coding agent memory, codebase memory, verified memory, AI coding assistant, Claude Code memory, Cursor memory, GitHub Copilot, MCP, dim CLI, aiDimag, codebase knowledge, stale context detection
+      content: coding agent memory, codebase memory, verified memory, AI coding assistant, Claude Code memory, Cursor memory, GitHub Copilot, MCP, dim CLI, AI Dimag, codebase knowledge, stale context detection
   - - meta
     - property: og:title
-      content: AI Dimag — Verified Memory for AI Coding Agents
+      content: AI Dimag — Cross-Agent Trust Layer for Coding Agents
   - - meta
     - property: og:description
-      content: Your coding agent forgets your codebase. AIDimag doesn't. Persistent, evidence-backed memory that verifies itself against the code.
+      content: Your coding agents remember. AI Dimag makes sure they remember correctly. One verified knowledge layer for every coding agent your team uses.
   - - meta
     - property: og:url
       content: https://aidimag.com
@@ -21,15 +21,15 @@ head:
 
 hero:
   name: AI Dimag
-  text: Your coding agent forgets your codebase. AIDimag doesn't.
-  tagline: Persistent, evidence-backed memory for AI coding agents — every claim is verified against the code, so agents stop trusting stale facts.
+  text: Your coding agents remember. AI Dimag makes sure they remember correctly.
+  tagline: One verified knowledge layer for every coding agent your team uses. Detect stale assumptions, enforce engineering rules, and stop agents from repeating known mistakes.
   actions:
     - theme: brand
-      text: Get started
-      link: /getting-started
+      text: Try interactive demo
+      link: /demo
     - theme: alt
-      text: Why AIDimag?
-      link: /why-aidimag
+      text: Install locally
+      link: /getting-started
     - theme: alt
       text: View on GitHub
       link: https://github.com/AiDimag/aidimag
@@ -51,7 +51,7 @@ hero:
 <p style="text-align:center;margin:0 0 8px;">
   <a href="https://github.com/AiDimag/aidimag" target="_blank" rel="noopener">GitHub</a> ·
   <a href="https://www.npmjs.com/package/aidimag" target="_blank" rel="noopener">npm</a> ·
-  <a href="/why-aidimag">Why AIDimag?</a> ·
+  <a href="/why-aidimag">Why AI Dimag?</a> ·
   <a href="/use-cases">Use cases</a> ·
   <a href="/benchmarks">Benchmarks</a> ·
   <a href="/comparison">Comparison</a> ·
@@ -79,7 +79,7 @@ Most memory systems **store** text and **retrieve** whatever is similar later �
 is assumed true forever. That's dangerous in a codebase, where a confidently-retrieved stale
 fact is *worse* than no memory at all.
 
-Every AIDimag memory carries **evidence** (a shell check, an anchored commit, a test) that
+Every AI Dimag memory carries **evidence** (a shell check, an anchored commit, a test) that
 `dim verify` re-runs against the current repo — automatically, via git hooks, on every pull,
 checkout, and rebase. Beliefs that stop being true go **STALE** instead of silently misleading
 your AI.
@@ -89,35 +89,39 @@ your AI.
 ### See it in action
 
 ```sh
-# Remember a checkable claim about your codebase
 dim remember "All DB access goes through src/db/store.ts" \
   -k CONVENTION -p src \
   -e "STATIC_CHECK:! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts"
 
-# Verify it against the current code
 dim verify
 ```
 
-Output:
-
-```
-✓ [CONVENTION] All DB access goes through src/db/store.ts
-    id=4f3a9c21 status=VERIFIED conf=0.80 scope=src/db
-    evidence: STATIC_CHECK(PASS) ! grep -rl better-sqlite3 src --include=*.ts | grep -v store.ts
-```
-
-Now imagine someone imports `better-sqlite3` somewhere it shouldn't be. Run verify again:
-
-```
-~ [VERIFIED → STALE] conf 0.80→0.20  All DB access goes through src/db/store.ts
-    STATIC_CHECK: FAIL (command exited 1)
-```
-
-**The memory noticed the code drifted.** That's the core value — memory that proves itself,
-instead of memory you hope is right.
+When someone imports `better-sqlite3` outside `store.ts`, the next `dim verify` flips the
+claim to **STALE** — the memory noticed the code drifted. That's the core value: memory that
+proves itself, instead of memory you hope is right.
 
 ![Dashboard overview showing memory browser, stat cards, memory graph, and health metrics](/screenshots/dashboard-overview.png)
 *The web dashboard: memory browser with trust badges, stat cards, and force-directed memory graph.*
+
+### Your team already learned this lesson. Your agent shouldn't repeat it.
+
+When an agent attempts something your team already tried and reverted, AI Dimag's
+`FAILED_APPROACH` memories fire **before** the work happens:
+
+```text
+Attempt detected:
+  Add automatic retries to declined payments
+
+Related lesson:
+  A similar implementation was reverted in PR #417 because it created
+  duplicate ledger entries.
+
+Recommendation:
+  Add idempotency protection before retrying.
+```
+
+This is the difference between an agent that *remembers* and one that *remembers correctly* —
+it doesn't just recall what was done, it recalls what **didn't work** and why.
 
 ### Try the interactive demo
 
@@ -126,7 +130,7 @@ a simulated walkthrough showing remember → verify → check → staleness dete
 
 ## Built for coding agents
 
-AIDimag works with the tools you already use:
+AI Dimag works with the tools you already use:
 
 | Tool | How |
 |---|---|
@@ -181,8 +185,8 @@ Two delivery channels so *every* tool benefits:
 
 ### Ticketing Integrations
 
-Connect your ticketing system so the *why* behind commits flows into memory. aiDimag supports
-14 providers plus a custom HTTP middleware and team-shared Remote mode:
+Connect your ticketing system so the *why* behind commits flows into memory. AI Dimag supports
+12 built-in providers, custom HTTP middleware, and team-shared Remote mode:
 
 <div class="integration-logos">
   <span class="ic-tooltip" data-name="Jira"><img src="https://api.iconify.design/simple-icons:jira.svg?color=%230052CC" alt="Jira"></span>
@@ -199,30 +203,18 @@ Connect your ticketing system so the *why* behind commits flows into memory. aiD
   <span class="ic-tooltip" data-name="Pivotal Tracker"><img src="https://api.iconify.design/simple-icons:pivotaltracker.svg?color=%230060A0" alt="Pivotal Tracker"></span>
 </div>
 
-Credentials are stored **per-repo** in `.aidimag/config.json` — never global, never leaked between
-projects. One admin can share credentials via the team sync server (`dim ticket share`); teammates
-connect via **Remote** mode with zero local credentials. See
-**[Connecting tickets](/guides/tickets)** for the full guide.
+Credentials are stored **per-repo** in `.aidimag/config.json`, which is automatically added to
+`.gitignore` so it won't be committed accidentally. Tokens are never shared between projects.
+One admin can share credentials via the team sync server (`dim ticket share`); teammates
+connect via **Remote** mode with zero local credentials. Environment variables are also
+supported as an alternative to file-based config. See
+**[Connecting tickets](/guides/tickets)** for the full security guide.
 
 ## Web dashboard
 
-Prefer clicking over typing? `dim ui` starts a local web app for everything you'd otherwise do
-on the command line:
-
-```sh
-dim ui              # start dashboard on port 4517
-dim ui -p 5000      # custom port
-dim ui --no-open    # start without opening browser
-```
-
-- **Memory browser** — every memory with kind, status, confidence, scope, and evidence
-- **Review queue** — approve, reword, or reject pending proposals
-- **Actions tab** — capture, review, verify, sync, tickets, branch rules, context files, and more
-- **Tickets modal** — connect and manage ticket providers (12+ supported) with team auto-discovery
-- **Memory graph** — force-directed visualization of memories and their links
-- **Health tab** — risk metrics, coverage heatmap, and trend charts
-- **Model Settings** — change embedding/LLM models, pull new ones, setup Ollama
-- **Interactive onboarding** — 14-step guided walkthrough for first-time users
+Prefer clicking over typing? `dim ui` starts a local web app with a memory browser, review
+queue, memory graph, health metrics, ticket management, model settings, and guided
+onboarding.
 
 See **[Web dashboard](/dashboard)** for the full feature list.
 
@@ -236,8 +228,7 @@ detect when its knowledge of a codebase is no longer true.
 |---|---|
 | Hybrid Recall@1 | **0.80** |
 | Hybrid MRR | **0.85** |
-| Staleness detection (broken claims → STALE) | **100%** (4/4) |
-| False positives (intact claims wrongly flagged) | **0%** (0/4) |
+| Staleness detection | All 4 broken claims detected, 0 false flags across 4 intact claims |
 | FTS keyword search (10,000 memories) | 1.45ms p50 |
 | Vector KNN (768-dim, sqlite-vec) | 4.15ms p50 |
 | Memory writes (transactional) | ~5,400/s |
@@ -261,20 +252,8 @@ Full methodology and raw data: **[Benchmarks](/benchmarks)** · Reproduce with `
   scratch is expensive. Path-scoped recall surfaces only memory relevant to the files being
   edited.
 
-See **[Use cases](/use-cases)** for detailed scenarios, or **[Why AIDimag?](/why-aidimag)** for
+See **[Use cases](/use-cases)** for detailed scenarios, or **[Why AI Dimag?](/why-aidimag)** for
 the full comparison against other memory systems.
-
-## The 30-second mental model
-
-- You (or your agent) **remember** things as short, checkable claims:
-  *"All database access goes through `src/db/store.ts`."*
-- AIDimag attaches **evidence** (a command, a commit, a test) and **verifies** it over time.
-- When the code changes and a claim no longer holds, it's marked **STALE** so nobody trusts it.
-- The most important rules can be **pinned** (never expire) and turned into **guardrails**
-  the agent must obey.
-- Short-lived session state goes in the **scratchpad** — it expires on its own and never
-  pollutes durable memory.
-- All of it is fed to your AI tools automatically.
 
 ## Open source. Built for developers.
 

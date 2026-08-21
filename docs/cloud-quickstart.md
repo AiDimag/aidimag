@@ -1,6 +1,10 @@
-# Cloud sync — TLDR (one page)
+# Cloud Sync Setup
 
-**Goal:** run aiDimag in *your* repo, sync a shared team brain through **aiDimag Cloud**, and keep agents reading **local** memory (fast, offline) while changes replicate in the background.
+**Goal:** sync a shared team brain through **AI Dimag Cloud** while agents read **local** memory (fast, offline) and changes replicate in the background.
+
+::: tip Prerequisites
+This guide assumes you've already installed the CLI (`npm install -g aidimag`) and run `dim init` in your repo. See [Getting started](/getting-started) if you haven't.
+:::
 
 ::: tip Local-first
 Agents always query your local SQLite copy. Cloud is sync only — not a remote database you search over the network.
@@ -11,9 +15,9 @@ Agents always query your local SQLite copy. Cloud is sync only — not a remote 
 | Step | Who | What |
 |------|-----|------|
 | 1 | Once (you) | Sign up at cloud.aidimag.com → create project → get API key |
-| 2 | Per repo | `dim init` → `dim cloud link` → `dim sync` |
-| 3 | Daily | Capture → review → verify → sync (auto-sync runs too) |
-| 4 | Teammates | Clone repo → `dim init` → paste token → `dim sync` |
+| 2 | Per repo | `dim cloud link` → `dim sync` |
+| 3 | Daily | Sync to cloud (auto-sync runs too) |
+| 4 | Teammates | Clone repo → `dim cloud link` → `dim sync` |
 
 ---
 
@@ -33,32 +37,12 @@ The token is stored per-project in `.aidimag/config.json`. Add this file to `.gi
 :::
 
 ::: tip Self-hosting?
-If you're running your own aiDimag Cloud instance instead of using cloud.aidimag.com, see [Team sync (self-hosted)](/guides/team-sync) for deployment instructions.
+If you're running your own AI Dimag Cloud instance instead of using cloud.aidimag.com, see [Team sync (self-hosted)](/guides/team-sync) for deployment instructions.
 :::
 
 ---
 
-## 2. Install the CLI
-
-```sh
-npm install -g aidimag
-dim --version
-```
-
----
-
-## 3. Set up your repo
-
-```sh
-cd /path/to/your-app
-dim init
-```
-
-`dim init` creates `.aidimag/` (memory DB, gitignored) and installs hooks.
-
----
-
-## 4. Link to cloud
+## 2. Link to cloud
 
 Use the brain ID and API key from your dashboard:
 
@@ -85,47 +69,12 @@ You should see memory counts (server vs local) and pending proposals.
 
 ---
 
-## 5. Fill the brain (first time)
-
-Pick one or more:
-
-```sh
-dim bootstrap              # LLM reads repo layout → review queue
-dim mine --full            # mine git commits (fast heuristics)
-dim mine --llm --full      # mine commits with LLM (needs Ollama or OPENAI_API_KEY)
-```
-
-Nothing becomes memory until you approve:
-
-```sh
-dim review                 # interactive: keep / reword / drop
-# or
-dim review list
-dim review approve all
-```
-
-After review, sync pushes new memories:
-
-```sh
-dim sync
-```
-
----
-
-## 6. Day-to-day workflow
+## 3. Sync to cloud
 
 ![Dashboard showing cloud sync status with brain icon and connected server](/screenshots/dim-sync.png)
 *Cloud sync status: the dashboard shows the connected server, brain name, and sync state at a glance.*
 
-```sh
-dim remember "…" -k CONVENTION -p src/…     # write a claim (+ optional evidence)
-dim verify                                   # run evidence; VERIFIED or STALE
-dim recall "…"                               # search local memory
-dim brief                                    # session briefing for agents
-dim ui                                       # local web dashboard
-```
-
-Sync runs **automatically** (~30s debounce) after remember, review, verify, refute, and forget. Disable with `AIDIMAG_AUTO_SYNC=off`.
+Sync runs **automatically** (~30s debounce) after `dim remember`, `dim review`, `dim verify`, `dim refute`, and `dim forget`. Disable with `AIDIMAG_AUTO_SYNC=off`.
 
 Manual sync when you want to be sure:
 
@@ -140,37 +89,7 @@ If you hit the 100 memory limit, `dim sync` will prompt you to select which memo
 
 ---
 
-## 7. Wire up your AI agent (recommended)
-
-**MCP** (Claude Code, Cursor, etc.) — see [MCP integration](/mcp):
-
-```json
-{
-  "mcpServers": {
-    "aidimag": {
-      "command": "npx",
-      "args": ["-y", "aidimag", "mcp"],
-      "env": { "AIDIMAG_REPO": "/path/to/your-app" }
-    }
-  }
-}
-```
-
-**Context files** (for non-MCP tools like Copilot, Cursor, Windsurf, etc.):
-
-```sh
-dim generate-context --format all --auto
-```
-
-This creates `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `AGENTS.md`, and `.github/copilot-instructions.md` with all verified/unverified memories, and enables **auto-regeneration** so these files stay fresh after `dim review`, `dim verify`, `dim sync`, etc.
-
-::: tip Auto-regeneration is opt-in
-By default, context files are **not** automatically updated. Use `--auto` to enable it. Without `--auto`, you must manually run `dim generate-context` after approving memories.
-:::
-
----
-
-## 8. Onboard a teammate
+## 4. Onboard a teammate
 
 They clone the repo (config already has server + brain ID):
 
@@ -185,11 +104,10 @@ Each person gets their own API key from the dashboard (don’t share keys). Thei
 
 ---
 
-## 9. Useful checks
+## 5. Useful cloud checks
 
 | Command | What it tells you |
 |---------|-------------------|
-| `dim status` | Local memory counts |
 | `dim cloud status` | Linked server + brain |
 | `dim cloud remote --summary` | Remote vs local counts |
 | `dim cloud remote --proposals` | Pending proposals on server |
