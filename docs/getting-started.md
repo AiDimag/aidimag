@@ -75,6 +75,9 @@ npm link        # makes `dim` and `aidimag` available globally
 
 ## Initialize a repo
 
+![Terminal output from dim setup showing detected agents and installed hooks](/screenshots/placeholder.svg)
+*dim setup: detects installed AI agents, wires MCP configs, installs git hooks, and generates context files.*
+
 From inside any git repository, the recommended way is:
 
 ```sh
@@ -191,6 +194,9 @@ The behavior is controlled by `AIDIMAG_EMBEDDINGS` (`auto` by default — OpenAI
 set, else Ollama if running, else keyword-only).
 
 ## Verify it's working
+
+![Terminal output from dim doctor showing green checkmarks for all components](/screenshots/placeholder.svg)
+*dim doctor: verifies that git hooks, MCP configs, embeddings, and sync are all wired correctly.*
 
 ```sh
 dim remember "All DB access goes through src/db/store.ts" -k CONVENTION -p src/db

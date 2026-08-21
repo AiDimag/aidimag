@@ -23,6 +23,9 @@ aiDimag keeps repo settings in **`.aidimag/config.json`**. This file contains se
   "token": "aidimag_sk_...",
   "tickets": {
     "provider": "github",
+    "baseUrl": "https://github.com/acme/api",
+    "token": "ghp_...",
+    "pattern": "#?\\d+",
     "branch": { "pattern": "^(feature|fix)/[A-Z]+-\\d+", "enforce": "warn" }
   },
   "knowledge": {
@@ -67,8 +70,16 @@ Set by `dim cloud link` or `dim login`. The server URL, brain name, and authenti
 
 ### `tickets`
 
-Set by `dim ticket connect`. The connected provider and the branch-naming convention. See
-[Connecting tickets](/guides/tickets).
+Set by `dim ticket connect`. The connected provider, base URL, ticket ID pattern, branch-naming
+convention, and credential. See [Connecting tickets](/guides/tickets).
+
+| Field | Meaning |
+|---|---|
+| `provider` | Ticket provider: `jira`, `github`, `linear`, `gitlab`, `azuredevops`, `clickup`, `shortcut`, `youtrack`, `asana`, `trello`, `notion`, `pivotal`, `http`, or `remote` |
+| `baseUrl` | Provider URL (e.g. `https://acme.atlassian.net`); not needed for some providers |
+| `token` | Ticket credential (API token, PAT, etc.) — stored per-repo with file mode `0o600`; can also be set via `AIDIMAG_TICKET_TOKEN` env var |
+| `pattern` | Regex for extracting ticket IDs from branch names and commit messages |
+| `branch` | Branch-naming convention with `pattern` and `enforce` (`off` / `warn` / `push`) |
 
 ### `knowledge`
 
@@ -117,6 +128,7 @@ table in the [CLI reference](/cli-reference#environment-variables). The most use
 - `AIDIMAG_REPO` — point the CLI/MCP server at a specific repo.
 - `AIDIMAG_EMBEDDINGS` — `auto` / `openai` / `ollama` / `off`.
 - `AIDIMAG_AUTO_SYNC=off` — disable automatic sync after writes.
+- `AIDIMAG_TICKET_TOKEN` — ticket credential; takes precedence over `tickets.token` in config.
 
 ---
 

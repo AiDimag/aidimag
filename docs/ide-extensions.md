@@ -19,6 +19,9 @@ the hood and need it on your `PATH`.
 
 ## VSCode extension
 
+![VS Code extension showing Memory Explorer sidebar with color-coded memories](/screenshots/placeholder.svg)
+*VS Code extension: Memory Explorer sidebar with colour-coded memory nodes and detail webview.*
+
 Source: [AiDimag/aidimag-vscode](https://github.com/AiDimag/aidimag-vscode).
 
 **Features**
@@ -42,6 +45,9 @@ Source: [AiDimag/aidimag-vscode](https://github.com/AiDimag/aidimag-vscode).
 3. **Cursor / VSCodium users:** install from the [Open VSX listing](https://open-vsx.org/extension/aidimag/aidimag-vscode) — same extension ID (`aidimag.aidimag-vscode`), same code.
 
 ## IntelliJ plugin
+
+![IntelliJ plugin showing Memory Explorer tool window with color-coded nodes](/screenshots/placeholder.svg)
+*IntelliJ plugin: Memory Explorer tool window with colour-coded nodes, search/filter, and toolbar actions.*
 
 Source: [AiDimag/aidimag-intellij](https://github.com/AiDimag/aidimag-intellij). Works in IntelliJ IDEA (and other JetBrains IDEs on the same
 platform version).

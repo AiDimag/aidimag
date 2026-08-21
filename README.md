@@ -29,13 +29,13 @@
 
 The subject of memory is your **repository**, not your preferences or chat history. Every capability — evidence, git-hook verification, guardrails, pre-commit checks, path-scoped recall, session scratchpad — exists to serve day-to-day development work.
 
-### 🎯 The Difference: Claim-and-Verify, Not Store-and-Retrieve
+### The Difference: Claim-and-Verify, Not Store-and-Retrieve
 
 Most memory systems **store** text and **retrieve** whatever is similar later — a stored fact is assumed true forever. That's dangerous in a codebase, where a confidently-retrieved stale fact is *worse* than no memory at all.
 
 Every AI Dimag memory carries **evidence** (a shell check, an anchored commit, a test) that `dim verify` re-runs against the current repo — automatically, via git hooks, on every pull, checkout, and rebase. Beliefs that stop being true go **STALE** instead of silently misleading your AI.
 
-### ✨ Works with Every AI Tool
+### Works with Every AI Tool
 
 - **MCP tools** (Claude, Cursor, etc.) get real-time memory via the MCP server
 - **Non-MCP tools** (Copilot, Windsurf, etc.) get static context files (`.cursorrules`, `CLAUDE.md`, `AGENTS.md`, etc.)
@@ -52,7 +52,7 @@ npm install -g aidimag
 
 Requires Node 22+. Ships two equivalent binaries: `dim` (short) and `aidimag`.
 
-## 🚀 Quick Start
+## Quick Start
 
 ```sh
 cd your-repo
@@ -78,7 +78,7 @@ dim setup-ollama             # install Ollama + pull a free local embedding mode
 dim doctor                   # verify everything is wired correctly
 ```
 
-## 🔌 Connect to Your AI Agent (MCP)
+## Connect to Your AI Agent (MCP)
 
 Add to your agent config (e.g. `.mcp.json` for Claude Code):
 
@@ -100,36 +100,85 @@ Add to your agent config (e.g. `.mcp.json` for Claude Code):
 
 **Hermes Agent**: `dim hermes install` registers aidimag as a native Hermes memory provider — one command, no pip, no venv. A single stdlib-only Python bridge delegates to the MCP server: session briefings are injected into the system prompt, recall is prefetched per turn, and session learnings become review-queue *proposals* (never silent writes). Then: `hermes config set memory.provider aidimag`.
 
-## ✨ Key Features
+## Key Features
 
-### 🛡️ Human-Gated Capture
+### Human-Gated Capture
 Commits, PRs, AI-chat transcripts (Claude Code, Codex, Copilot, Cursor), and pasted docs are mined into *proposals*. Nothing enters memory until you approve it in `dim review` (auto-triaged best-first, `approve all --min-score 0.7` for batches).
 
-### ✅ Verification Lifecycle
+### Verification Lifecycle
 `STATIC_CHECK` / `COMMIT_REF` / `TEST_RESULT` / `EXEC_TRACE` / `HUMAN_ATTESTED` evidence. Failing evidence flips memories to STALE and auto-drafts a recovery proposal. Confidence decays without re-confirmation.
 
-### 🔒 Evidence Trust Gate
+### Evidence Trust Gate
 Shell-command evidence that arrives via team sync is **never executed** until you inspect and approve it (`dim verify --trust`).
 
-### 🔍 Hybrid Semantic Recall
+### Hybrid Semantic Recall
 FTS5 keyword + vector KNN (OpenAI, local Ollama, or AWS Bedrock; auto-detected except Bedrock, which is explicit opt-in; works keyword-only with none).
 
-### 🚦 Guardrails & Skills
+### Guardrails & Skills
 Behavioral rules (`never` / `ask-first` / `always`) and step-by-step procedures, enforced by `dim check` (pre-commit) and `memory_critique`.
 
-### 👥 Team Mode, Self-Hosted
+### Team Mode, Self-Hosted
 `dim serve` + `dim sync`: local-first replicas, device-code login, brain-scoped API keys, hashed credentials, cross-machine verification consensus.
 
-### 📚 Knowledgebase Inbox
+### Knowledgebase Inbox
 Drop design docs / ADRs / PDFs / DOCX into `knowledge/` and they're summarized into reviewed, pinned memories.
 
-### 📝 Scratchpad & Provenance Audit
+### Scratchpad & Provenance Audit
 `dim scratch` (and the `scratchpad_*` MCP tools) hold short-term session notes — TTL-expiring, never synced, never durable memory. `dim audit` lists memories resting on the weakest ground (agent-authored, evidence-free, stale, or long-unverified) so you can fix them up like a dependency audit for your repo's knowledge.
 
-### 🎨 Web Dashboard & Extensions
+### Web Dashboard & Extensions
 `dim ui` — run checks, session briefings, bootstrap, harvest, and context generation from the browser — plus VS Code and IntelliJ extensions.
 
-## 🥊 How It Compares
+## Ticketing Integration
+
+Commits tell you *what* changed; tickets hold the *why*. aiDimag connects to your ticketing system so that context flows into your memory — ticket titles, types, and statuses appear next to mined proposals during `dim review`, and agents can fetch tickets via the `ticket_get` MCP tool.
+
+### Supported providers
+
+Jira, GitHub Issues, Linear, GitLab Issues, Azure DevOps, ClickUp, Shortcut, YouTrack, Asana, Trello, Notion, Pivotal Tracker, a custom HTTP middleware, or **Remote** (team sync server — zero local credentials).
+
+### Quick start
+
+```sh
+# Connect a provider (interactive)
+dim ticket connect
+
+# Check status
+dim ticket status
+
+# View a specific ticket
+dim ticket show XXX-2100
+
+# Share credentials with your team (admin)
+dim ticket share
+```
+
+### Per-repo credential storage
+
+Ticket credentials are stored **per-repo** in `.aidimag/config.json` under `tickets.token` (with file mode `0o600`), matching the same pattern as cloud sync tokens. Credentials never leak between projects. You can also set the `AIDIMAG_TICKET_TOKEN` environment variable, which takes precedence over the config file.
+
+### Team-shared tickets (Remote provider)
+
+One admin shares their ticket credential via the sync server (`dim ticket share`). Team members select **"Remote (team sync server)"** as their provider — they resolve tickets through the server and hold **zero** ticket credentials locally. When a cloud server is linked, the dashboard auto-discovers the team's ticket provider and shows a **"Connect now"** button.
+
+### Branch conventions
+
+Define a branch-naming convention and have aiDimag warn or block on violations:
+
+```sh
+dim ticket branch-rule        # manage the convention
+dim branch XXX-2100           # create a conforming branch (fetches title for slug)
+```
+
+| Enforcement | Effect |
+|---|---|
+| `off` | No checking |
+| `warn` | Heads-up at branch creation (`post-checkout`) |
+| `push` | Blocks pushing non-conforming branches (`pre-push`) |
+
+Full guide: **[Connecting tickets](https://aidimag.com/guides/tickets)**
+
+## How It Compares
 
 AI Dimag follows a **claim-and-verify** model; other memory systems follow **store-and-retrieve**. The short version:
 
@@ -167,7 +216,7 @@ histories*, so they don't apply to aiDimag — its memory subject is the repo. I
 aiDimag publishes its own reproducible suite (below), including the metric none of
 the chat benchmarks measure: **does memory notice when the code changes?**
 
-## 📊 Benchmarks
+## Benchmarks
 
 Reproducible performance and quality suites live in [`benchmark/`](./benchmark)
 (`npm run bench`, `npm run bench:quality`). Headline results (Apple M4, Node 24,
@@ -184,7 +233,7 @@ Reproducible performance and quality suites live in [`benchmark/`](./benchmark)
 | Retrieval, keyword queries (Recall@1 / MRR, FTS-only) | 1.00 / 1.00 |
 | Retrieval, paraphrase queries (FTS-only; hybrid closes this gap) | 0.25 / 0.27 |
 
-## 📖 Documentation
+## Documentation
 
 <table>
 <tr>
@@ -202,6 +251,7 @@ Reproducible performance and quality suites live in [`benchmark/`](./benchmark)
 - [Why AIDimag?](https://aidimag.com/why-aidimag)
 - [Use Cases](https://aidimag.com/use-cases)
 - [How it Works](https://aidimag.com/how-it-works)
+- [Web Dashboard](https://aidimag.com/dashboard)
 - [Comparison](https://aidimag.com/comparison)
 - [CLI Reference](https://aidimag.com/cli-reference)
 - [MCP Integration](https://aidimag.com/mcp)
@@ -212,6 +262,7 @@ Reproducible performance and quality suites live in [`benchmark/`](./benchmark)
 
 **Guides**
 - [Team Sync](https://aidimag.com/guides/team-sync)
+- [Connecting Tickets](https://aidimag.com/guides/tickets)
 - [Guardrails](https://aidimag.com/guides/guardrails)
 - [Context Files](https://aidimag.com/guides/generate-context)
 
@@ -223,11 +274,11 @@ Full documentation: **[aidimag.com](https://aidimag.com)**
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! See [**CONTRIBUTING.md**](./CONTRIBUTING.md) for dev setup, project principles, and the PR checklist. All participation is governed by our [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-## 💰 License & Pricing
+## License & Pricing
 
 **AI Dimag is open source under the [MIT License](./LICENSE)** — free for everyone, any team size, forever. Use it, fork it, embed it.
 

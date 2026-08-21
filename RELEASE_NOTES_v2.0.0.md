@@ -12,7 +12,8 @@ A major release focused on team collaboration, ticketing integration, UI polish,
 
 - **Remote ticket provider**: Team members can now connect to a shared ticket provider (Jira, GitHub, Linear, etc.) via the cloud server without holding any credentials locally. The admin stores credentials on the server; teammates simply select "Remote (team server)" and connect.
 - **Team ticket auto-discovery**: When a cloud server is linked and the admin has shared ticket credentials, the dashboard automatically detects and displays the team's ticket provider with a "Connect now" button.
-- **Ticket config sync**: `teamTickets` is now fetched from the server when connected via remote, so the UI shows the actual team provider (e.g., Jira) instead of a generic cloud icon.
+- **Ticket config sync**: `teamTickets` is fetched from the server when cloud is connected and no local provider is configured (or provider is `remote`), so the UI shows the actual team provider (e.g., Jira) instead of a generic cloud icon.
+- **Per-repo ticket credentials**: Ticket credentials are now stored per-repo in `.aidimag/config.json` under `tickets.token`, matching the pattern used for cloud sync tokens. This prevents credential leakage between projects. The old global `~/.aidimag/credentials.json` ticket keys are no longer used.
 - **Separate Validate button**: The "Validate with a real ticket id" feature is now a standalone button with inline success/error feedback, decoupled from the Connect button.
 - **New `/api/tickets/validate` endpoint**: Tests a ticket ID against the current provider config without requiring a full connect cycle.
 - **Graceful error handling**: When team ticket credentials are removed from the server, users see a clear message: "Team ticket credentials were removed from the server — ask your admin to reconfigure."
@@ -23,9 +24,11 @@ A major release focused on team collaboration, ticketing integration, UI polish,
 - **Iconify icon migration**: Replaced all custom inline SVG icons for providers and agents with Iconify icons managed centrally in `icons.config.json`. Added 67+ icons including Jira, GitHub, Linear, Claude, Cursor, Copilot, Windsurf, MCP, Ollama, and more.
 - **Folder icon on memory cards**: Replaced the folder emoji with an Iconify `fluent-emoji-flat:open-file-folder` icon on individual memory cards in the overview.
 - **Health page icons**: Added icons to each widget in the Memory Summary section (Total Memories, Verified, Unverified, Stale, Refuted, Failed Approaches, Pending Proposals, Pinned, Coverage Paths).
-- **Tickets stat card simplified**: Now shows just the provider logo + "linked" or "off" text, matching the clean style of other stat cards.
+- **Tickets stat card simplified**: Shows just the provider logo + "linked" or "off" text. When no local provider is configured but team tickets exist on the server, shows "off" with a "team has jira — click to connect" hint, and the card remains clickable to open the ticket modal.
 - **Team sync stat card**: Shows the proprietary aidimag logo when connected to `cloud.aidimag.com`, and `IC_BRAIN` for other servers.
-- **Dropdown overflow fix**: The provider dropdown menu in the ticket modal now uses `position: fixed` and is rendered at the body level, preventing modal scrollbar issues.
+- **Dropdown overflow fix**: The provider dropdown menu in the ticket modal is now rendered inside the dialog's `tk-provider-wrap` with `position: absolute; top: 100%`, and the dialog's `overflow` toggles between `visible`/`auto` to prevent scrollbar issues while keeping the menu above the dialog's top layer.
+- **Themed scrollbars**: All scrollable elements now use thin, themed scrollbars (8px width, rounded thumb using `--border` color, transparent track) for both WebKit and Firefox.
+- **Confirm dialog for memory deletion**: The "Forget" button now uses a confirmation dialog instead of the browser's native `confirm()`.
 - **Modal close button**: Added an X close button to the top-right corner of the Tickets modal.
 - **Disabled fields for remote**: When connected via remote, the provider dropdown, sample ticket IDs, ticket ID pattern, infer pattern button, validate button, and validate ticket ID field are all disabled.
 - **Remote provider display**: When connected via remote, the modal and stat card show the actual team provider's logo and name (e.g., "Jira (remote)") instead of a generic cloud icon.
@@ -41,7 +44,7 @@ A major release focused on team collaboration, ticketing integration, UI polish,
 
 - **Chat transcript harvesting**: Multi-source harvesting from Claude Code, Codex, Copilot, and Cursor transcripts.
 - **PR miner**: New pull request mining capability.
-- **Bootstrap survey**: LLM-powered repo survey for initial memory proposals.
+- **Bootstrap survey**: LLM-powered repo survey for initial memory proposals. Auto-generated aidimag context files are now skipped to avoid circular reasoning, and a source file fallback is used when docs are sparse.
 - **Commit miner improvements**: Enhanced commit mining with better extraction logic.
 
 ### MCP
@@ -70,8 +73,10 @@ A major release focused on team collaboration, ticketing integration, UI polish,
 
 - **Icon management**: All provider/agent icons are now centralized in `src/ui/icons.config.json` with `IC_` constants, auto-generated via `npm run build`.
 - **Ticket config proxying**: `GET /v1/ticket-config` and `GET /v1/ticket` endpoints on the cloud server enable remote ticket access.
-- **Credential security**: Team credentials are encrypted (AES-256-GCM) and stored on the cloud server; team members never hold ticket credentials locally.
-- **Dropdown positioning**: Uses `getBoundingClientRect()` for fixed positioning, with click-outside detection updated for the new DOM structure.
+- **Credential security**: Team credentials are encrypted (AES-256-GCM) and stored on the cloud server; team members never hold ticket credentials locally. Local ticket credentials are stored per-repo in `.aidimag/config.json` with file mode `0o600`.
+- **Dropdown positioning**: Menu is a child of `tk-provider-wrap` inside the dialog, using `position: absolute; top: 100%; left: 0; width: 100%`. Dialog `overflow` is toggled to `visible` when the menu opens and back to `auto` when closed, avoiding the CSS spec quirk where `overflow-y: visible` computes to `auto` when `overflow-x` is not `visible`.
+- **LLM/embedding provider fallback**: `getOllamaChatModel` and `getOllamaEmbeddingModel` now use `findRepoRoot()` as a fallback when `AIDIMAG_REPO_ROOT` is not set, ensuring CLI commands can read `config.json` correctly.
+- **qwen2.5-coder model**: Added to both CLI setup and UI model selection lists.
 
 ---
 

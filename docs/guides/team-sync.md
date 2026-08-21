@@ -120,6 +120,57 @@ commit X?"* — turning one developer's green check into team-wide confidence.
 - **Generic errors** — the server never leaks internal error details to clients; specifics
   go to the server log only.
 
+## aiDimag Cloud
+
+Prefer a managed sync server? [cloud.aidimag.com](https://cloud.aidimag.com) runs the
+sync protocol for you — no infrastructure, no Docker, just an API key. Create a project,
+invite teammates, and everyone gets a shared brain with automatic sync.
+
+<!-- TODO: add /screenshots/cloud-showcase.webm and cloud-showcase.mp4, then add <source> tags back -->
+<video autoplay loop muted playsinline poster="/screenshots/placeholder.svg" style="width:100%;border-radius:0.875rem;border:1px solid hsl(var(--aid-border,214 28% 90%) / 0.6);box-shadow:0 0 0 1px rgba(37,99,235,0.06),0 8px 32px rgba(37,99,235,0.06);margin:24px 0;">
+</video>
+*A tour of cloud.aidimag.com: homepage, dashboard, creating a project, browsing memory, managing API keys, and connecting ticketing.*
+
+### Homepage
+
+![cloud.aidimag.com homepage with hero section and feature highlights](/screenshots/placeholder.svg)
+*The cloud homepage — sign in or create an account to get started.*
+
+### Dashboard
+
+![Cloud dashboard showing project list and team overview](/screenshots/placeholder.svg)
+*The dashboard: all your projects at a glance, with memory counts and sync status.*
+
+### Create a new project
+
+![Create new project dialog with brain name and server selection](/screenshots/placeholder.svg)
+*Creating a new project: name your brain, choose a server region, and get an API key instantly.*
+
+### Project page
+
+![Project page showing memory stats, team members, and sync timeline](/screenshots/placeholder.svg)
+*The project page: memory stats, team members, and a live sync timeline.*
+
+### API keys
+
+![API keys management page with create, list, and revoke actions](/screenshots/placeholder.svg)
+*API keys: mint revocable, brain-scoped keys for each teammate. Never share the admin token.*
+
+### Memory browser
+
+![Cloud memory browser showing memories with kind, status, and confidence](/screenshots/placeholder.svg)
+*The cloud memory browser: search and filter all team memories by kind, status, and scope.*
+
+### Ticketing
+
+![Cloud ticketing page showing connected provider and shared credentials](/screenshots/placeholder.svg)
+*Ticketing in the cloud: the admin connects a provider and shares credentials with the team via Remote mode.*
+
+::: tip Get started
+Visit [cloud.aidimag.com](https://cloud.aidimag.com) to create your team brain. Then link
+your repo with `dim cloud link` and run `dim sync` — that's it.
+:::
+
 ## Check status
 
 ```sh

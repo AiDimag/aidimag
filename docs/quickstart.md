@@ -51,6 +51,9 @@ aiDimag replies:
 
 ## 2. Verify it
 
+![Terminal output showing dim verify with VERIFIED status](/screenshots/placeholder.svg)
+*dim verify: evidence runs and the memory transitions from UNVERIFIED to VERIFIED.*
+
 ```sh
 dim verify
 ```
@@ -63,6 +66,9 @@ becomes **verified**:
 ```
 
 ## 3. Watch it catch a regression
+
+![Terminal output showing a memory flipping to STALE after code drift](/screenshots/placeholder.svg)
+*Staleness detection: when the code drifts, the memory flips to STALE and confidence drops.*
 
 Now imagine someone imports `better-sqlite3` somewhere it shouldn't be. Run verify again:
 
@@ -123,6 +129,9 @@ review queue (approved claims become *pinned*). See [Knowledgebase](/guides/know
 :::
 
 ## 7. See everything
+
+![Dashboard opening after running dim ui](/screenshots/placeholder.svg)
+*The web dashboard: open it with dim ui to browse memories, review proposals, and check health metrics.*
 
 ```sh
 dim status         # counts by status and kind

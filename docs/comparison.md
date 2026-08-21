@@ -86,6 +86,8 @@ The tools people most often ask about, and where each one actually sits. Most of
 them are *conversational/agent* memory — excellent at remembering users and chat
 sessions, which is a different problem from remembering a living codebase:
 
+<div class="wide-table" style="overflow-x:auto;">
+
 | | **aiDimag** | Mnemosyne | mem0 | Letta | Honcho | SuperMemory | Hindsight | ChromaDB |
 |---|---|---|---|---|---|---|---|---|
 | **Subject of memory** | **Your codebase** | Chat/agent sessions | User & agent facts | Agent's own context window | User/peer reasoning | Personal + agent memory | Agent memory | — (vector database) |
@@ -98,6 +100,8 @@ sessions, which is a different problem from remembering a living codebase:
 | **Team story** | Self-hosted sync, evidence trust gate, verification consensus | Sync service | Managed platform | Server deployment | Managed | SaaS | Self-hosted | Server mode |
 | **Open source** | ✅ MIT | ✅ MIT | ✅ Apache 2.0 | ✅ Apache 2.0 | ⚠️ AGPL | ❌ Proprietary | ✅ MIT | ✅ Apache 2.0 |
 | **Published benchmarks** | [Own reproducible suite](/benchmarks): 100% staleness detection / 0% FP | BEAM 65.2%, LongMemEval 98.9% R@All@5 (self-reported, v3.0.0) | LoCoMo | LoCoMo 83.2% | LongMemEval 90.4% | MemoryBench 85.2% | BEAM 73.4%, LongMemEval 94.6% | — |
+
+</div>
 
 Competitor figures are the numbers those projects publish themselves (metrics and
 judges differ between them — see each project's methodology before comparing rows).

@@ -762,6 +762,32 @@ body {
   }
 }
 
+/* Wide tables — horizontal scroll wrapper */
+.vp-doc .wide-table {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--aid-radius);
+  border: 1px solid hsl(var(--aid-border) / 0.6);
+  margin: 1.5rem 0;
+}
+
+.vp-doc .wide-table table {
+  border: none;
+  border-radius: 0;
+  min-width: 100%;
+}
+
+.vp-doc .wide-table table th,
+.vp-doc .wide-table table td {
+  white-space: nowrap;
+}
+
+.vp-doc .wide-table table td:first-child,
+.vp-doc .wide-table table th:first-child {
+  white-space: normal;
+  min-width: 120px;
+}
+
 /* Diagrams */
 .dim-diagram {
   display: block;
@@ -771,6 +797,17 @@ body {
   border-radius: calc(var(--aid-radius) + 4px);
   border: 1px solid hsl(var(--aid-border) / 0.6);
   box-shadow: var(--surface-glow);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: zoom-in;
+}
+.dim-diagram:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 2px hsl(var(--aid-ring) / 0.4), 0 12px 48px rgba(37, 99, 235, 0.15);
+}
+
+/* Lightbox close button hover */
+.dim-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* Focus rings (508-friendly) */

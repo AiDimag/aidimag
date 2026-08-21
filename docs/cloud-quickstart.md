@@ -114,6 +114,9 @@ dim sync
 
 ## 6. Day-to-day workflow
 
+![Dashboard showing cloud sync status with brain icon and connected server](/screenshots/placeholder.svg)
+*Cloud sync status: the dashboard shows the connected server, brain name, and sync state at a glance.*
+
 ```sh
 dim remember "…" -k CONVENTION -p src/…     # write a claim (+ optional evidence)
 dim verify                                   # run evidence; VERIFIED or STALE

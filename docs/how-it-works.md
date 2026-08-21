@@ -129,22 +129,8 @@ No SaaS is required; the same protocol is what a future hosted version would use
 
 ## Putting it together
 
-```
-        you / agent
-            │  remember / propose
-            ▼
-   ┌──────────────────┐      verify (hooks + dim verify)
-   │  .aidimag/        │◀──────────────────────────────┐
-   │   memory.db       │   re-run evidence, decay,      │
-   └──────────────────┘   mark stale / verified         │
-            │                                            │
-   search (hybrid + trust-rank)                          │
-            │                                            │
-   ┌────────┴─────────┐                                  │
-   ▼                  ▼                                  │
- MCP server     generated CLAUDE.md  ───────────────────┘
- (live tools)   (.cursorrules, copilot)
-```
+![Architecture diagram: capture flows into the memory store, verification loops back, and retrieval branches to MCP server and generated context files](/diagram-putting-it-together.svg){.dim-diagram}
+*The full flow: you or an agent captures a memory, evidence verification loops over the store via git hooks, and retrieval branches out to MCP tools and generated context files.*
 
 Next: **[How aiDimag compares](/comparison)**.
 

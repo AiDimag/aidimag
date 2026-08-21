@@ -682,8 +682,10 @@ dim brief
 
 ### `dim ticket <connect|status|show|share|branch-rule>`
 
-Connect a ticketing system (Jira, GitHub Issues, Linear, a custom HTTP provider, or the team
-sync server) so proposals carry ticket context. See [Connecting tickets](/guides/tickets).
+Connect a ticketing system (Jira, GitHub Issues, Linear, GitLab Issues, Azure DevOps, ClickUp,
+Shortcut, YouTrack, Asana, Trello, Notion, Pivotal Tracker, a custom HTTP provider, or the team
+sync server via Remote) so proposals carry ticket context. Credentials are stored per-repo in
+`.aidimag/config.json` under `tickets.token`. See [Connecting tickets](/guides/tickets).
 
 ```sh
 dim ticket connect
@@ -907,6 +909,7 @@ dim mcp
 | `AIDIMAG_OPENAI_CHAT_MODEL` | Override the OpenAI chat model (default: `gpt-4o-mini`) |
 | `AIDIMAG_AUTO_SYNC` | Set to `off` to disable debounced auto-sync after writes |
 | `AIDIMAG_API_KEY` | Auth token for sync (alternative to the credentials file) |
+| `AIDIMAG_TICKET_TOKEN` | Ticket credential; takes precedence over `tickets.token` in `.aidimag/config.json` |
 | `AIDIMAG_SYNC_TOKEN`, `AIDIMAG_ADMIN_TOKEN` | Server/admin tokens for `dim serve` / `dim keys` |
 | `AIDIMAG_DEBUG` | Set to `1` to print errors from best-effort paths (auto-sync, embeddings, LLM mining skips, gap logging) that are normally silent |
 

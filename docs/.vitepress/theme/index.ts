@@ -20,6 +20,7 @@ export default {
       } else if (consent === "accepted") {
         enableAnalytics();
       }
+      setupDiagramLightbox();
     });
   },
 };
@@ -84,5 +85,58 @@ function enableAnalytics() {
       analytics_storage: "granted",
     });
   }
+}
+
+function setupDiagramLightbox() {
+  if (typeof window === "undefined") return;
+
+  function openLightbox(src: string, alt: string) {
+    const overlay = document.createElement("div");
+    overlay.id = "dim-lightbox";
+    overlay.innerHTML = `
+      <div class="dim-lightbox-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:2rem;cursor:zoom-out;">
+        <button class="dim-lightbox-close" aria-label="Close" style="position:fixed;top:1.5rem;right:1.5rem;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;backdrop-filter:blur(4px);">&times;</button>
+        <img src="${src}" alt="${alt}" style="max-width:none;max-height:95vh;border-radius:12px;box-shadow:0 8px 48px rgba(0,0,0,0.5);object-fit:contain;transform:scale(1.15);transform-origin:center;" />
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.body.style.overflow = "hidden";
+
+    const close = () => {
+      overlay.remove();
+      document.body.style.overflow = "";
+    };
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay || (e.target as HTMLElement).classList.contains("dim-lightbox-backdrop") || (e.target as HTMLElement).classList.contains("dim-lightbox-close")) {
+        close();
+      }
+    });
+
+    document.addEventListener("keydown", function escHandler(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        close();
+        document.removeEventListener("keydown", escHandler);
+      }
+    });
+  }
+
+  function attachListeners() {
+    document.querySelectorAll("img.dim-diagram").forEach((img) => {
+      if (img.getAttribute("data-lightbox-attached")) return;
+      img.setAttribute("data-lightbox-attached", "true");
+      img.addEventListener("click", () => {
+        const src = img.getAttribute("src") || "";
+        const alt = img.getAttribute("alt") || "";
+        openLightbox(src, alt);
+      });
+    });
+  }
+
+  attachListeners();
+
+  // Re-attach on route changes (SPA navigation)
+  const observer = new MutationObserver(() => attachListeners());
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 

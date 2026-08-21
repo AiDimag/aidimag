@@ -116,6 +116,9 @@ Now imagine someone imports `better-sqlite3` somewhere it shouldn't be. Run veri
 **The memory noticed the code drifted.** That's the core value — memory that proves itself,
 instead of memory you hope is right.
 
+![Dashboard overview showing memory browser, stat cards, memory graph, and health metrics](/screenshots/placeholder.svg)
+*The web dashboard: memory browser with trust badges, stat cards, and force-directed memory graph.*
+
 ### Try the interactive demo
 
 Want to see the full workflow without installing anything? Try our [interactive demo →](/demo) —
@@ -141,6 +144,87 @@ Two delivery channels so *every* tool benefits:
 - **Generated context files** — `dim generate-context` writes `CLAUDE.md`, `.cursorrules`,
   `AGENTS.md`, and `.github/copilot-instructions.md` from your trusted memory, for tools that
   just read a file at startup. With `--auto`, these regenerate whenever memory changes.
+
+## Integrations
+
+### AI Agent Integrations
+
+<style>
+.integration-logos { display:flex;flex-wrap:wrap;gap:20px;justify-content:center;align-items:center;margin:24px 0; }
+.integration-logos .ic-tooltip { position:relative;display:inline-flex;align-items:center; }
+.integration-logos .ic-tooltip img { height:32px;transition:transform 0.15s ease; }
+.integration-logos .ic-tooltip:hover img { transform:scale(1.12); }
+.integration-logos .ic-tooltip::after {
+  content: attr(data-name);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: hsl(222 47% 11%); color: #fff;
+  padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 500;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s ease; z-index: 10;
+}
+.integration-logos .ic-tooltip:hover::after { opacity: 1; }
+.dark .integration-logos .ic-dark-invert { filter: invert(1); }
+.dark .integration-logos .ic-tooltip::after { background: hsl(210 40% 98%); color: hsl(222 47% 11%); }
+</style>
+<div class="integration-logos">
+  <span class="ic-tooltip" data-name="Claude Code"><img src="https://api.iconify.design/simple-icons:anthropic.svg?color=%23D97757" alt="Claude (Anthropic)"></span>
+  <span class="ic-tooltip" data-name="Cursor"><img src="https://api.iconify.design/simple-icons:cursor.svg?color=%231F6FFF" alt="Cursor"></span>
+  <span class="ic-tooltip" data-name="GitHub Copilot"><img src="https://api.iconify.design/simple-icons:githubcopilot.svg?color=%23000000" class="ic-dark-invert" alt="GitHub Copilot"></span>
+  <span class="ic-tooltip" data-name="Windsurf"><img src="https://api.iconify.design/simple-icons:windsurf.svg?color=%231F6FFF" alt="Windsurf"></span>
+  <span class="ic-tooltip" data-name="Model Context Protocol"><img src="https://api.iconify.design/simple-icons:modelcontextprotocol.svg?color=%236366f1" alt="MCP"></span>
+  <span class="ic-tooltip" data-name="Ollama (local LLM)"><img src="https://api.iconify.design/simple-icons:ollama.svg?color=%23000000" class="ic-dark-invert" alt="Ollama"></span>
+  <span class="ic-tooltip" data-name="OpenAI"><img src="https://api.iconify.design/simple-icons:openai.svg?color=%23412993" alt="OpenAI"></span>
+  <span class="ic-tooltip" data-name="AWS Bedrock"><img src="https://api.iconify.design/simple-icons:amazonaws.svg?color=%23FF9900" alt="AWS Bedrock"></span>
+  <span class="ic-tooltip" data-name="VS Code Extension"><img src="/integrations/vscode.svg" alt="VS Code"></span>
+  <span class="ic-tooltip" data-name="JetBrains Extension"><img src="https://api.iconify.design/simple-icons:jetbrains.svg?color=%23FF0000" alt="JetBrains"></span>
+</div>
+
+### Ticketing Integrations
+
+Connect your ticketing system so the *why* behind commits flows into memory. aiDimag supports
+14 providers plus a custom HTTP middleware and team-shared Remote mode:
+
+<div class="integration-logos">
+  <span class="ic-tooltip" data-name="Jira"><img src="https://api.iconify.design/simple-icons:jira.svg?color=%230052CC" alt="Jira"></span>
+  <span class="ic-tooltip" data-name="GitHub Issues"><img src="https://api.iconify.design/simple-icons:github.svg?color=%23000000" class="ic-dark-invert" alt="GitHub Issues"></span>
+  <span class="ic-tooltip" data-name="Linear"><img src="https://api.iconify.design/simple-icons:linear.svg?color=%235E6AD2" alt="Linear"></span>
+  <span class="ic-tooltip" data-name="GitLab Issues"><img src="https://api.iconify.design/simple-icons:gitlab.svg?color=%23FC6D26" alt="GitLab Issues"></span>
+  <span class="ic-tooltip" data-name="Azure DevOps"><img src="https://api.iconify.design/simple-icons:azuredevops.svg?color=%230078D7" alt="Azure DevOps"></span>
+  <span class="ic-tooltip" data-name="ClickUp"><img src="https://api.iconify.design/simple-icons:clickup.svg?color=%237B68EE" alt="ClickUp"></span>
+  <span class="ic-tooltip" data-name="Shortcut"><img src="https://api.iconify.design/simple-icons:shortcut.svg?color=%2336b37e" alt="Shortcut"></span>
+  <span class="ic-tooltip" data-name="YouTrack"><img src="https://api.iconify.design/logos:youtrack.svg" alt="YouTrack"></span>
+  <span class="ic-tooltip" data-name="Asana"><img src="https://api.iconify.design/simple-icons:asana.svg?color=%23F06A6A" alt="Asana"></span>
+  <span class="ic-tooltip" data-name="Trello"><img src="https://api.iconify.design/simple-icons:trello.svg?color=%230052CC" alt="Trello"></span>
+  <span class="ic-tooltip" data-name="Notion"><img src="https://api.iconify.design/simple-icons:notion.svg?color=%23000000" class="ic-dark-invert" alt="Notion"></span>
+  <span class="ic-tooltip" data-name="Pivotal Tracker"><img src="https://api.iconify.design/simple-icons:pivotaltracker.svg?color=%230060A0" alt="Pivotal Tracker"></span>
+</div>
+
+Credentials are stored **per-repo** in `.aidimag/config.json` — never global, never leaked between
+projects. One admin can share credentials via the team sync server (`dim ticket share`); teammates
+connect via **Remote** mode with zero local credentials. See
+**[Connecting tickets](/guides/tickets)** for the full guide.
+
+## Web dashboard
+
+Prefer clicking over typing? `dim ui` starts a local web app for everything you'd otherwise do
+on the command line:
+
+```sh
+dim ui              # start dashboard on port 4517
+dim ui -p 5000      # custom port
+dim ui --no-open    # start without opening browser
+```
+
+- **Memory browser** — every memory with kind, status, confidence, scope, and evidence
+- **Review queue** — approve, reword, or reject pending proposals
+- **Actions tab** — capture, review, verify, sync, tickets, branch rules, context files, and more
+- **Tickets modal** — connect and manage ticket providers (12+ supported) with team auto-discovery
+- **Memory graph** — force-directed visualization of memories and their links
+- **Health tab** — risk metrics, coverage heatmap, and trend charts
+- **Model Settings** — change embedding/LLM models, pull new ones, setup Ollama
+- **Interactive onboarding** — 14-step guided walkthrough for first-time users
+
+See **[Web dashboard](/dashboard)** for the full feature list.
 
 ## Benchmarks
 

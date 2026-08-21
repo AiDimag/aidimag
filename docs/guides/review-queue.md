@@ -44,6 +44,9 @@ its reasons, and `dim review approve all --min-score 0.7` batch-approves above a
 
 ## Review interactively
 
+![CLI review walkthrough showing a proposal with keep/reword/drop prompt](/screenshots/placeholder.svg)
+*CLI review walkthrough: each proposal shows its kind, source, scope, and evidence with keep/reword/drop/skip options.*
+
 In a terminal, just run:
 
 ```sh
@@ -81,6 +84,9 @@ dim review reject all
 ```
 
 ## In the dashboard or IDE
+
+![Dashboard review queue with click-to-approve buttons](/screenshots/placeholder.svg)
+*Dashboard review queue: triage proposals with one-click approve, reword, or reject — nicer when you have a lot to triage.*
 
 `dim ui` and both IDE extensions show the same queue with click-to-approve, which is nicer
 when you have a lot to triage. See [Web dashboard](/dashboard).
