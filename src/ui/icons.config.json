@@ -61,7 +61,7 @@
   "IC_JIRA": { "icon": "simple-icons:jira", "color": "#0052CC" },
   "IC_GITHUB": { "icon": "simple-icons:github", "color": "#181717" },
   "IC_LINEAR": { "icon": "simple-icons:linear", "color": "#5E6AD2" },
-  "IC_HTTP": "noto:globe-with-meridians",
+  "IC_HTTP": "feather:globe",
   "IC_REMOTE": "noto:cloud",
   "IC_GITLAB": { "icon": "simple-icons:gitlab", "color": "#FC6D26" },
   "IC_AZUREDEVOPS": { "icon": "simple-icons:azuredevops", "color": "#0078D7" },

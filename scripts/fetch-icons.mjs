@@ -92,14 +92,11 @@ function escapeForTemplateLiteral(str) {
 }
 
 async function main() {
-  // Skip fetch if generated file exists and config hasn't changed (unless --force)
+  // Skip fetch if generated file exists (unless --force)
+  // The generated file is committed to git, so CI never needs to fetch.
   if (!FORCE && fs.existsSync(OUTPUT_PATH)) {
-    const configMtime = fs.statSync(CONFIG_PATH).mtimeMs;
-    const outputMtime = fs.statSync(OUTPUT_PATH).mtimeMs;
-    if (outputMtime >= configMtime) {
-      console.log(`Icons up to date (skipping fetch). Use --force to re-fetch.`);
-      return;
-    }
+    console.log(`Icons up to date (skipping fetch). Use --force to re-fetch.`);
+    return;
   }
 
   const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
