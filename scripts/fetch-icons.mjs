@@ -40,6 +40,20 @@ function fetchSvg(url) {
   });
 }
 
+async function fetchSvgWithRetry(url, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fetchSvg(url);
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
+      const delay = 1000 * Math.pow(2, attempt);
+      process.stderr.write(`retry in ${delay}ms ... `);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("unreachable");
+}
+
 function cacheFile(iconId, color) {
   const colorSuffix = color ? "--" + color.replace(/[^a-zA-Z0-9]/g, "") : "";
   return path.join(CACHE_DIR, iconId.replace(/[:/]/g, "--") + colorSuffix + ".svg");
@@ -56,7 +70,7 @@ async function getSvg(iconId, color) {
   let url = `https://api.iconify.design/${iconId}.svg`;
   if (color) url += `?color=${encodeURIComponent(color)}`;
   process.stderr.write(`  fetching ${iconId}${color ? " (" + color + ")" : ""} ... `);
-  const svg = await fetchSvg(url);
+  const svg = await fetchSvgWithRetry(url);
   process.stderr.write("ok\n");
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(cfile, svg);
