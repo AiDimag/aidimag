@@ -2,14 +2,15 @@
 /**
  * Build-time icon fetcher.
  *
- * Reads src/ui/icons.config.json, fetches SVGs from the Iconify API
- * (with local caching for offline use), and generates
- * src/ui/icons-generated.ts with inline SVG constants.
+ * Reads src/ui/icons.config.json, loads SVGs from the committed .icon-cache/
+ * directory, and generates src/ui/icons-generated.ts with inline SVG constants.
+ *
+ * The .icon-cache/ directory is committed to git so CI never needs network access.
+ * To add or update icons, run with --force to re-fetch from the Iconify API.
  *
  * Usage:
- *   node scripts/fetch-icons.mjs          # fetch missing, use cache
- *   node scripts/fetch-icons.mjs --force  # re-fetch all icons
- *   node scripts/fetch-icons.mjs --offline # never hit the network
+ *   node scripts/fetch-icons.mjs          # use committed cache, generate if missing
+ *   node scripts/fetch-icons.mjs --force  # re-fetch all icons from Iconify API
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -22,7 +23,6 @@ const OUTPUT_PATH = path.join(ROOT, "src", "ui", "icons-generated.ts");
 
 const args = new Set(process.argv.slice(2));
 const FORCE = args.has("--force");
-const OFFLINE = args.has("--offline");
 
 function fetchSvg(url) {
   return new Promise((resolve, reject) => {
@@ -64,8 +64,8 @@ async function getSvg(iconId, color) {
   if (!FORCE && fs.existsSync(cfile)) {
     return fs.readFileSync(cfile, "utf8");
   }
-  if (OFFLINE) {
-    throw new Error(`Icon "${iconId}" not in cache and --offline is set. Run without --offline to fetch.`);
+  if (!FORCE) {
+    throw new Error(`Icon "${iconId}" not in cache. Run with --force to fetch from the Iconify API.`);
   }
   let url = `https://api.iconify.design/${iconId}.svg`;
   if (color) url += `?color=${encodeURIComponent(color)}`;
@@ -92,10 +92,9 @@ function escapeForTemplateLiteral(str) {
 }
 
 async function main() {
-  // Skip fetch if generated file exists (unless --force)
-  // The generated file is committed to git, so CI never needs to fetch.
+  // Skip if generated file exists and not forced — the generated file is committed.
   if (!FORCE && fs.existsSync(OUTPUT_PATH)) {
-    console.log(`Icons up to date (skipping fetch). Use --force to re-fetch.`);
+    console.log(`Icons up to date (skipping). Use --force to re-fetch from API.`);
     return;
   }
 
