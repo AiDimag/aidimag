@@ -40,13 +40,13 @@ function fetchSvg(url) {
   });
 }
 
-async function fetchSvgWithRetry(url, maxRetries = 3) {
+async function fetchSvgWithRetry(url, maxRetries = 5) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fetchSvg(url);
     } catch (err) {
       if (attempt === maxRetries) throw err;
-      const delay = 1000 * Math.pow(2, attempt);
+      const delay = 2000 * Math.pow(2, attempt);
       process.stderr.write(`retry in ${delay}ms ... `);
       await new Promise((r) => setTimeout(r, delay));
     }
@@ -74,6 +74,7 @@ async function getSvg(iconId, color) {
   process.stderr.write("ok\n");
   fs.mkdirSync(CACHE_DIR, { recursive: true });
   fs.writeFileSync(cfile, svg);
+  await new Promise((r) => setTimeout(r, 500));
   return svg;
 }
 
@@ -91,6 +92,16 @@ function escapeForTemplateLiteral(str) {
 }
 
 async function main() {
+  // Skip fetch if generated file exists and config hasn't changed (unless --force)
+  if (!FORCE && fs.existsSync(OUTPUT_PATH)) {
+    const configMtime = fs.statSync(CONFIG_PATH).mtimeMs;
+    const outputMtime = fs.statSync(OUTPUT_PATH).mtimeMs;
+    if (outputMtime >= configMtime) {
+      console.log(`Icons up to date (skipping fetch). Use --force to re-fetch.`);
+      return;
+    }
+  }
+
   const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
   const entries = Object.entries(config);
 
