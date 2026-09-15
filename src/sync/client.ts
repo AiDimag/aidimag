@@ -12,6 +12,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { debugLog } from "../debug.js";
 import type { MemoryStore } from "../db/store.js";
 import type { MemoryEntry, Proposal } from "../types.js";
@@ -193,9 +194,31 @@ function formatFetchError(server: string, err: unknown): Error {
   return new Error(String(err));
 }
 
+function getVersion(): string {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../package.json"),
+        "utf8"
+      )
+    );
+    return pkg.version ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+const CLI_USER_AGENT = `Mozilla/5.0 (compatible; aidimag-cli/${getVersion()})`;
+
 async function cloudFetch(server: string, url: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(url, init);
+    return await fetch(url, {
+      ...init,
+      headers: {
+        "User-Agent": CLI_USER_AGENT,
+        ...(init?.headers ?? {}),
+      },
+    });
   } catch (err) {
     throw formatFetchError(server, err);
   }
